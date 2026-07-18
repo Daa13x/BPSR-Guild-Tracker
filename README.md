@@ -34,6 +34,15 @@ PINs are never written to Sheets or returned by the API; a unique server salt pl
 
 Publish the root folder, add the supplied real logo as `assets/guild-logo.png`, and set `APP_CONFIG.apiUrl` in `AppFrontend.js` to the deployed Apps Script `/exec` URL. Pages contains only public assets. The UI provides registration/login, session restoration, atomic SV/Master updates, member logout, and a separate administrator session/control panel. The logo automatically falls back to the BPSR Guild text mark when the asset is absent. Test the deployed origin for CORS, registration, login, logout, expiration, member updates and administrator actions.
 
+### Publishing the visual preview
+
+1. In GitHub, open **Settings → Pages** for `Daa13x/BPSR-Guild-Tracker`.
+2. Set **Source** to **GitHub Actions**.
+3. Merge the Pages workflow, or run **Deploy GitHub Pages** manually from the Actions tab.
+4. Open `https://daa13x.github.io/BPSR-Guild-Tracker/`.
+
+The root `index.html` redirects relatively to `Leaderboard.html`, and all local paths—including `assets/guild-logo.png` and `AppFrontend.js`—work under `/BPSR-Guild-Tracker/`. A 404 normally means Pages has not finished publishing or the source is not GitHub Actions; a missing asset means its relative repository path is wrong; a failed workflow is diagnosed from the Actions log. The public preview deliberately shows a notice and does not save anything until the Apps Script `/exec` URL is configured. Never commit that URL if it carries private deployment context.
+
 ## Operations
 
 Admins use the separate Script-Property-backed session. Administrative corrections and reset actions must be audited; back up the spreadsheet before deletes/merges and record the deployment version and commit SHA privately. For rollback, redeploy the prior Apps Script version and restore a verified Sheet backup.
