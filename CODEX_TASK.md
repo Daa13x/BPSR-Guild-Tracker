@@ -1,6 +1,8 @@
 # Codex implementation task
 
-Work only in `Daa13x/BPSR-Guild-Tracker` on branch `agent/complete-guild-tracker`.
+> Historical implementation brief retained for provenance. The original branch was merged; `README.md` and `docs/DEPLOYMENT_CHECKLIST.md` describe the current member-role and GitHub Pages deployment.
+
+Work only in `Daa13x/BPSR-Guild-Tracker`.
 
 ## Inputs
 
@@ -28,7 +30,8 @@ Treat those files as the baseline implementation. Preserve working leaderboard a
 - Server-side salted PIN hashing
 - Opaque expiring member sessions
 - Failed-login throttling
-- Secure admin sessions using Script Properties
+- Member-based administrator roles and separate member-bound admin sessions
+- Optional Script-Property recovery secret only
 - Members can edit only their own records
 - SV floors 1–60
 - Masters progression and server-calculated totals
@@ -68,6 +71,6 @@ Replace the baseline README with accurate documentation covering architecture, f
 
 ## Delivery
 
-Commit and push all work to `agent/complete-guild-tracker`, then open a draft PR to `main`. Do not merge.
+Commit and push work on the task-specific branch, then open a draft PR to `main`. Do not merge without explicit authorization.
 
 Return implementation summary, changed files, architecture, exact tests/results, security review, deployment steps, manual configuration, limitations, and PR URL.

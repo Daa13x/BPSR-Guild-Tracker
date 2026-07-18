@@ -12,7 +12,7 @@ Automated tests must exercise the real backend implementation through a mocked G
 - Unknown account
 - Failed-login throttling
 - Session expiry
-- Logout
+- Member-token logout isolation
 - Reuse of invalidated session
 
 ## Authorization
@@ -22,6 +22,8 @@ Automated tests must exercise the real backend implementation through a mocked G
 - Member cannot update another member
 - Anonymous and expired sessions rejected
 - Non-admin cannot call admin actions
+- Normal IsAdmin member receives a member-bound admin session
+- Live role recheck rejects stale/demoted admin sessions
 
 ## Progress
 
@@ -47,13 +49,19 @@ Automated tests must exercise the real backend implementation through a mocked G
 
 ## Administration
 
-- Invalid and valid admin authentication
+- Normal administrator member login and optional recovery authentication
+- Profile/list/details return `isAdmin` without authentication material
+- Promotion, refresh-issued access, demotion and demotion-session revocation
+- Strict boolean role/disabled payload validation
+- Self-demotion confirmation and last-active-admin demote/disable/merge protection
 - Admin edit and delete
 - Duplicate merge/removal
 - Manual reset
 - Achievement correction
-- Audit record for every mutation
+- Authenticated actor ID in the audit record for every mutation
 - Session invalidation after destructive identity changes
+- Administrator-token logout isolation
+- Stable Members-to-Players identity mismatch fails closed
 
 ## API
 
@@ -67,15 +75,20 @@ Automated tests must exercise the real backend implementation through a mocked G
 ## Frontend
 
 - Registration/login/update flows
+- Normal administrator login and role-state restoration
 - Tabs, search, and filters
-- Admin controls and confirmations
+- Selected-member details/edit/role/disable controls and confirmations
+- Duplicate keep/remove choice and confirmed merge payload
+- Achievement-correction, reset and audit-list rendering
 - Loading/empty/error states
 - Repeated-click prevention
-- Expired session handling
+- Member/admin expired-session cleanup in the correct interface
+- Member/admin logout isolation
 - Keyboard navigation and focus
 - Mobile-width rendering
 - Long and HTML-like character names
-- Missing or invalid API URL
+- Unified query/constant/stored API configuration and preview notice state
+- Missing, invalid, or storage-denied API configuration
 
 ## Honest reporting
 

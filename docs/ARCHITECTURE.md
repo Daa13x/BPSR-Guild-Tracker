@@ -47,16 +47,20 @@ Stable IDs must be used instead of row numbers as permanent identity.
 
 ### Admin
 
-1. Initial admin secret is stored only in Apps Script Script Properties.
-2. Admin login returns a separate opaque expiring admin session.
-3. Every admin action independently validates that session.
-4. Frontend visibility is never treated as authorization.
+1. `Players.IsAdmin` is authoritative and the corresponding `Members.MemberId` must equal `Players.UserId`.
+2. An administrator signs in through the normal character-name/PIN flow.
+3. The backend returns a separate opaque administrator session tied to that real member ID.
+4. Every admin action independently validates the session, active member and live Players role.
+5. Demotion revokes administrator sessions; disabling revokes all sessions for that member; logout revokes only its submitted token.
+6. Atomic last-administrator checks prevent the final active administrator from being demoted, disabled or merged away.
+7. `BPSR_ADMIN_SECRET`, when configured, is throttled emergency recovery only.
+8. Frontend visibility is never treated as authorization.
 
 ## Public data
 
 Leaderboard responses may include character name, validated progression, rank, timestamps intended for display, achievement summaries, and public feed entries.
 
-They must not include emails, member IDs, hashes, salts, session data, admin data, spreadsheet IDs, or raw rows.
+Public leaderboard payloads must not include emails, member IDs, hashes, salts, session data, admin data, spreadsheet IDs, or raw rows. A member’s protected own-profile response may include that member’s stable ID and `isAdmin`, but no authentication material.
 
 ## Progression flow
 
@@ -71,13 +75,9 @@ They must not include emails, member IDs, hashes, salts, session data, admin dat
 
 ## Deployment modes
 
-### Apps Script-hosted
-
-The script may serve the frontend directly through `HtmlService`. A small transport adapter may use `google.script.run` only in this mode.
-
 ### GitHub Pages
 
-The same frontend uses `fetch()` against the Apps Script JSON API. Transport details should be isolated so rendering and business UI are shared.
+The supported full frontend is published as static files through GitHub Pages and uses `fetch()` against the Apps Script JSON API. `config.js` is the sole API URL source. The backend may retain a legacy `doGet`, but repository assets such as `config.js` and `styles.css` are not automatically served by `HtmlService`; production UI instructions therefore target Pages.
 
 ## Source visibility
 
