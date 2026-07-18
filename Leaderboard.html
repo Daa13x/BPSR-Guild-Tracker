@@ -50,6 +50,7 @@ header.site{text-align:center;padding:26px 0 10px}
 header.site h1{font-size:clamp(1.6rem,4.5vw,2.4rem);font-weight:900;color:var(--brass-hi);text-transform:uppercase}
 .subtitle{color:var(--parch-dim);font-size:.95rem;margin-top:6px}
 .stamp{font-size:.8rem;color:var(--parch-dim);margin-top:4px}
+.guild-mark{display:flex;align-items:center;justify-content:center;gap:10px;color:var(--brass-hi);font-weight:700}.guild-mark img{width:46px;height:46px;object-fit:contain}.account-panel form{display:grid;gap:9px;max-width:560px}.account-panel input,.account-panel select{padding:8px;background:var(--ink);color:var(--parchment);border:1px solid var(--cloth-edge);border-radius:6px}.account-panel .row{display:flex;gap:8px;flex-wrap:wrap}.notice{padding:8px;border-left:3px solid var(--brass);margin:8px 0}.notice.error{border-color:var(--ember)}.member-list{display:grid;gap:6px;max-height:260px;overflow:auto}.member-list button{text-align:left;padding:7px;background:var(--ink);color:var(--parchment);border:1px solid var(--cloth-edge)}
 
 /* Panels */
 .panel{background:var(--cloth);border:1px solid var(--cloth-edge);border-radius:var(--radius);padding:16px;margin-top:18px}
@@ -207,6 +208,7 @@ dialog h3{color:var(--brass-hi);margin-bottom:12px}
 <div class="wrap">
 
   <header class="site">
+    <div class="guild-mark" aria-label="BPSR Guild"><img src="assets/guild-logo.png" alt="BPSR Guild logo" onerror="this.hidden=true"><span>BPSR Guild</span></div>
     <div class="rule display" style="font-size:.8rem;letter-spacing:.3em">GUILD RECORDS</div>
     <h1>Leaderboard</h1>
     <p class="subtitle">Standings are calculated on the server from validated progression records.</p>
@@ -217,6 +219,9 @@ dialog h3{color:var(--brass-hi);margin-bottom:12px}
       <button class="btn ghost" id="btn-newperiod" hidden>Start new period (admin)</button>
     </div>
   </header>
+
+  <section class="panel account-panel" aria-labelledby="account-h"><h2 id="account-h">Member account</h2><div id="member-ui" aria-live="polite"></div></section>
+  <section class="panel account-panel" aria-labelledby="admin-h"><h2 id="admin-h">Administrator</h2><div id="admin-ui" aria-live="polite"></div></section>
 
   <!-- First Guildie to Update -->
   <section class="panel" id="fg-panel" hidden aria-labelledby="fg-h">
@@ -637,5 +642,6 @@ function demoData(){
 
 load();
 </script>
+<script src="AppFrontend.js"></script>
 </body>
 </html>

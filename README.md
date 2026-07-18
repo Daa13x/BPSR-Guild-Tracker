@@ -32,7 +32,7 @@ PINs are never written to Sheets or returned by the API; a unique server salt pl
 
 ## GitHub Pages
 
-Publish the root folder, add the supplied real logo as `assets/guild-logo.png`, and set the Apps Script `/exec` endpoint in the documented frontend configuration. Pages contains only public assets. Test the deployed origin for CORS, registration, login, logout, expiration, member updates and administrator actions.
+Publish the root folder, add the supplied real logo as `assets/guild-logo.png`, and set `APP_CONFIG.apiUrl` in `AppFrontend.js` to the deployed Apps Script `/exec` URL. Pages contains only public assets. The UI provides registration/login, session restoration, atomic SV/Master updates, member logout, and a separate administrator session/control panel. The logo automatically falls back to the BPSR Guild text mark when the asset is absent. Test the deployed origin for CORS, registration, login, logout, expiration, member updates and administrator actions.
 
 ## Operations
 
@@ -40,4 +40,4 @@ Admins use the separate Script-Property-backed session. Administrative correctio
 
 ## Validation
 
-Run `npm test` and `npm run check`. Local checks cannot validate a real Apps Script deployment, Google authorization, protected-sheet permissions, browser/mobile behaviour, or cross-origin requests; complete the checklists in `docs/DEPLOYMENT_CHECKLIST.md` before release.
+Run `npm test` and `npm run check`. Tests execute the Apps Script backend under a mock and test fetch transport success, API envelopes, invalid responses and configuration errors. Local checks cannot validate a real Apps Script deployment, Google authorization, protected-sheet permissions, browser/mobile behaviour, or cross-origin requests; complete the checklists in `docs/DEPLOYMENT_CHECKLIST.md` before release. Deploy the web app as the script owner with access appropriate to the guild, rotate `BPSR_ADMIN_SECRET` in Script Properties when administrators change, back up the Sheet before upgrades, and roll back by redeploying a prior Apps Script version plus a verified Sheet backup.
