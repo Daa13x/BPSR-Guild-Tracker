@@ -78,7 +78,7 @@ test('API client reports unconfigured, safe backend and invalid-response failure
   })).api('me', {}), /invalid response/);
 });
 
-function runConfig(search, initialStore, storageThrows) {
+function runConfig(search, initialStore, storageThrows, keepConstant) {
   const store = { ...(initialStore || {}) };
   const ctx = {
     window: null,
@@ -98,7 +98,13 @@ function runConfig(search, initialStore, storageThrows) {
   };
   ctx.window = ctx;
   vm.createContext(ctx);
-  vm.runInContext(fs.readFileSync('config.js', 'utf8'), ctx);
+  let source = fs.readFileSync('config.js', 'utf8');
+  if (!keepConstant) {
+    // Neutralize the committed production constant so these tests exercise
+    // the query/storage/none fallback tiers regardless of deployment state.
+    source = source.replace(/var configuredApiUrl = '[^']*';/, "var configuredApiUrl = 'PASTE_APPS_SCRIPT_EXEC_URL_HERE';");
+  }
+  vm.runInContext(source, ctx);
   return { config: ctx.BPSR_CONFIG, store };
 }
 
@@ -118,6 +124,18 @@ test('one API configuration source persists only an explicit valid Apps Script U
   assert.equal(restored.config.apiUrl, url);
   assert.equal(restored.config.source, 'storage');
   assert.equal(restored.config.isConfigured(), true);
+});
+
+test('committed constant configures the production Apps Script URL and still yields to an explicit query', () => {
+  const production = runConfig('', {}, false, true);
+  assert.equal(production.config.source, 'constant');
+  assert.equal(production.config.isConfigured(), true);
+  assert.match(production.config.apiUrl, new RegExp('^https://script\\.google\\.com/macros/' + 's/[A-Za-z0-9_-]+/exec$'));
+
+  const override = 'https://script.google.com/macros/' + 's/abc_123-XYZ/exec';
+  const overridden = runConfig('?api=' + encodeURIComponent(override), {}, false, true);
+  assert.equal(overridden.config.apiUrl, override);
+  assert.equal(overridden.config.source, 'query');
 });
 
 test('invalid API values and unavailable storage fail closed without breaking the page', () => {

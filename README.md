@@ -64,13 +64,13 @@ This confirms only that the deployed GET handler is reachable; it does not verif
 
 ## Configure the one API URL
 
-`config.js` is the only frontend API configuration source. Replace this exact placeholder with the real deployed `/exec` URL:
+`config.js` is the only frontend API configuration source, and its `configuredApiUrl` constant is the single sanctioned location for the production `/exec` URL. The committed constant is the live production deployment URL; after redeploying the Apps Script web app under a new URL, update only that constant:
 
 ```js
-var configuredApiUrl = 'PASTE_APPS_SCRIPT_EXEC_URL_HERE';
+var configuredApiUrl = 'https://script.google.com/macros/s/.../exec';
 ```
 
-Do not invent an URL and do not place credentials in it. `BPSR_CONFIG.apiUrl` sends JSON `POST` requests for public leaderboard, member and administrator actions; direct browser navigation to the same URL is only the GET health diagnostic.
+A fresh fork may instead carry the documented `PASTE_APPS_SCRIPT_EXEC_URL_HERE` placeholder until its own deployment exists; `npm run check` accepts exactly those two forms and still rejects deployment URLs anywhere else in the repository. Do not invent an URL and do not place credentials in it. `BPSR_CONFIG.apiUrl` sends JSON `POST` requests for public leaderboard, member and administrator actions; direct browser navigation to the same URL is only the GET health diagnostic.
 
 For one-browser setup, `?api=https%3A%2F%2Fscript.google.com%2Fmacros%2Fs%2F...%2Fexec` is also accepted. Only an explicitly supplied, valid HTTPS Apps Script `/exec` URL is stored under `bpsrApiUrl`; invalid or unrelated URLs fail closed. Clear the site’s local storage if an obsolete test deployment was saved. Editing the constant is the recommended shared Pages configuration.
 
