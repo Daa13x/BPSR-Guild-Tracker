@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guild Leaderboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* =========================================================
+   GUILD THEME — edit these variables to match your colours
+   ========================================================= */
+:root{
+  --ink:        #260D19;   /* BPSR dark                  */
+  --cloth:      #261D21;   /* BPSR panel                 */
+  --cloth-edge: #4C3945;   /* BPSR border                */
+  --oxblood:    #4C3945;   /* BPSR primary               */
+  --brass:      #D9BFCB;   /* BPSR accent                */
+  --brass-hi:   #D9D9D9;   /* BPSR light                 */
+  --parchment:  #D9D9D9;   /* main text                  */
+  --parch-dim:  #D9BFCB;   /* secondary text             */
+  --sv:         #8fb3d1;   /* SV steel-blue accent       */
+  --ember:      #d2703f;   /* warnings / outdated        */
+  --ok:         #8fbb7a;   /* success / complete         */
+  --radius: 10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--ink);
+  background-image:radial-gradient(1200px 500px at 50% -10%, rgba(92,31,39,.35), transparent 70%);
+  color:var(--parchment);
+  font-family:"Alegreya Sans",system-ui,sans-serif;
+  font-size:16px;line-height:1.5;
+  min-height:100vh;
+}
+h1,h2,h3,.display{font-family:"Cinzel",serif;letter-spacing:.04em}
+a{color:var(--brass-hi)}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--brass-hi);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+.wrap{max-width:1060px;margin:0 auto;padding:20px 16px 80px}
+
+/* Header */
+header.site{text-align:center;padding:26px 0 10px}
+.rule{display:flex;align-items:center;gap:14px;justify-content:center;color:var(--brass)}
+.rule::before,.rule::after{content:"";height:1px;width:min(120px,20vw);background:linear-gradient(90deg,transparent,var(--brass));}
+.rule::after{background:linear-gradient(90deg,var(--brass),transparent)}
+header.site h1{font-size:clamp(1.6rem,4.5vw,2.4rem);font-weight:900;color:var(--brass-hi);text-transform:uppercase}
+.subtitle{color:var(--parch-dim);font-size:.95rem;margin-top:6px}
+.stamp{font-size:.8rem;color:var(--parch-dim);margin-top:4px}
+.guild-mark{display:flex;align-items:center;justify-content:center;gap:10px;color:var(--brass-hi);font-weight:700}.guild-mark img{width:46px;height:46px;object-fit:contain}.account-panel form{display:grid;gap:9px;max-width:560px}.account-panel input,.account-panel select{padding:8px;background:var(--ink);color:var(--parchment);border:1px solid var(--cloth-edge);border-radius:6px}.account-panel .row{display:flex;gap:8px;flex-wrap:wrap}.notice{padding:8px;border-left:3px solid var(--brass);margin:8px 0}.notice.error{border-color:var(--ember)}.member-list{display:grid;gap:6px;max-height:260px;overflow:auto}.member-list button{text-align:left;padding:7px;background:var(--ink);color:var(--parchment);border:1px solid var(--cloth-edge)}
+
+/* Panels */
+.panel{background:var(--cloth);border:1px solid var(--cloth-edge);border-radius:var(--radius);padding:16px;margin-top:18px}
+.panel h2{color:var(--brass);font-size:1.05rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.panel h2::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--cloth-edge),transparent)}
+
+/* First Guildie ribbon */
+.fg-card{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.fg-badge{
+  flex:0 0 auto;width:64px;height:64px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, var(--brass-hi), var(--brass) 60%, #7a5c22);
+  display:grid;place-items:center;color:#241a08;font-family:Cinzel,serif;font-weight:900;font-size:1.3rem;
+  box-shadow:0 0 0 3px var(--oxblood), 0 0 0 4px var(--brass);
+}
+.fg-main{flex:1;min-width:220px}
+.fg-name{font-family:Cinzel,serif;font-weight:700;font-size:1.2rem;color:var(--brass-hi)}
+.fg-what{color:var(--parchment)}
+.fg-meta{color:var(--parch-dim);font-size:.85rem}
+.fg-empty{color:var(--parch-dim);font-style:italic}
+details.fg-prev{margin-top:10px;width:100%}
+details.fg-prev summary{cursor:pointer;color:var(--brass);font-size:.9rem}
+.fg-prev-list{margin-top:8px;display:grid;gap:6px}
+.fg-prev-list div{font-size:.9rem;color:var(--parch-dim)}
+.fg-prev-list b{color:var(--parchment);font-weight:500}
+
+/* Tabs */
+.tabs{display:flex;gap:8px;margin-top:22px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.tab{
+  flex:0 0 auto;background:transparent;border:1px solid var(--cloth-edge);color:var(--parch-dim);
+  border-radius:999px;padding:8px 16px;font-family:Cinzel,serif;font-weight:700;font-size:.82rem;
+  letter-spacing:.08em;text-transform:uppercase;transition:color .15s,border-color .15s,background .15s;
+}
+.tab:hover{color:var(--parchment)}
+.tab[aria-selected="true"]{background:var(--oxblood);border-color:var(--brass);color:var(--brass-hi)}
+
+/* Podium — three hanging guild banners */
+.podium{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:start;margin:26px 0 6px;position:relative}
+.podium::before{ /* the rail the banners hang from */
+  content:"";position:absolute;top:-8px;left:2%;right:2%;height:4px;border-radius:2px;
+  background:linear-gradient(90deg,#7a5c22,var(--brass-hi),#7a5c22);
+}
+.banner{
+  position:relative;background:linear-gradient(180deg,var(--oxblood),#3d151b 78%);
+  border:1px solid var(--brass);border-top-width:3px;
+  clip-path:polygon(0 0,100% 0,100% calc(100% - 26px),50% 100%,0 calc(100% - 26px));
+  padding:20px 12px 44px;text-align:center;min-height:190px;
+  animation:hang .6s ease-out both;
+}
+.banner.gold{min-height:230px;border-color:var(--brass-hi)}
+.banner .medal{font-family:Cinzel,serif;font-weight:900;font-size:1.6rem;color:var(--brass-hi)}
+.banner.gold .medal{font-size:2rem}
+.banner .b-name{font-family:Cinzel,serif;font-weight:700;font-size:1.02rem;color:var(--parchment);margin-top:6px;overflow-wrap:anywhere}
+.banner .b-stat{margin-top:8px;font-size:1.35rem;font-weight:700;color:var(--brass-hi);font-variant-numeric:tabular-nums}
+.banner .b-sub{color:var(--parch-dim);font-size:.8rem;margin-top:2px}
+.banner .b-badges{margin-top:8px}
+@keyframes hang{from{transform:translateY(-10px);opacity:0}to{transform:none;opacity:1}}
+.pod-2{order:1}.pod-1{order:2}.pod-3{order:3}
+
+/* Filters */
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px}
+.search{
+  flex:1;min-width:200px;background:var(--ink);border:1px solid var(--cloth-edge);color:var(--parchment);
+  border-radius:8px;padding:9px 12px;font:inherit;
+}
+.search::placeholder{color:var(--parch-dim)}
+.chip{
+  background:transparent;border:1px solid var(--cloth-edge);color:var(--parch-dim);
+  border-radius:999px;padding:6px 12px;font-size:.82rem;
+}
+.chip[aria-pressed="true"]{border-color:var(--sv);color:var(--sv)}
+.chip.gold[aria-pressed="true"]{border-color:var(--brass);color:var(--brass-hi)}
+.chip.ember[aria-pressed="true"]{border-color:var(--ember);color:var(--ember)}
+
+/* Table */
+.tablewrap{overflow-x:auto;margin-top:14px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{
+  text-align:left;font-family:Cinzel,serif;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--brass);padding:10px 10px;border-bottom:1px solid var(--brass);white-space:nowrap;
+}
+td{padding:11px 10px;border-bottom:1px solid var(--cloth-edge);vertical-align:middle}
+tr:hover td{background:rgba(201,162,75,.05)}
+.rank{font-family:Cinzel,serif;font-weight:700;color:var(--parch-dim);width:3ch}
+.rank.top{color:var(--brass-hi)}
+.pname{font-weight:700;color:var(--parchment)}
+.dim{color:var(--parch-dim);font-size:.85rem}
+.num{font-weight:700;color:var(--brass-hi)}
+.bar{height:6px;background:var(--ink);border-radius:3px;overflow:hidden;min-width:80px;margin-top:4px}
+.bar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--brass),var(--brass-hi))}
+.bar.blue i{background:linear-gradient(90deg,#4d7397,var(--sv))}
+.badge{display:inline-block;border:1px solid;border-radius:4px;font-size:.68rem;letter-spacing:.06em;
+  text-transform:uppercase;padding:2px 6px;margin:2px 3px 0 0;font-weight:700}
+.badge.gold{border-color:var(--brass);color:var(--brass-hi)}
+.badge.blue{border-color:var(--sv);color:var(--sv)}
+.badge.ok{border-color:var(--ok);color:var(--ok)}
+.badge.ember{border-color:var(--ember);color:var(--ember)}
+.empty{padding:26px;text-align:center;color:var(--parch-dim);font-style:italic}
+
+/* Hall of fame */
+.hall{display:grid;gap:10px;margin-top:8px}
+.hall-row{display:flex;gap:12px;align-items:center;border:1px solid var(--cloth-edge);border-radius:8px;padding:10px 12px;background:var(--ink)}
+.hall-pos{font-family:Cinzel,serif;font-weight:900;color:var(--brass-hi);font-size:1.15rem;width:2.4ch;text-align:center}
+.hall-name{font-weight:700;flex:1}
+.hall-meta{color:var(--parch-dim);font-size:.85rem;text-align:right}
+
+/* Firsts + feed */
+.firsts{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.first-card{border:1px solid var(--cloth-edge);border-left:3px solid var(--brass);border-radius:8px;padding:10px 12px;background:var(--ink)}
+.first-type{font-family:Cinzel,serif;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--brass)}
+.first-name{font-weight:700;margin-top:2px}
+.first-date{color:var(--parch-dim);font-size:.8rem}
+.feed{list-style:none;display:grid;gap:8px}
+.feed li{display:flex;gap:10px;align-items:baseline;border-bottom:1px dashed var(--cloth-edge);padding-bottom:8px;font-size:.95rem}
+.feed time{color:var(--parch-dim);font-size:.78rem;white-space:nowrap;min-width:86px}
+
+/* Update button + dialog */
+.actions{display:flex;gap:10px;justify-content:center;margin-top:14px;flex-wrap:wrap}
+.btn{
+  background:var(--oxblood);border:1px solid var(--brass);color:var(--brass-hi);
+  border-radius:8px;padding:10px 18px;font-family:Cinzel,serif;font-weight:700;letter-spacing:.06em;
+}
+.btn:hover{background:#6d2530}
+.btn.ghost{background:transparent;color:var(--parch-dim);border-color:var(--cloth-edge)}
+dialog{
+  background:var(--cloth);color:var(--parchment);border:1px solid var(--brass);border-radius:var(--radius);
+  max-width:440px;width:calc(100vw - 32px);padding:20px;
+}
+dialog::backdrop{background:rgba(10,6,7,.7)}
+dialog h3{color:var(--brass-hi);margin-bottom:12px}
+.field{margin-bottom:10px}
+.field label{display:block;font-size:.8rem;color:var(--parch-dim);margin-bottom:3px}
+.field input{width:100%;background:var(--ink);border:1px solid var(--cloth-edge);border-radius:6px;color:var(--parchment);padding:8px 10px;font:inherit}
+.field .check{display:flex;align-items:center;gap:8px;color:var(--parchment);font-size:.95rem}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--oxblood);border:1px solid var(--brass);color:var(--brass-hi);padding:10px 18px;border-radius:8px;display:none;z-index:9}
+
+/* Mobile: table -> cards */
+@media (max-width:719px){
+  .podium{grid-template-columns:1fr;gap:10px}
+  .podium::before{display:none}
+  .pod-1{order:1}.pod-2{order:2}.pod-3{order:3}
+  .banner{min-height:0;padding-bottom:36px}
+  table,thead,tbody,tr,td{display:block}
+  thead{display:none}
+  tr{border:1px solid var(--cloth-edge);border-radius:8px;margin-bottom:10px;background:var(--ink);padding:10px 12px}
+  td{border:none;padding:3px 0}
+  td[data-l]::before{content:attr(data-l);display:inline-block;min-width:9ch;color:var(--brass);
+    font-family:Cinzel,serif;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;margin-right:8px}
+  .rank{width:auto;font-size:1.1rem}
+  .hall-meta{text-align:left}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="site">
+    <div class="guild-mark" aria-label="BPSR Guild"><img src="assets/guild-logo.png" alt="BPSR Guild logo" onerror="this.hidden=true"><span>BPSR Guild</span></div>
+    <div class="rule display" style="font-size:.8rem;letter-spacing:.3em">GUILD RECORDS</div>
+    <h1>Leaderboard</h1>
+    <p class="subtitle">Standings are calculated on the server from validated progression records.</p>
+    <p class="stamp" id="stamp">Loading…</p>
+    <div class="actions">
+      <button class="btn" id="btn-update">Update my progress</button>
+      <button class="btn ghost" id="btn-refresh">Refresh</button>
+      <button class="btn ghost" id="btn-newperiod" hidden>Start new period (admin)</button>
+    </div>
+  </header>
+
+  <section class="panel account-panel" aria-labelledby="account-h"><h2 id="account-h">Member account</h2><div id="member-ui" aria-live="polite"></div></section>
+  <section class="panel account-panel" aria-labelledby="admin-h"><h2 id="admin-h">Administrator</h2><div id="admin-ui" aria-live="polite"></div></section>
+
+  <!-- First Guildie to Update -->
+  <section class="panel" id="fg-panel" hidden aria-labelledby="fg-h">
+    <h2 id="fg-h">First Guildie to Update</h2>
+    <div class="fg-card" id="fg-card"></div>
+  </section>
+
+  <!-- Tabs -->
+  <div class="tabs" role="tablist" aria-label="Leaderboards">
+    <button class="tab" role="tab" data-tab="sv" aria-selected="true">SV</button>
+    <button class="tab" role="tab" data-tab="mp" aria-selected="false">Master Points</button>
+    <button class="tab" role="tab" data-tab="mc" aria-selected="false">Master Completion</button>
+    <button class="tab" role="tab" data-tab="hall" aria-selected="false">Mount Hall of Fame</button>
+  </div>
+
+  <!-- Podium -->
+  <div class="podium" id="podium"></div>
+
+  <!-- Filters -->
+  <div class="controls" id="controls">
+    <input class="search" id="search" type="search" placeholder="Search character name…" aria-label="Search character name">
+    <button class="chip" id="f-active" aria-pressed="false">Active</button>
+    <button class="chip ember" id="f-outdated" aria-pressed="false">Outdated</button>
+    <button class="chip gold" id="f-mount" aria-pressed="false">Mount earned</button>
+    <button class="chip" id="f-svdone" aria-pressed="false">SV complete</button>
+  </div>
+
+  <!-- Board -->
+  <div class="tablewrap" id="board"></div>
+
+  <!-- First-to-achieve records -->
+  <section class="panel" aria-labelledby="firsts-h">
+    <h2 id="firsts-h">First-to-Achieve Records</h2>
+    <div class="firsts" id="firsts"><div class="empty">No records yet — the race is on.</div></div>
+  </section>
+
+  <!-- Recent guild progress -->
+  <section class="panel" id="feed-panel" hidden aria-labelledby="feed-h">
+    <h2 id="feed-h">Recent Guild Progress</h2>
+    <ul class="feed" id="feed"></ul>
+  </section>
+
+</div>
+
+<!-- Update dialog -->
+<dialog id="dlg">
+  <h3>Update my progress</h3>
+  <p class="dim" style="margin-bottom:12px">The server compares this with your stored record — only genuine progress counts.</p>
+  <div class="field"><label for="u-name">Character name</label><input id="u-name" maxlength="40"></div>
+  <div class="grid2">
+    <div class="field"><label for="u-sv">SV floor (0–60)</label><input id="u-sv" type="number" min="0" max="60"></div>
+    <div class="field"><label for="u-points">Master points</label><input id="u-points" type="number" min="0"></div>
+  </div>
+  <div class="grid2">
+    <div class="field check"><input id="u-easy" type="checkbox"><label for="u-easy" style="margin:0">Easy complete</label></div>
+    <div class="field check"><input id="u-hard" type="checkbox"><label for="u-hard" style="margin:0">Hard complete</label></div>
+  </div>
+  <div id="u-ranks"></div>
+  <div class="actions" style="justify-content:flex-end">
+    <button class="btn ghost" id="u-cancel">Cancel</button>
+    <button class="btn" id="u-save">Save progress</button>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+'use strict';
+var DATA = null;
+var state = { tab:'sv', q:'', active:false, outdated:false, mount:false, svdone:false };
+var HAS_GAS = typeof google !== 'undefined' && google.script && google.script.run;
+// GitHub Pages configuration: set ?api=https://script.google.com/macros/s/.../exec
+// once, then it is retained locally. No credential belongs here.
+var API_URL = new URLSearchParams(location.search).get('api') || localStorage.getItem('bpsrApiUrl') || '';
+if (new URLSearchParams(location.search).get('api')) localStorage.setItem('bpsrApiUrl', API_URL);
+function api(action,data){ if(!API_URL) return Promise.reject(new Error('API URL is not configured. Add ?api=YOUR_EXEC_URL once.'));
+  return fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:action,data:data||{}})})
+    .then(function(r){return r.text();}).then(function(t){var j;try{j=JSON.parse(t);}catch(e){throw new Error('The API returned an invalid response.');}if(!j.ok)throw new Error((j.error&&j.error.message)||'Request could not be completed.');return j.data;}); }
+
+// ---------- data loading ----------
+function load(){
+  document.getElementById('stamp').textContent = 'Loading…';
+  if (HAS_GAS){
+    google.script.run
+      .withSuccessHandler(function(json){ DATA = JSON.parse(json); render(); })
+      .withFailureHandler(function(err){ document.getElementById('stamp').textContent = 'Could not load standings: ' + err.message; })
+      .getLeaderboardBundle();
+  } else if (API_URL) {
+    api('leaderboard',{}).then(function(d){DATA=d;render();}).catch(function(err){document.getElementById('stamp').textContent=err.message;});
+  } else {
+    DATA = demoData(); render();  // preview mode when opened outside Apps Script
+  }
+}
+
+// ---------- rendering ----------
+function render(){
+  var d = DATA;
+  document.getElementById('stamp').textContent =
+    'Updated ' + fmtDateTime(d.generatedAt) + (HAS_GAS ? '' : ' · preview with sample data');
+  document.getElementById('btn-newperiod').hidden = !(d.viewer && d.viewer.isAdmin);
+
+  renderFirstGuildie();
+  renderBoard();
+  renderFirsts();
+  renderFeed();
+}
+
+function boardRows(){
+  var d = DATA, rows;
+  if (state.tab === 'sv') rows = d.svBoard;
+  else if (state.tab === 'mp') rows = d.mpBoard;
+  else if (state.tab === 'mc') rows = d.mcBoard;
+  else return null;
+  return rows.filter(function(p){
+    if (state.q && p.name.toLowerCase().indexOf(state.q) === -1) return false;
+    if (state.active && p.outdated) return false;
+    if (state.outdated && !p.outdated) return false;
+    if (state.mount && !p.mount) return false;
+    if (state.svdone && !p.svComplete) return false;
+    return true;
+  });
+}
+
+function renderBoard(){
+  var el = document.getElementById('board');
+  var pod = document.getElementById('podium');
+  var controls = document.getElementById('controls');
+
+  if (state.tab === 'hall'){
+    pod.innerHTML = ''; controls.style.display = 'none';
+    el.innerHTML = renderHall();
+    return;
+  }
+  controls.style.display = '';
+  var rows = boardRows();
+
+  // Top-3 podium banners (unfiltered board order, spec: podium then full table)
+  var full = state.tab==='sv' ? DATA.svBoard : state.tab==='mp' ? DATA.mpBoard : DATA.mcBoard;
+  pod.innerHTML = full.slice(0,3).map(function(p,i){
+    var medal = ['I','II','III'][i];
+    var stat, sub;
+    if (state.tab==='sv'){ stat='Floor '+p.sv; sub=p.svPct+'% of '+DATA.config.svMax; }
+    else if (state.tab==='mp'){ stat=num(p.points)+' pts'; sub=num(p.pointsRemaining)+' to the mount'; }
+    else { stat=p.mastersAtMax+' at max'; sub=p.totalRanks+' ranks total'; }
+    return '<div class="banner pod-'+(i+1)+(i===0?' gold':'')+'" style="animation-delay:'+(i*0.08)+'s">' +
+      '<div class="medal">'+medal+'</div>' +
+      '<div class="b-name">'+esc(p.name)+'</div>' +
+      '<div class="b-stat">'+stat+'</div>' +
+      '<div class="b-sub">'+sub+'</div>' +
+      '<div class="b-badges">'+badges(p)+'</div></div>';
+  }).join('');
+  if (!full.length) pod.innerHTML='';
+
+  if (!rows.length){ el.innerHTML = '<div class="empty">No guildies match — clear a filter or be the first to register.</div>'; return; }
+
+  var head, body;
+  if (state.tab === 'sv'){
+    head = th(['Rank','Character','SV Floor','Progress','Floor achieved','Badges','Last updated']);
+    body = rows.map(function(p){
+      var r = DATA.svBoard.indexOf(p)+1;
+      return tr(r, [
+        td('Character','<span class="pname">'+esc(p.name)+'</span>'),
+        td('SV floor','<span class="num">'+p.sv+'</span> <span class="dim">/ '+DATA.config.svMax+'</span>'),
+        td('Progress', p.svPct+'%<div class="bar blue"><i style="width:'+p.svPct+'%"></i></div>'),
+        td('Achieved','<span class="dim">'+fmtDate(p.svDate)+'</span>'),
+        td('Badges', badges(p, 'sv')),
+        td('Updated', updated(p))
+      ]);
+    }).join('');
+  } else if (state.tab === 'mp'){
+    head = th(['Rank','Character','Master points','Progress to '+num(DATA.config.mountTarget),'Remaining','Mount','Score achieved','Last updated']);
+    body = rows.map(function(p){
+      var r = DATA.mpBoard.indexOf(p)+1;
+      return tr(r, [
+        td('Character','<span class="pname">'+esc(p.name)+'</span>'),
+        td('Points','<span class="num">'+num(p.points)+'</span>'),
+        td('Progress', p.pointsPct+'%<div class="bar"><i style="width:'+p.pointsPct+'%"></i></div>'),
+        td('Remaining','<span class="dim">'+num(p.pointsRemaining)+'</span>'),
+        td('Mount', p.mount ? '<span class="badge gold">Mount earned</span>' : '<span class="dim">—</span>'),
+        td('Achieved','<span class="dim">'+fmtDate(p.pointsDate)+'</span>'),
+        td('Updated', updated(p))
+      ]);
+    }).join('');
+  } else {
+    head = th(['Rank','Character','Masters at max','Total ranks','Master points','Badges','Last updated']);
+    body = rows.map(function(p){
+      var r = DATA.mcBoard.indexOf(p)+1;
+      return tr(r, [
+        td('Character','<span class="pname">'+esc(p.name)+'</span>'),
+        td('At max','<span class="num">'+p.mastersAtMax+'</span> <span class="dim">/ '+DATA.activities.length+'</span>'),
+        td('Ranks','<span class="dim">'+p.totalRanks+'</span>'),
+        td('Points','<span class="dim">'+num(p.points)+'</span>'),
+        td('Badges', badges(p)),
+        td('Updated', updated(p))
+      ]);
+    }).join('');
+  }
+  el.innerHTML = '<table>'+head+'<tbody>'+body+'</tbody></table>';
+}
+
+function renderHall(){
+  var h = DATA.hallOfFame;
+  var html = '<section class="panel" style="margin-top:6px"><h2>Mount Hall of Fame</h2>';
+  if (!h.length) return html + '<div class="empty">No one has earned the mount yet. History awaits.</div></section>';
+  html += '<div class="hall">' + h.map(function(m){
+    return '<div class="hall-row"><div class="hall-pos">'+m.position+'</div>' +
+      '<div class="hall-name">'+esc(m.name)+(m.corrected?' <span class="badge ember">corrected</span>':'')+'</div>' +
+      '<div class="hall-meta">'+(m.points!=null?num(m.points)+' pts · ':'')+fmtDateTime(m.at)+'</div></div>';
+  }).join('') + '</div></section>';
+  return html;
+}
+
+function renderFirstGuildie(){
+  var fg = DATA.firstGuildie, panel = document.getElementById('fg-panel');
+  panel.hidden = !fg.enabled;
+  if (!fg.enabled) return;
+  var c = fg.current, el = document.getElementById('fg-card'), html = '';
+  if (c && c.winner){
+    html += '<div class="fg-badge">1st</div><div class="fg-main">' +
+      '<div class="fg-name">'+esc(c.winner.name)+'</div>' +
+      '<div class="fg-what">'+esc(c.winner.what)+'</div>' +
+      '<div class="fg-meta">'+fmtDateTime(c.winner.at)+' · '+periodLabel(c)+'</div></div>';
+  } else {
+    html += '<div class="fg-main"><div class="fg-empty">No winner yet this period — the badge goes to the first genuine progress update.</div>' +
+      (c ? '<div class="fg-meta">'+periodLabel(c)+'</div>' : '') + '</div>';
+  }
+  var prev = fg.previous.filter(function(p){ return p.winner; });
+  if (prev.length){
+    html += '<details class="fg-prev"><summary>Previous winners ('+prev.length+')</summary><div class="fg-prev-list">' +
+      prev.map(function(p){ return '<div><b>'+esc(p.winner.name)+'</b> — '+esc(p.winner.what)+' · '+fmtDateTime(p.winner.at)+'</div>'; }).join('') +
+      '</div></details>';
+  }
+  el.innerHTML = html;
+}
+
+function renderFirsts(){
+  var el = document.getElementById('firsts');
+  if (!DATA.firsts.length) return;
+  var actNames = {}; DATA.activities.forEach(function(a){ actNames[a.id]=a.name; });
+  el.innerHTML = DATA.firsts.map(function(f){
+    return '<div class="first-card"><div class="first-type">'+esc(firstLabel(f, actNames))+'</div>' +
+      '<div class="first-name">'+esc(f.name)+(f.corrected?' <span class="badge ember">corrected</span>':'')+'</div>' +
+      '<div class="first-date">'+fmtDateTime(f.at)+'</div></div>';
+  }).join('');
+}
+
+function firstLabel(f, actNames){
+  if (f.type==='FIRST_SV_FLOOR_60') return 'First to SV Floor 60';
+  if (f.type==='FIRST_MOUNT') return 'First to earn the mount';
+  if (f.type==='FIRST_ALL_MASTERS') return 'First to complete every Master activity';
+  if (f.type.indexOf('FIRST_MMAX_')===0) return 'First to max ' + (actNames[f.activityId]||f.activityId);
+  if (f.type.indexOf('FIRST_MILESTONE_')===0) return 'First to milestone: ' + f.type.replace('FIRST_MILESTONE_','');
+  return f.type;
+}
+
+function renderFeed(){
+  var panel = document.getElementById('feed-panel');
+  panel.hidden = !DATA.config.feedEnabled || !DATA.feed.length;
+  if (panel.hidden) return;
+  document.getElementById('feed').innerHTML = DATA.feed.map(function(e){
+    return '<li><time>'+fmtRelative(e.at)+'</time><span>'+esc(e.text)+'</span></li>';
+  }).join('');
+}
+
+// ---------- helpers ----------
+function badges(p, ctx){
+  var out = '';
+  if (p.svComplete) out += '<span class="badge blue">SV complete</span>';
+  if (p.mount) out += '<span class="badge gold">Mount</span>';
+  if (ctx==='sv'){ if (p.easy) out += '<span class="badge ok">Easy</span>'; if (p.hard) out += '<span class="badge ok">Hard</span>'; }
+  return out || '<span class="dim">—</span>';
+}
+function updated(p){
+  return '<span class="dim">'+fmtDate(p.lastUpdated)+'</span>' +
+    (p.outdated ? ' <span class="badge ember">outdated</span>' : '');
+}
+function th(cols){ return '<thead><tr>'+cols.map(function(c){return '<th>'+c+'</th>';}).join('')+'</tr></thead>'; }
+function tr(rank, tds){
+  return '<tr><td class="rank'+(rank<=3?' top':'')+'" data-l="Rank">'+rank+'</td>'+tds.join('')+'</tr>';
+}
+function td(label, html){ return '<td data-l="'+label+'">'+html+'</td>'; }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function num(n){ return Number(n||0).toLocaleString(); }
+function fmtDate(iso){ if(!iso) return '—'; return new Date(iso).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}); }
+function fmtDateTime(iso){ if(!iso) return '—'; return new Date(iso).toLocaleString(undefined,{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+function fmtRelative(iso){
+  var s = (Date.now()-new Date(iso).getTime())/1000;
+  if (s<3600) return Math.max(1,Math.round(s/60))+' min ago';
+  if (s<86400) return Math.round(s/3600)+' h ago';
+  if (s<86400*7) return Math.round(s/86400)+' d ago';
+  return fmtDate(iso);
+}
+function periodLabel(c){
+  var t = c.type.charAt(0).toUpperCase()+c.type.slice(1);
+  return t+' period · started '+fmtDate(c.start)+(c.end?' · resets '+fmtDate(c.end):'');
+}
+
+// ---------- interactions ----------
+document.querySelectorAll('.tab').forEach(function(b){
+  b.addEventListener('click', function(){
+    document.querySelectorAll('.tab').forEach(function(x){ x.setAttribute('aria-selected','false'); });
+    b.setAttribute('aria-selected','true');
+    state.tab = b.dataset.tab; renderBoard();
+  });
+});
+document.getElementById('search').addEventListener('input', function(e){
+  state.q = e.target.value.trim().toLowerCase(); renderBoard();
+});
+[['f-active','active'],['f-outdated','outdated'],['f-mount','mount'],['f-svdone','svdone']].forEach(function(pair){
+  var el = document.getElementById(pair[0]);
+  el.addEventListener('click', function(){
+    state[pair[1]] = !state[pair[1]];
+    el.setAttribute('aria-pressed', String(state[pair[1]]));
+    renderBoard();
+  });
+});
+document.getElementById('btn-refresh').addEventListener('click', load);
+
+// Update dialog
+var dlg = document.getElementById('dlg');
+document.getElementById('btn-update').addEventListener('click', function(){
+  if (!HAS_GAS){ toast('Preview mode — deploy in Apps Script to save progress.'); return; }
+  if (DATA && DATA.viewerCharacter) document.getElementById('u-name').value = DATA.viewerCharacter;
+  var ranks = document.getElementById('u-ranks');
+  ranks.innerHTML = DATA.activities.map(function(a){
+    return '<div class="field"><label for="r-'+a.id+'">'+esc(a.name)+' — highest rank (0–'+a.maxRank+')</label>' +
+      '<input id="r-'+a.id+'" type="number" min="0" max="'+a.maxRank+'" data-act="'+a.id+'"></div>';
+  }).join('');
+  dlg.showModal();
+});
+document.getElementById('u-cancel').addEventListener('click', function(){ dlg.close(); });
+document.getElementById('u-save').addEventListener('click', function(){
+  var ranks = {};
+  document.querySelectorAll('#u-ranks input').forEach(function(i){ if(i.value!=='') ranks[i.dataset.act]=i.value; });
+  var payload = {
+    characterName: document.getElementById('u-name').value,
+    svFloor: document.getElementById('u-sv').value,
+    masterPoints: document.getElementById('u-points').value,
+    easyComplete: document.getElementById('u-easy').checked,
+    hardComplete: document.getElementById('u-hard').checked,
+    masterRanks: ranks
+  };
+  var btn = document.getElementById('u-save');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  google.script.run
+    .withSuccessHandler(function(res){
+      btn.disabled = false; btn.textContent = 'Save progress'; dlg.close();
+      if (res.firstGuildie) toast('You are the First Guildie to Update this period! 🏅');
+      else if (res.changed) toast('Progress saved — the board is updating.');
+      else toast('Saved, but nothing changed — identical data does not count as an update.');
+      load();
+    })
+    .withFailureHandler(function(err){
+      btn.disabled = false; btn.textContent = 'Save progress';
+      toast('Could not save: ' + err.message);
+    })
+    .submitProgress(payload);
+});
+document.getElementById('btn-newperiod').addEventListener('click', function(){
+  if (!confirm('Start a new update period now? The current period will be closed and its winner kept in history.')) return;
+  google.script.run
+    .withSuccessHandler(function(){ toast('New update period started.'); load(); })
+    .withFailureHandler(function(err){ toast(err.message); })
+    .startNewPeriod();
+});
+
+function toast(msg){
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.style.display = 'block';
+  clearTimeout(t._h); t._h = setTimeout(function(){ t.style.display='none'; }, 4200);
+}
+
+// ---------- demo data (only when opened outside Apps Script) ----------
+function demoData(){
+  var day = 86400000, now = Date.now();
+  function ago(d){ return new Date(now - d*day).toISOString(); }
+  var names = ['Aelric','Brannwyn','Caelora','Dathrek','Eirwen','Fenmarr','Gilda','Hrothgar'];
+  var players = names.map(function(n,i){
+    var sv = [60,58,60,44,37,52,21,12][i];
+    var pts = [3720,3650,3100,2400,1980,2900,900,410][i];
+    var mount = pts >= 3650;
+    return { name:n, sv:sv, svPct:Math.round(sv/60*100), svDate:ago(3+i*4), svComplete:sv>=60,
+      easy:i<6, hard:i<4, points:pts, pointsPct:Math.min(100,Math.round(pts/3650*100)),
+      pointsRemaining:Math.max(0,3650-pts), pointsDate:ago(1+i*3), mount:mount,
+      mountAt:mount?ago(10+i*5):null, mountPosition:mount?(i===1?1:2):null, mountPoints:mount?3650+(i===0?40:0):null,
+      mastersAtMax:[5,4,3,2,1,3,0,0][i], totalRanks:[100,92,78,55,41,70,18,6][i],
+      mastersDate:ago(6+i*2), lastUpdated:ago([1,2,0,9,22,4,31,3][i]), outdated:[false,false,false,false,true,false,true,false][i] };
+  });
+  var bySv = players.slice().sort(function(a,b){ return b.sv-a.sv || new Date(a.svDate)-new Date(b.svDate) || a.name.localeCompare(b.name); });
+  var byMp = players.slice().sort(function(a,b){ return b.points-a.points || new Date(a.pointsDate)-new Date(b.pointsDate) || a.name.localeCompare(b.name); });
+  var byMc = players.slice().sort(function(a,b){ return b.mastersAtMax-a.mastersAtMax || b.totalRanks-a.totalRanks || b.points-a.points; });
+  return {
+    generatedAt:new Date().toISOString(),
+    config:{ mountTarget:3650, svMax:60, outdatedDays:14, overallEnabled:false, feedEnabled:true, firstGuildieEnabled:true, timezone:'Europe/London' },
+    activities:[{id:'ACT1',name:'Trials of the Deep',maxRank:20},{id:'ACT2',name:'Emberforge Gauntlet',maxRank:20},{id:'ACT3',name:'Stormcaller Rites',maxRank:20},{id:'ACT4',name:'Wardens of the Vale',maxRank:20},{id:'ACT5',name:'The Long Vigil',maxRank:20}],
+    svBoard:bySv, mpBoard:byMp, mcBoard:byMc,
+    hallOfFame:[ {position:1,name:'Brannwyn',points:3650,at:ago(41),corrected:false},
+                 {position:2,name:'Aelric',points:3690,at:ago(18),corrected:false} ],
+    firsts:[ {type:'FIRST_MOUNT',name:'Brannwyn',activityId:'',value:'3650',at:ago(41),corrected:false},
+             {type:'FIRST_SV_FLOOR_60',name:'Aelric',activityId:'',value:'60',at:ago(33),corrected:false},
+             {type:'FIRST_MMAX_ACT1',name:'Caelora',activityId:'ACT1',value:'20',at:ago(26),corrected:false} ],
+    firstGuildie:{ enabled:true,
+      current:{ periodId:'RP-demo', start:ago(2), end:new Date(now+5*day).toISOString(), type:'weekly', status:'Active',
+        winner:{ name:'Caelora', at:ago(1.6), what:'Caelora reached SV Floor 60' } },
+      previous:[ { periodId:'RP-prev1', start:ago(9), end:ago(2), type:'weekly', status:'Closed',
+                   winner:{ name:'Fenmarr', at:ago(8.7), what:'Fenmarr completed M14 in Emberforge Gauntlet' } },
+                 { periodId:'RP-prev2', start:ago(16), end:ago(9), type:'weekly', status:'Closed',
+                   winner:{ name:'Aelric', at:ago(15.9), what:'Aelric is on 3,720 Master points' } } ] },
+    feed:[ {at:ago(0.1),text:'Caelora reached SV Floor 60'},
+           {at:ago(0.8),text:'Aelric is on 3,720 Master points'},
+           {at:ago(1.6),text:'Caelora reached SV Floor 60'},
+           {at:ago(2.4),text:'Fenmarr completed M16 in Stormcaller Rites'},
+           {at:ago(4.2),text:'Hrothgar completed Easy'},
+           {at:ago(18),text:'Aelric earned the mount'} ],
+    viewer:{ isAdmin:true, signedIn:true }, viewerCharacter:'Aelric'
+  };
+}
+
+load();
+</script>
+<script src="AppFrontend.js"></script>
+</body>
+</html>
