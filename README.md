@@ -26,7 +26,9 @@ tests/                          Apps Script runtime and DOM-controller tests
 
 Members register and sign in with a unique character name and PIN. The API stores a unique salt and derived PIN hash, never the plaintext PIN. Public responses never contain PIN material, token hashes, salts, session tokens, spreadsheet IDs or raw rows. Sessions expire after 12 hours; five failed attempts create a 15-minute failed-login window.
 
-`Players.IsAdmin` is the authoritative role flag. `Members.MemberId` and `Players.UserId` must be the same stable identifier and each member must map to exactly one player row. An administrator signs in through the normal member form. The server returns a separate member-bound administrator session only after rechecking `IsAdmin`; every protected route rechecks the live member state and role.
+`Players.IsAdmin` is the authoritative role flag. `Members.MemberId` and `Players.UserId` must be the same stable identifier and each member must map to exactly one player row. An administrator signs in through the normal member form. A fresh sign-in returns one separate member-bound administrator session after rechecking `IsAdmin`; member refresh returns the current profile and role without minting or replacing an administrator session. The browser restores a stored administrator token separately through the protected administrator refresh path, and every protected route rechecks the live member state and role.
+
+If an administrator closes the administrator session while keeping the member session open, ordinary page restoration does not silently reopen it. Sign out of the member account and sign in again to obtain a new administrator session. Emergency recovery remains a separate last-resort path, not the normal solution.
 
 The prepared spreadsheet’s initial administrator is Dax because Dax’s `Players.IsAdmin` value is `TRUE`. Confirm Dax’s `Members.MemberId` exactly matches Dax’s `Players.UserId`. Dax uses the existing normal PIN flow—there is no default or repository-stored PIN.
 

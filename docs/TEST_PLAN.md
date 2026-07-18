@@ -51,7 +51,7 @@ Automated tests must exercise the real backend implementation through a mocked G
 
 - Normal administrator member login and optional recovery authentication
 - Profile/list/details return `isAdmin` without authentication material
-- Promotion, refresh-issued access, demotion and demotion-session revocation
+- Promotion, fresh-login-issued access, role-only member refresh, repeated-refresh row stability, demotion and demotion-session revocation
 - Strict boolean role/disabled payload validation
 - Self-demotion confirmation and last-active-admin demote/disable/merge protection
 - Admin edit and delete

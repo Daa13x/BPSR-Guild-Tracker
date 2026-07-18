@@ -36,7 +36,9 @@
 - [ ] Sign in as Dax through the normal character-name/PIN form and confirm the Administrator badge and protected view appear.
 - [ ] Confirm an ordinary member cannot call any administrator action, even if browser controls are manually exposed.
 - [ ] Promote a registered test member and confirm the audit entry identifies the acting member ID.
-- [ ] Sign in or refresh that member and confirm a member-bound administrator session is issued.
+- [ ] Sign in afresh as that member and confirm exactly one member-bound administrator session is issued.
+- [ ] Refresh the page repeatedly and confirm the existing administrator token is restored through the administrator refresh route without adding administrator rows to `Sessions`.
+- [ ] End that administrator session, refresh the member view and confirm administrator controls stay closed until the member signs out and signs in again.
 - [ ] With at least two active administrators, demote the test administrator and confirm all of their administrator sessions fail immediately while member sessions remain valid.
 - [ ] Confirm self-demotion requires the stronger warning and explicit confirmation.
 - [ ] Confirm the final active administrator cannot be demoted, disabled or removed/merged away.

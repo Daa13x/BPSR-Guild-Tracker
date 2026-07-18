@@ -322,6 +322,7 @@ test('member registration and login forms submit character name and PIN', async 
   assert.deepEqual(loginApp.calls.find(call => call.action === 'login').data, {
     characterName: 'Dax', pin: '654321'
   });
+  assert.equal(loginApp.store['bpsr.admin.session'], undefined);
 });
 
 test('profile renders and progression sends SV and ranks without browser totals', async () => {
@@ -355,28 +356,36 @@ test('profile renders and progression sends SV and ranks without browser totals'
   assert.match(app.member.querySelector('.notice').textContent, /Progress updated/);
 });
 
-test('member restore consumes profile/adminSession directly and member logout preserves admin', async () => {
+test('member restore keeps and separately validates the stored administrator session', async () => {
   const initialMember = session('old-member');
+  const initialAdmin = session('stored-admin');
   const app = createHarness((action, data) => {
     if (action === 'refresh' && data.kind === 'member') {
-      return { profile: profile({ isAdmin: true }), adminSession: session('new-admin'), expiresAt: future() };
+      return { profile: profile({ isAdmin: true }), expiresAt: future() };
     }
     if (action === 'refresh' && data.kind === 'admin') return { expiresAt: future() };
     if (action === 'activities') return [];
     if (action.startsWith('admin')) return [];
     if (action === 'logout') return { ok: true };
     return {};
-  }, { store: { 'bpsr.member.session': JSON.stringify({ ...initialMember, kind: 'member', display: 'Dax' }) } });
+  }, { store: {
+    'bpsr.member.session': JSON.stringify({ ...initialMember, kind: 'member', display: 'Dax' }),
+    'bpsr.admin.session': JSON.stringify({ ...initialAdmin, kind: 'admin', display: 'Dax' })
+  } });
   await app.ready();
   assert.equal(app.calls.some(call => call.action === 'me'), false);
-  assert.equal(JSON.parse(app.store['bpsr.admin.session']).token, 'new-admin');
+  assert.equal(JSON.parse(app.store['bpsr.admin.session']).token, 'stored-admin');
+  const refreshes = app.calls.filter(call => call.action === 'refresh');
+  assert.deepEqual(refreshes.map(call => [call.data.kind, call.data.token]), [
+    ['member', 'old-member'], ['admin', 'stored-admin']
+  ]);
   assert.equal(app.administration.hidden, false);
   buttonByText(app.member, 'Sign out').click();
   await settle();
   const logouts = app.calls.filter(call => call.action === 'logout');
   assert.deepEqual(logouts.map(call => call.data.kind), ['member']);
   assert.equal(app.store['bpsr.member.session'], undefined);
-  assert.equal(JSON.parse(app.store['bpsr.admin.session']).token, 'new-admin');
+  assert.equal(JSON.parse(app.store['bpsr.admin.session']).token, 'stored-admin');
 });
 
 test('administrator selection, edit, role, disable, duplicate, reset and audit flows use stable IDs', async () => {
@@ -416,6 +425,7 @@ test('administrator selection, edit, role, disable, duplicate, reset and audit f
   await app.ready();
   formByButton(app.member, 'Sign in').dispatch('submit');
   await settle(15);
+  assert.equal(JSON.parse(app.store['bpsr.admin.session']).token, 'admin-token');
 
   const memberRow = app.admin.querySelector('[data-member-id="MEM-X"]');
   memberRow.click();
@@ -501,6 +511,33 @@ test('administrator logout is isolated and repeated rendering does not duplicate
   assert.ok(app.store['bpsr.member.session']);
   assert.equal(app.store['bpsr.admin.session'], undefined);
   assert.equal(app.ui.state.selected, null);
+});
+
+test('ending administrator access stays closed across ordinary member refresh', async () => {
+  const app = createHarness((action, data) => {
+    if (action === 'login') return {
+      member: profile({ isAdmin: true }), session: session('member-live'), adminSession: session('admin-live')
+    };
+    if (action === 'refresh' && data.kind === 'member') {
+      return { profile: profile({ isAdmin: true }), expiresAt: future() };
+    }
+    if (action === 'activities' || action.startsWith('admin')) return [];
+    if (action === 'logout') return { ok: true };
+    return {};
+  });
+  await app.ready();
+  formByButton(app.member, 'Sign in').dispatch('submit');
+  await settle(12);
+  buttonByText(app.admin, 'End administrator session').click();
+  await settle();
+  assert.equal(app.store['bpsr.admin.session'], undefined);
+  const refreshCount = app.calls.filter(call => call.action === 'refresh' && call.data.kind === 'member').length;
+  await app.ui.restore('member');
+  await settle();
+  assert.equal(app.calls.filter(call => call.action === 'refresh' && call.data.kind === 'member').length, refreshCount + 1);
+  assert.equal(app.store['bpsr.admin.session'], undefined);
+  assert.equal(buttonByText(app.admin, 'Start administrator session'), undefined);
+  assert.match(app.admin.querySelector('.notice').textContent, /Sign out of your member account and sign in again/);
 });
 
 test('expired sessions clear only their own storage and API errors stay in the correct interface', async () => {

@@ -160,12 +160,6 @@
       save('admin', result.adminSession, result.member.characterName);
       state.admin = true;
       syncAdminVisibility(true);
-      return;
-    }
-    if (result && result.member && !result.member.isAdmin) {
-      clear('admin');
-      state.admin = false;
-      syncAdminVisibility(false);
     }
   }
 
@@ -380,17 +374,9 @@
 
     if (!session) {
       state.admin = false;
-      message.textContent = 'Administrator access comes from a member account with the administrator role.';
-      var memberSession = get('member');
-      if (memberSession && state.member && state.member.isAdmin) {
-        host.appendChild(actionButton('Start administrator session', 'admin', function () {
-          return api('refresh', { token: memberSession.token, kind: 'member' }).then(function (result) {
-            state.member = result.profile;
-            acceptAdminSession({ member: result.profile, adminSession: result.adminSession });
-            renderAdmin();
-          });
-        }));
-      }
+      message.textContent = get('member') && state.member && state.member.isAdmin
+        ? 'Your administrator role is active, but this browser has no administrator session. Sign out of your member account and sign in again to reopen administrator controls.'
+        : 'Administrator access comes from a member account with the administrator role.';
       var recovery = E('details');
       var summary = E('summary', 'Emergency recovery');
       var recoveryForm = E('form');
@@ -706,7 +692,6 @@
     return api('refresh', { token: session.token, kind: kind }).then(function (result) {
       if (kind === 'member') {
         state.member = result.profile;
-        acceptAdminSession({ member: result.profile, adminSession: result.adminSession });
         renderMember();
       } else {
         state.admin = true;
