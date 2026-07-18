@@ -47,9 +47,9 @@ function requireText(relative, patterns) {
 }
 
 requireText('Leaderboard.html', [
-  { label: 'must load repository-relative config.js', regex: /<script src="config\.js"><\/script>/ },
-  { label: 'must load repository-relative styles.css', regex: /<link rel="stylesheet" href="styles\.css">/ },
-  { label: 'must load repository-relative AppFrontend.js', regex: /<script src="AppFrontend\.js"><\/script>/ },
+  { label: 'must load repository-relative config.js with a cache version token', regex: /<script src="config\.js\?v=[\w.-]+"><\/script>/ },
+  { label: 'must load repository-relative styles.css with a cache version token', regex: /<link rel="stylesheet" href="styles\.css\?v=[\w.-]+">/ },
+  { label: 'must load repository-relative AppFrontend.js with a cache version token', regex: /<script src="AppFrontend\.js\?v=[\w.-]+"><\/script>/ },
   { label: 'must reference repository-relative supplied logo', regex: /(?:src|href)="assets\/guild-logo\.png"/ },
   { label: 'must provide a visible logo fallback', regex: /onerror="[^"]*nextElementSibling[^"]*"/ }
 ]);

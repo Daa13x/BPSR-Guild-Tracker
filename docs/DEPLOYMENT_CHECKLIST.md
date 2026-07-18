@@ -69,6 +69,7 @@
 - [ ] Confirm `.github/workflows/pages.yml` publishes the repository root and the latest run succeeds.
 - [ ] Open `https://daa13x.github.io/BPSR-Guild-Tracker/` and confirm `index.html` opens `Leaderboard.html` while retaining query/hash values.
 - [ ] Confirm `config.js`, `styles.css`, `AppFrontend.js`, favicon and `assets/guild-logo.png` load beneath `/BPSR-Guild-Tracker/`; no asset assumes `/` hosting.
+- [ ] Confirm the release bumps the shared `?v=` cache token in `Leaderboard.html` whenever `config.js`, `styles.css` or `AppFrontend.js` changed, so ten-minute Pages caching cannot serve stale assets with fresh HTML.
 - [ ] Confirm the supplied transparent OnlyPaws logo is not stretched and its text fallback appears if the image request is blocked.
 - [ ] Test desktop sidebar and narrow/mobile top navigation, including horizontal navigation scrolling.
 - [ ] Test keyboard focus, leaderboard arrow-key tabs, form labels, status announcements and reduced-motion behavior.
