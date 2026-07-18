@@ -130,9 +130,12 @@ function ensureSheet_(ss, name, headers) {
 // ---------------------------------------------------------------------------
 
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('Leaderboard')
-    .setTitle('Guild Leaderboard')
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  return ContentService.createTextOutput(JSON.stringify({
+    ok: true,
+    service: 'BPSR Guild Tracker API',
+    status: 'ready',
+    message: 'Use POST requests for API actions.'
+  })).setMimeType(ContentService.MimeType.JSON);
 }
 
 // ---------------------------------------------------------------------------
