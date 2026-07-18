@@ -9,7 +9,7 @@
 - Login errors do not reveal whether an account exists.
 - Repeated failures are throttled.
 - Member sessions are opaque, expiring, revocable, and validated server-side.
-- Logout and deleted accounts invalidate sessions.
+- Logout invalidates only the submitted session; disabling an account invalidates all of that member’s sessions.
 
 ## Member permissions
 
@@ -58,12 +58,17 @@
 
 ## Admin
 
-- Admin secret is not committed or returned to the frontend.
-- Admin login creates a separate server-validated session.
-- Every admin operation verifies that session.
-- Admin can list/search, edit, delete, merge duplicates, reset periods, correct achievements, and log out.
+- `Players.IsAdmin` is authoritative and `Members.MemberId` maps exactly to `Players.UserId`.
+- Administrators use normal character-name/PIN login and receive a separate member-bound admin session.
+- An optional recovery secret is not committed or returned and is not the normal sign-in path.
+- Every admin operation rechecks the session, active member and live role server-side.
+- Admin can list/search, edit, enable/disable, promote/demote, merge duplicates, reset periods, correct achievements, view audit entries, and log out.
+- Demotion immediately revokes the target’s admin sessions; disable revokes all target sessions.
+- The last active administrator cannot be demoted, disabled or merged away.
+- Self-demotion requires an explicit stronger confirmation.
+- Member and administrator logout do not revoke unrelated sessions.
 - Destructive actions require confirmation.
-- Every administrative mutation is audited.
+- Every administrative mutation is audited with the authenticated actor’s stable ID.
 
 ## Frontend
 
@@ -80,7 +85,7 @@
 
 - Spreadsheet setup is idempotent and non-destructive.
 - Demo members are never seeded automatically.
-- Required Script Properties are documented.
-- Apps Script-hosted and GitHub Pages deployment instructions match the final code.
+- Optional emergency Script Properties are documented.
+- GitHub Pages deployment instructions match the final repository-relative frontend.
 - GitHub Pages requires no build process.
 - Real deployment checks still needed are clearly disclosed.
