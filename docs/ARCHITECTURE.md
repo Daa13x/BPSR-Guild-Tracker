@@ -12,7 +12,8 @@
 
 ### Google Apps Script backend
 
-- Routes `doGet` and `doPost` actions
+- Returns a static, side-effect-free JSON health response from `doGet`
+- Routes public and protected JSON actions through `doPost`
 - Validates all input server-side
 - Owns authentication, authorization, totals, achievements, reset awards, and auditing
 - Stores secrets in Script Properties
@@ -77,7 +78,7 @@ Public leaderboard payloads must not include emails, member IDs, hashes, salts, 
 
 ### GitHub Pages
 
-The supported full frontend is published as static files through GitHub Pages and uses `fetch()` against the Apps Script JSON API. `config.js` is the sole API URL source. The backend may retain a legacy `doGet`, but repository assets such as `config.js` and `styles.css` are not automatically served by `HtmlService`; production UI instructions therefore target Pages.
+The supported full frontend is published as static files through GitHub Pages and uses `fetch()` against the Apps Script JSON API. `config.js` is the sole API URL source. Apps Script `GET /exec` returns only the static health JSON; it does not use `HtmlService` or serve the frontend. Public and protected actions use JSON `POST /exec` requests.
 
 ## Source visibility
 

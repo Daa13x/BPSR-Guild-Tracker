@@ -22,9 +22,14 @@
 
 ## Apps Script deployment
 
+- [ ] Confirm GitHub Pages hosts the interface; `Leaderboard.html` is not required or served by the Apps Script endpoint.
 - [ ] Deploy a **new version** of the web app after copying backend changes; saving source alone does not update `/exec`.
 - [ ] Use the execute-as and access options appropriate to the production spreadsheet and intended guild members.
 - [ ] Copy the final HTTPS URL ending in `/exec` without adding credentials.
+- [ ] Open `/exec` directly and confirm the `GET` health response is JSON with `ok: true` and `status: "ready"`.
+- [ ] Confirm the health payload contains only the four static `ok`, `service`, `status` and `message` fields, with no Sheet, member, administrator or session data.
+- [ ] Treat the health response as a reachability check only; it does not replace live POST, authorization, redirect or Pages-origin verification.
+- [ ] Confirm public and protected API operations use JSON `POST` requests; never place PINs, session tokens or other credentials in the URL.
 - [ ] From the live Pages origin, test the public leaderboard POST and confirm CORS/redirect behavior.
 - [ ] Test normal registration, login, own profile, SV update, Master update, identical update and member logout.
 - [ ] Test session restoration, 12-hour expiry behavior and five-failure/15-minute throttling.
@@ -59,6 +64,7 @@
 
 ## GitHub Pages and visual checks
 
+- [ ] Open the tracker at `https://daa13x.github.io/BPSR-Guild-Tracker/`; use Apps Script `/exec` only as the backend endpoint and direct GET diagnostic.
 - [ ] Confirm repository **Settings → Pages → Source** is **GitHub Actions**.
 - [ ] Confirm `.github/workflows/pages.yml` publishes the repository root and the latest run succeeds.
 - [ ] Open `https://daa13x.github.io/BPSR-Guild-Tracker/` and confirm `index.html` opens `Leaderboard.html` while retaining query/hash values.
