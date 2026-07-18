@@ -288,6 +288,13 @@ dialog h3{color:var(--brass-hi);margin-bottom:12px}
 var DATA = null;
 var state = { tab:'sv', q:'', active:false, outdated:false, mount:false, svdone:false };
 var HAS_GAS = typeof google !== 'undefined' && google.script && google.script.run;
+// GitHub Pages configuration: set ?api=https://script.google.com/macros/s/.../exec
+// once, then it is retained locally. No credential belongs here.
+var API_URL = new URLSearchParams(location.search).get('api') || localStorage.getItem('bpsrApiUrl') || '';
+if (new URLSearchParams(location.search).get('api')) localStorage.setItem('bpsrApiUrl', API_URL);
+function api(action,data){ if(!API_URL) return Promise.reject(new Error('API URL is not configured. Add ?api=YOUR_EXEC_URL once.'));
+  return fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:action,data:data||{}})})
+    .then(function(r){return r.text();}).then(function(t){var j;try{j=JSON.parse(t);}catch(e){throw new Error('The API returned an invalid response.');}if(!j.ok)throw new Error((j.error&&j.error.message)||'Request could not be completed.');return j.data;}); }
 
 // ---------- data loading ----------
 function load(){
@@ -297,6 +304,8 @@ function load(){
       .withSuccessHandler(function(json){ DATA = JSON.parse(json); render(); })
       .withFailureHandler(function(err){ document.getElementById('stamp').textContent = 'Could not load standings: ' + err.message; })
       .getLeaderboardBundle();
+  } else if (API_URL) {
+    api('leaderboard',{}).then(function(d){DATA=d;render();}).catch(function(err){document.getElementById('stamp').textContent=err.message;});
   } else {
     DATA = demoData(); render();  // preview mode when opened outside Apps Script
   }
