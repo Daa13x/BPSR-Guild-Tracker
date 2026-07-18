@@ -6,7 +6,7 @@
  */
 (function (root) {
   'use strict';
-  var configuredApiUrl = 'PASTE_APPS_SCRIPT_EXEC_URL_HERE';
+  var configuredApiUrl = 'https://script.google.com/macros/s/AKfycbyImSiO-iSXsL1KoFXWNv98Hen3ak6k-T3HB_F15Gv3t3kNQoa2WStLPGlMImHwda2Vlg/exec';
   var storageKey = 'bpsrApiUrl';
   function validExecUrl(value) {
     try {

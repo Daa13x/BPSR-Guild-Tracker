@@ -54,7 +54,10 @@ requireText('Leaderboard.html', [
   { label: 'must provide a visible logo fallback', regex: /onerror="[^"]*nextElementSibling[^"]*"/ }
 ]);
 requireText('config.js', [
-  { label: 'must retain the documented deployment placeholder', regex: /PASTE_APPS_SCRIPT_EXEC_URL_HERE/ },
+  {
+    label: 'must set configuredApiUrl to the documented placeholder or a valid Apps Script /exec URL',
+    regex: /var configuredApiUrl = '(?:PASTE_APPS_SCRIPT_EXEC_URL_HERE|https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec)';/
+  },
   { label: 'must expose the authoritative BPSR_CONFIG object', regex: /root\.BPSR_CONFIG\s*=/ }
 ]);
 requireText('.github/workflows/pages.yml', [
@@ -94,7 +97,11 @@ if (fs.existsSync(leaderboardPath)) {
 
 const textExtensions = new Set(['.js', '.gs', '.html', '.md', '.json', '.css']);
 const forbiddenPatterns = [
-  { label: 'hard-coded Apps Script deployment URL', regex: /https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec/g },
+  {
+    label: 'hard-coded Apps Script deployment URL',
+    regex: /https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec/g,
+    allowedFiles: ['config.js']
+  },
   { label: 'probable private key', regex: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g },
   { label: 'probable Google API key', regex: /AIza[0-9A-Za-z_-]{30,}/g },
   { label: 'probable GitHub token', regex: /gh[pousr]_[A-Za-z0-9_]{30,}/g }
@@ -111,7 +118,9 @@ function walk(directory) {
     if (!textExtensions.has(path.extname(entry.name))) continue;
     const relative = path.relative(root, absolute);
     const content = fs.readFileSync(absolute, 'utf8');
+    const normalized = relative.split(path.sep).join('/');
     for (const pattern of forbiddenPatterns) {
+      if (pattern.allowedFiles && pattern.allowedFiles.includes(normalized)) continue;
       if (pattern.regex.test(content)) {
         failures.push(`${relative}: ${pattern.label}`);
       }

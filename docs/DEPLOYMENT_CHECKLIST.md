@@ -55,7 +55,7 @@
 
 ## One frontend API configuration
 
-- [ ] In `config.js`, replace only `PASTE_APPS_SCRIPT_EXEC_URL_HERE` with the real `/exec` URL, or explicitly use `?api=...` for one-browser setup.
+- [ ] Confirm the `configuredApiUrl` constant in `config.js` equals the current production `/exec` URL; after an Apps Script redeployment under a new URL, update only that constant. `?api=...` remains available for one-browser overrides or fresh forks still carrying the placeholder.
 - [ ] Confirm `Leaderboard.html` and `AppFrontend.js` both use `window.BPSR_CONFIG`; no legacy `APP_CONFIG`, direct totals submission or second URL store remains.
 - [ ] If a stale deployment was previously supplied, clear the site’s `bpsrApiUrl` local-storage value/site data.
 - [ ] With no URL, confirm **Not configured** and the preview notice; member/admin writes must explain that saving is unavailable.
@@ -79,7 +79,7 @@
 ## Security and release record
 
 - [ ] Run `npm test`, `npm run check`, and `git diff --check` against the release commit.
-- [ ] Search current files and Git history for secrets and real deployment URLs before publication.
+- [ ] Search current files and Git history for secrets before publication. The only deployment URL permitted in Git is the sanctioned `configuredApiUrl` constant in `config.js`; `npm run check` rejects deployment URLs in any other file.
 - [ ] Inspect public leaderboard and authenticated profile payloads for private fields.
 - [ ] Confirm PINs and session tokens are never logged, placed in URLs or rendered into the DOM.
 - [ ] Record the Git commit SHA, Apps Script deployment version, workflow run, spreadsheet owner, backup location, live-test results and date privately.
