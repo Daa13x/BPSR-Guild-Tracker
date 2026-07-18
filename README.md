@@ -82,7 +82,8 @@ The sidebar reports **Not configured**, **Connecting**, **Connected**, or **API 
 2. Set **Source** to **GitHub Actions**.
 3. Merge an approved change to `main` or run **Deploy GitHub Pages** with `workflow_dispatch`.
 4. Confirm the workflow succeeds and open `https://daa13x.github.io/BPSR-Guild-Tracker/`.
-5. Hard-refresh after changing `config.js`, then verify the connection state and a harmless leaderboard request.
+5. When changing `config.js`, `styles.css` or `AppFrontend.js`, bump the shared `?v=` cache token on their references in `Leaderboard.html` in the same commit. GitHub Pages serves every file with `Cache-Control: max-age=600`, so without a token bump browsers that visited recently keep the old assets for up to ten minutes and can show **Not configured** or stale behavior until then.
+6. Hard-refresh after deploying, then verify the connection state and a harmless leaderboard request.
 
 The workflow uploads the repository root. `.nojekyll`, `index.html`, `Leaderboard.html`, `config.js`, `styles.css`, `AppFrontend.js` and `assets/guild-logo.png` therefore retain project-relative URLs under `/BPSR-Guild-Tracker/`. A 404 usually means Pages Source is not GitHub Actions or deployment has not completed; a missing logo/script/style usually means a file or case-sensitive relative path is wrong; a failed publication is diagnosed in the Actions run log. If `/exec` still returns HTML or a missing-`Leaderboard` error, deploy a new Apps Script version. If the health GET succeeds but Pages cannot connect, verify `config.js`, deployment access, POST redirect/response behavior and the Apps Script execution log.
 
