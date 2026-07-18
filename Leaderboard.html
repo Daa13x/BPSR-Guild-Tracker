@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Guild Leaderboard</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<title>OnlyPaws Guild Tracker</title>
+<link rel="icon" type="image/png" href="assets/guild-logo.png">
+<script src="config.js"></script>
 <style>
 /* =========================================================
    GUILD THEME — edit these variables to match your colours
@@ -203,26 +203,38 @@ dialog h3{color:var(--brass-hi);margin-bottom:12px}
   .hall-meta{text-align:left}
 }
 </style>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<div class="app-shell">
+  <aside class="sidebar" aria-label="OnlyPaws tracker navigation">
+    <a class="brand" href="#overview"><img src="assets/guild-logo.png" alt="OnlyPaws guild logo" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span hidden><strong>OnlyPaws</strong><small>Guild tracker</small></span></a>
+    <nav class="sidebar-nav">
+      <a class="nav-item selected" href="#overview" aria-current="page">Overview</a>
+      <a class="nav-item" href="#leaderboards" data-board-tab="sv">SV Leaderboard</a>
+      <a class="nav-item" href="#leaderboards" data-board-tab="mp">Masters</a>
+      <a class="nav-item" href="#achievements">Achievements</a>
+      <a class="nav-item" href="#feed-panel">Activity</a>
+      <a class="nav-item" href="#my-progress">My Progress</a>
+      <a class="nav-item" href="#administration" data-admin-nav hidden>Administration</a>
+    </nav>
+    <div class="sidebar-footer" role="status" aria-live="polite"><span class="status-dot"></span><span id="connection-status">Not configured</span></div>
+  </aside>
+  <main class="main">
 <div class="wrap">
 
-  <header class="site">
-    <div class="guild-mark" aria-label="BPSR Guild"><img src="assets/guild-logo.png" alt="BPSR Guild logo" onerror="this.hidden=true"><span>BPSR Guild</span></div>
-    <div class="rule display" style="font-size:.8rem;letter-spacing:.3em">GUILD RECORDS</div>
-    <h1>Leaderboard</h1>
-    <p class="subtitle">Standings are calculated on the server from validated progression records.</p>
+  <header class="site topbar" id="overview">
+    <div><p class="eyebrow">ONLYPAWS GUILD</p><h1>Guild dashboard</h1><p class="subtitle">Validated progression, achievements and guild activity.</p></div>
     <p class="notice" id="preview-notice" hidden>Preview mode: the Google Sheets backend has not been connected yet.</p>
     <p class="stamp" id="stamp">Loading…</p>
     <div class="actions">
       <button class="btn" id="btn-update">Update my progress</button>
       <button class="btn ghost" id="btn-refresh">Refresh</button>
-      <button class="btn ghost" id="btn-newperiod" hidden>Start new period (admin)</button>
     </div>
   </header>
 
-  <section class="panel account-panel" aria-labelledby="account-h"><h2 id="account-h">Member account</h2><div id="member-ui" aria-live="polite"></div></section>
-  <section class="panel account-panel" aria-labelledby="admin-h"><h2 id="admin-h">Administrator</h2><div id="admin-ui" aria-live="polite"></div></section>
+  <section class="panel account-panel" id="my-progress" aria-labelledby="account-h"><div class="panel-heading"><div><p class="eyebrow">MEMBER AREA</p><h2 id="account-h">My progress</h2></div><img class="panel-logo" src="assets/guild-logo.png" alt="OnlyPaws" onerror="this.hidden=true"></div><div id="member-ui" aria-live="polite"></div></section>
+  <section class="panel account-panel" id="administration" aria-labelledby="admin-h" hidden><div class="panel-heading"><div><p class="eyebrow">ROLE-PROTECTED</p><h2 id="admin-h">Administration</h2></div><span class="pill">Administrator</span></div><div id="admin-ui" aria-live="polite"></div></section>
 
   <!-- First Guildie to Update -->
   <section class="panel" id="fg-panel" hidden aria-labelledby="fg-h">
@@ -231,11 +243,11 @@ dialog h3{color:var(--brass-hi);margin-bottom:12px}
   </section>
 
   <!-- Tabs -->
-  <div class="tabs" role="tablist" aria-label="Leaderboards">
-    <button class="tab" role="tab" data-tab="sv" aria-selected="true">SV</button>
-    <button class="tab" role="tab" data-tab="mp" aria-selected="false">Master Points</button>
-    <button class="tab" role="tab" data-tab="mc" aria-selected="false">Master Completion</button>
-    <button class="tab" role="tab" data-tab="hall" aria-selected="false">Mount Hall of Fame</button>
+  <div class="tabs" id="leaderboards" role="tablist" aria-label="Leaderboards">
+    <button class="tab" id="tab-sv" role="tab" data-tab="sv" aria-selected="true" aria-controls="board" tabindex="0">SV</button>
+    <button class="tab" id="tab-mp" role="tab" data-tab="mp" aria-selected="false" aria-controls="board" tabindex="-1">Master Points</button>
+    <button class="tab" id="tab-mc" role="tab" data-tab="mc" aria-selected="false" aria-controls="board" tabindex="-1">Master Completion</button>
+    <button class="tab" id="tab-hall" role="tab" data-tab="hall" aria-selected="false" aria-controls="board" tabindex="-1">Mount Hall of Fame</button>
   </div>
 
   <!-- Podium -->
@@ -251,10 +263,10 @@ dialog h3{color:var(--brass-hi);margin-bottom:12px}
   </div>
 
   <!-- Board -->
-  <div class="tablewrap" id="board"></div>
+  <div class="tablewrap" id="board" role="tabpanel" aria-labelledby="tab-sv"></div>
 
   <!-- First-to-achieve records -->
-  <section class="panel" aria-labelledby="firsts-h">
+  <section class="panel" id="achievements" aria-labelledby="firsts-h">
     <h2 id="firsts-h">First-to-Achieve Records</h2>
     <div class="firsts" id="firsts"><div class="empty">No records yet — the race is on.</div></div>
   </section>
@@ -266,26 +278,8 @@ dialog h3{color:var(--brass-hi);margin-bottom:12px}
   </section>
 
 </div>
-
-<!-- Update dialog -->
-<dialog id="dlg">
-  <h3>Update my progress</h3>
-  <p class="dim" style="margin-bottom:12px">The server compares this with your stored record — only genuine progress counts.</p>
-  <div class="field"><label for="u-name">Character name</label><input id="u-name" maxlength="40"></div>
-  <div class="grid2">
-    <div class="field"><label for="u-sv">SV floor (0–60)</label><input id="u-sv" type="number" min="0" max="60"></div>
-    <div class="field"><label for="u-points">Master points</label><input id="u-points" type="number" min="0"></div>
-  </div>
-  <div class="grid2">
-    <div class="field check"><input id="u-easy" type="checkbox"><label for="u-easy" style="margin:0">Easy complete</label></div>
-    <div class="field check"><input id="u-hard" type="checkbox"><label for="u-hard" style="margin:0">Hard complete</label></div>
-  </div>
-  <div id="u-ranks"></div>
-  <div class="actions" style="justify-content:flex-end">
-    <button class="btn ghost" id="u-cancel">Cancel</button>
-    <button class="btn" id="u-save">Save progress</button>
-  </div>
-</dialog>
+  </main>
+</div>
 
 <div class="toast" id="toast" role="status"></div>
 
@@ -293,11 +287,8 @@ dialog h3{color:var(--brass-hi);margin-bottom:12px}
 'use strict';
 var DATA = null;
 var state = { tab:'sv', q:'', active:false, outdated:false, mount:false, svdone:false };
-var HAS_GAS = typeof google !== 'undefined' && google.script && google.script.run;
-// GitHub Pages configuration: set ?api=https://script.google.com/macros/s/.../exec
-// once, then it is retained locally. No credential belongs here.
-var API_URL = new URLSearchParams(location.search).get('api') || localStorage.getItem('bpsrApiUrl') || '';
-if (new URLSearchParams(location.search).get('api')) localStorage.setItem('bpsrApiUrl', API_URL);
+// GitHub Pages and the protected controller share this one configuration source.
+var API_URL = window.BPSR_CONFIG ? window.BPSR_CONFIG.apiUrl : '';
 function api(action,data){ if(!API_URL) return Promise.reject(new Error('API URL is not configured. Add ?api=YOUR_EXEC_URL once.'));
   return fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:action,data:data||{}})})
     .then(function(r){return r.text();}).then(function(t){var j;try{j=JSON.parse(t);}catch(e){throw new Error('The API returned an invalid response.');}if(!j.ok)throw new Error((j.error&&j.error.message)||'Request could not be completed.');return j.data;}); }
@@ -305,24 +296,20 @@ function api(action,data){ if(!API_URL) return Promise.reject(new Error('API URL
 // ---------- data loading ----------
 function load(){
   document.getElementById('stamp').textContent = 'Loading…';
-  if (HAS_GAS){
-    google.script.run
-      .withSuccessHandler(function(json){ DATA = JSON.parse(json); render(); })
-      .withFailureHandler(function(err){ document.getElementById('stamp').textContent = 'Could not load standings: ' + err.message; })
-      .getLeaderboardBundle();
-  } else if (API_URL) {
-    api('leaderboard',{}).then(function(d){DATA=d;render();}).catch(function(err){document.getElementById('stamp').textContent=err.message;});
+  setConnectionStatus(API_URL ? 'connecting' : 'not configured');
+  if (API_URL) {
+    api('leaderboard',{}).then(function(d){DATA=d;setConnectionStatus('connected');render();}).catch(function(err){setConnectionStatus('API error');document.getElementById('stamp').textContent=err.message;});
   } else {
-    DATA = demoData(); render();  // preview mode when opened outside Apps Script
+    setConnectionStatus('not configured'); DATA = demoData(); render();
   }
 }
+function setConnectionStatus(value){var el=document.getElementById('connection-status');if(el)el.textContent=value.charAt(0).toUpperCase()+value.slice(1);document.documentElement.dataset.connection=value.replace(/\s+/g,'-');}
 
 // ---------- rendering ----------
 function render(){
   var d = DATA;
   document.getElementById('stamp').textContent =
-    'Updated ' + fmtDateTime(d.generatedAt) + (HAS_GAS ? '' : ' · preview with sample data');
-  document.getElementById('btn-newperiod').hidden = !(d.viewer && d.viewer.isAdmin);
+    'Updated ' + fmtDateTime(d.generatedAt) + (API_URL ? '' : ' · preview only');
 
   renderFirstGuildie();
   renderBoard();
@@ -460,7 +447,7 @@ function renderFirstGuildie(){
 
 function renderFirsts(){
   var el = document.getElementById('firsts');
-  if (!DATA.firsts.length) return;
+  if (!DATA.firsts.length){ el.innerHTML = '<div class="empty">No achievement records yet.</div>'; return; }
   var actNames = {}; DATA.activities.forEach(function(a){ actNames[a.id]=a.name; });
   el.innerHTML = DATA.firsts.map(function(f){
     return '<div class="first-card"><div class="first-type">'+esc(firstLabel(f, actNames))+'</div>' +
@@ -480,9 +467,11 @@ function firstLabel(f, actNames){
 
 function renderFeed(){
   var panel = document.getElementById('feed-panel');
-  panel.hidden = !DATA.config.feedEnabled || !DATA.feed.length;
-  if (panel.hidden) return;
-  document.getElementById('feed').innerHTML = DATA.feed.map(function(e){
+  panel.hidden = false;
+  var feed = document.getElementById('feed');
+  if (!DATA.config.feedEnabled){ feed.innerHTML = '<li class="empty">Activity feed is not enabled.</li>'; return; }
+  if (!DATA.feed.length){ feed.innerHTML = '<li class="empty">No recent guild activity yet.</li>'; return; }
+  feed.innerHTML = DATA.feed.map(function(e){
     return '<li><time>'+fmtRelative(e.at)+'</time><span>'+esc(e.text)+'</span></li>';
   }).join('');
 }
@@ -521,11 +510,39 @@ function periodLabel(c){
 }
 
 // ---------- interactions ----------
-document.querySelectorAll('.tab').forEach(function(b){
-  b.addEventListener('click', function(){
-    document.querySelectorAll('.tab').forEach(function(x){ x.setAttribute('aria-selected','false'); });
-    b.setAttribute('aria-selected','true');
-    state.tab = b.dataset.tab; renderBoard();
+function selectBoardTab(button, moveFocus){
+  document.querySelectorAll('.tab').forEach(function(tab){
+    var selected = tab === button;
+    tab.setAttribute('aria-selected', String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+  });
+  state.tab = button.dataset.tab;
+  document.getElementById('board').setAttribute('aria-labelledby', button.id);
+  if (moveFocus) button.focus();
+  if (DATA) renderBoard();
+}
+document.querySelectorAll('.tab').forEach(function(button){
+  button.addEventListener('click', function(){ selectBoardTab(button, false); });
+  button.addEventListener('keydown', function(event){
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') return;
+    event.preventDefault();
+    var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab'));
+    var index = tabs.indexOf(button);
+    if (event.key === 'Home') index = 0;
+    else if (event.key === 'End') index = tabs.length - 1;
+    else index = (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+    selectBoardTab(tabs[index], true);
+  });
+});
+document.querySelectorAll('.nav-item').forEach(function(link){
+  link.addEventListener('click', function(){
+    document.querySelectorAll('.nav-item').forEach(function(item){item.classList.remove('selected');item.removeAttribute('aria-current');});
+    link.classList.add('selected');
+    link.setAttribute('aria-current','page');
+    if (link.dataset.boardTab) {
+      var tab = document.querySelector('.tab[data-tab="'+link.dataset.boardTab+'"]');
+      if (tab) selectBoardTab(tab, false);
+    }
   });
 });
 document.getElementById('search').addEventListener('input', function(e){
@@ -541,52 +558,9 @@ document.getElementById('search').addEventListener('input', function(e){
 });
 document.getElementById('btn-refresh').addEventListener('click', load);
 
-// Update dialog
-var dlg = document.getElementById('dlg');
 document.getElementById('btn-update').addEventListener('click', function(){
-  if (!HAS_GAS){ toast('Preview mode — deploy in Apps Script to save progress.'); return; }
-  if (DATA && DATA.viewerCharacter) document.getElementById('u-name').value = DATA.viewerCharacter;
-  var ranks = document.getElementById('u-ranks');
-  ranks.innerHTML = DATA.activities.map(function(a){
-    return '<div class="field"><label for="r-'+a.id+'">'+esc(a.name)+' — highest rank (0–'+a.maxRank+')</label>' +
-      '<input id="r-'+a.id+'" type="number" min="0" max="'+a.maxRank+'" data-act="'+a.id+'"></div>';
-  }).join('');
-  dlg.showModal();
-});
-document.getElementById('u-cancel').addEventListener('click', function(){ dlg.close(); });
-document.getElementById('u-save').addEventListener('click', function(){
-  var ranks = {};
-  document.querySelectorAll('#u-ranks input').forEach(function(i){ if(i.value!=='') ranks[i.dataset.act]=i.value; });
-  var payload = {
-    characterName: document.getElementById('u-name').value,
-    svFloor: document.getElementById('u-sv').value,
-    masterPoints: document.getElementById('u-points').value,
-    easyComplete: document.getElementById('u-easy').checked,
-    hardComplete: document.getElementById('u-hard').checked,
-    masterRanks: ranks
-  };
-  var btn = document.getElementById('u-save');
-  btn.disabled = true; btn.textContent = 'Saving…';
-  google.script.run
-    .withSuccessHandler(function(res){
-      btn.disabled = false; btn.textContent = 'Save progress'; dlg.close();
-      if (res.firstGuildie) toast('You are the First Guildie to Update this period! 🏅');
-      else if (res.changed) toast('Progress saved — the board is updating.');
-      else toast('Saved, but nothing changed — identical data does not count as an update.');
-      load();
-    })
-    .withFailureHandler(function(err){
-      btn.disabled = false; btn.textContent = 'Save progress';
-      toast('Could not save: ' + err.message);
-    })
-    .submitProgress(payload);
-});
-document.getElementById('btn-newperiod').addEventListener('click', function(){
-  if (!confirm('Start a new update period now? The current period will be closed and its winner kept in history.')) return;
-  google.script.run
-    .withSuccessHandler(function(){ toast('New update period started.'); load(); })
-    .withFailureHandler(function(err){ toast(err.message); })
-    .startNewPeriod();
+  document.getElementById('my-progress').scrollIntoView({behavior:'smooth'});
+  if (!API_URL) toast('Connect the Apps Script API to save progress.');
 });
 
 function toast(msg){

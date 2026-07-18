@@ -1,15 +1,9 @@
 # Guild assets
 
-Place the real guild logo in this directory using a stable descriptive filename such as:
+`guild-logo.png` is the supplied transparent OnlyPaws logo and is the stable production asset path used by the sidebar, member panel and favicon.
 
-`guild-logo.png`
-
-Requirements:
-
-- Do not commit temporary screenshots containing unrelated UI or private information.
-- Keep the original aspect ratio.
-- Provide useful alt text in the frontend.
-- Ensure the logo remains legible at mobile sizes.
-- Optimise the production image without replacing the original source unless explicitly intended.
-
-The application must not invent or substitute a different guild name or logo.
+- Preserve the original aspect ratio and transparency.
+- Replace the file only with an explicitly approved logo at the same exact path and filename.
+- Verify desktop and mobile sizing after replacement.
+- Keep useful `alt` text and the OnlyPaws text fallback in `Leaderboard.html`.
+- Do not commit temporary screenshots, private information or invented replacement branding.
