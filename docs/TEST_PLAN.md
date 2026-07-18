@@ -65,7 +65,8 @@ Automated tests must exercise the real backend implementation through a mocked G
 
 ## API
 
-- Valid GET and POST routes
+- GET health route returns the exact safe JSON fields without invoking `HtmlService` or exposing private data
+- POST routes preserve the public and protected action envelopes
 - Unknown route
 - Malformed JSON
 - Invalid and oversized payload

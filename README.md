@@ -4,8 +4,8 @@ A build-free guild progression tracker backed by Google Sheets and Google Apps S
 
 ## Architecture
 
-- `Code.gs` owns the Sheets schema, server-calculated totals, rankings, progression events, achievements, reset periods, caching and audit utilities.
-- `AuthApi.gs` exposes the JSON `/exec` API, character-name/PIN authentication, opaque sessions and protected member/administrator actions.
+- `Code.gs` owns the Sheets schema, server-calculated totals, rankings, progression events, achievements, reset periods, caching, audit utilities and the safe `GET /exec` health response.
+- `AuthApi.gs` exposes the JSON `POST /exec` API, character-name/PIN authentication, opaque sessions and protected member/administrator actions.
 - `Leaderboard.html`, `styles.css`, `config.js` and `AppFrontend.js` are the static HTML/CSS/vanilla-JavaScript application. No React, bundler or production Node server is used.
 - `index.html` opens `Leaderboard.html` with repository-relative paths suitable for the GitHub Pages project path.
 
@@ -41,13 +41,26 @@ Character-name/PIN authentication is suitable for a small trusted guild, not hig
 ## Backend setup and redeployment
 
 1. Back up the production spreadsheet and open **Extensions → Apps Script**.
-2. Copy the final `Code.gs` and `AuthApi.gs` into the bound Apps Script project. `Leaderboard.html` may remain for the legacy `doGet`, but the supported full interface is GitHub Pages because it also loads repository assets.
+2. Copy the final `Code.gs` and `AuthApi.gs` into the bound Apps Script project. `Leaderboard.html` is not required or served there: GitHub Pages hosts the interface, while Apps Script `/exec` hosts only the JSON API.
 3. Run `setupSpreadsheet()` once. It is idempotent and does not seed demo members.
 4. Verify every `Members.MemberId` has exactly one matching `Players.UserId`. In particular, verify Dax’s matching player row has `IsAdmin=TRUE` before relying on normal administrator login.
 5. Review `Config`, configure `MasterActivities`, and protect `Members`, `Sessions`, `LoginAttempts`, events, achievements, resets and audit sheets.
 6. Optionally set Script Property `BPSR_ADMIN_SECRET` for emergency recovery. Do not set any PIN, hash, salt or token in repository files.
 7. Choose **Deploy → Manage deployments**, edit the web-app deployment, select **New version**, and deploy with the access policy intended for the guild.
 8. Copy the resulting HTTPS URL ending in `/exec`. A source edit is not live until a new Apps Script deployment version is created.
+
+Opening `/exec` directly sends a `GET` request and returns this static JSON health response:
+
+```json
+{
+  "ok": true,
+  "service": "BPSR Guild Tracker API",
+  "status": "ready",
+  "message": "Use POST requests for API actions."
+}
+```
+
+This confirms only that the deployed GET handler is reachable; it does not verify spreadsheet authorization, POST routing, authentication or Pages-origin behavior. The tracker interface remains `https://daa13x.github.io/BPSR-Guild-Tracker/`. Public and protected API actions use JSON `POST` requests, and credentials or session tokens must never be placed in the URL.
 
 ## Configure the one API URL
 
@@ -57,7 +70,7 @@ Character-name/PIN authentication is suitable for a small trusted guild, not hig
 var configuredApiUrl = 'PASTE_APPS_SCRIPT_EXEC_URL_HERE';
 ```
 
-Do not invent an URL and do not place credentials in it. The same `BPSR_CONFIG.apiUrl` is used for public leaderboard reads and protected member/administrator calls.
+Do not invent an URL and do not place credentials in it. `BPSR_CONFIG.apiUrl` sends JSON `POST` requests for public leaderboard, member and administrator actions; direct browser navigation to the same URL is only the GET health diagnostic.
 
 For one-browser setup, `?api=https%3A%2F%2Fscript.google.com%2Fmacros%2Fs%2F...%2Fexec` is also accepted. Only an explicitly supplied, valid HTTPS Apps Script `/exec` URL is stored under `bpsrApiUrl`; invalid or unrelated URLs fail closed. Clear the site’s local storage if an obsolete test deployment was saved. Editing the constant is the recommended shared Pages configuration.
 
@@ -71,7 +84,7 @@ The sidebar reports **Not configured**, **Connecting**, **Connected**, or **API 
 4. Confirm the workflow succeeds and open `https://daa13x.github.io/BPSR-Guild-Tracker/`.
 5. Hard-refresh after changing `config.js`, then verify the connection state and a harmless leaderboard request.
 
-The workflow uploads the repository root. `.nojekyll`, `index.html`, `Leaderboard.html`, `config.js`, `styles.css`, `AppFrontend.js` and `assets/guild-logo.png` therefore retain project-relative URLs under `/BPSR-Guild-Tracker/`. A 404 usually means Pages Source is not GitHub Actions or deployment has not completed; a missing logo/script/style usually means a file or case-sensitive relative path is wrong; a failed publication is diagnosed in the Actions run log.
+The workflow uploads the repository root. `.nojekyll`, `index.html`, `Leaderboard.html`, `config.js`, `styles.css`, `AppFrontend.js` and `assets/guild-logo.png` therefore retain project-relative URLs under `/BPSR-Guild-Tracker/`. A 404 usually means Pages Source is not GitHub Actions or deployment has not completed; a missing logo/script/style usually means a file or case-sensitive relative path is wrong; a failed publication is diagnosed in the Actions run log. If `/exec` still returns HTML or a missing-`Leaderboard` error, deploy a new Apps Script version. If the health GET succeeds but Pages cannot connect, verify `config.js`, deployment access, POST redirect/response behavior and the Apps Script execution log.
 
 To replace the logo, overwrite `assets/guild-logo.png` with the approved transparent image at the same path, retain its aspect ratio, then verify both desktop and mobile. The sidebar supplies an OnlyPaws text fallback if the image fails.
 
