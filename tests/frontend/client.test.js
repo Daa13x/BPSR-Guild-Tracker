@@ -138,6 +138,17 @@ test('committed constant configures the production Apps Script URL and still yie
   assert.equal(overridden.config.source, 'query');
 });
 
+test('local mock backends are accepted for development while other origins fail closed', () => {
+  const local = runConfig('?api=' + encodeURIComponent('http://localhost:8788/exec'), {});
+  assert.equal(local.config.isConfigured(), true);
+  assert.equal(local.config.source, 'query');
+  const loopback = runConfig('?api=' + encodeURIComponent('http://127.0.0.1:8788/exec'), {});
+  assert.equal(loopback.config.isConfigured(), true);
+  const remote = runConfig('?api=' + encodeURIComponent('https://evil.example.com/exec'), {});
+  assert.equal(remote.config.isConfigured(), false);
+  assert.equal(remote.config.invalidQuery, true);
+});
+
 test('invalid API values and unavailable storage fail closed without breaking the page', () => {
   const invalid = runConfig('?api=' + encodeURIComponent('https://example.com/not-apps-script'), {
     bpsrApiUrl: 'javascript:alert(1)'

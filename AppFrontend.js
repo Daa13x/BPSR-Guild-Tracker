@@ -1,4 +1,6 @@
-/* Build-free member and administrator controller for the static tracker. */
+/* Build-free member and administrator controller for the static tracker.
+ * Passwordless accounts: a remembered-device cookie holds only an opaque
+ * session token; the backend decides identity and role on every request. */
 (function (root) {
   'use strict';
 
@@ -7,49 +9,21 @@
     timeoutMs: 15000,
     isConfigured: function () { return false; }
   };
-  var keys = { member: 'bpsr.member.session', admin: 'bpsr.admin.session' };
+  var LEGACY_KEYS = { member: 'bpsr.member.session', admin: 'bpsr.admin.session' };
   var state = {
     member: null,
-    admin: null,
+    session: null,
+    recoveryToken: null,
+    backupCode: null,
+    codeAcknowledged: true,
     selected: null,
     selectedProfile: null,
-    activities: []
+    activities: [],
+    mySeal: null
   };
 
   function configured() {
     return CONFIG.isConfigured ? CONFIG.isConfigured() : Boolean(CONFIG.apiUrl);
-  }
-
-  function get(kind) {
-    try {
-      return JSON.parse(root.localStorage.getItem(keys[kind]) || 'null');
-    } catch (_) {
-      return null;
-    }
-  }
-
-  function save(kind, session, display) {
-    try {
-      root.localStorage.setItem(keys[kind], JSON.stringify({
-        token: session.token,
-        expiresAt: session.expiresAt,
-        kind: kind,
-        display: display || ''
-      }));
-    } catch (_) {
-      throw Object.assign(new Error('This browser cannot store a session. Allow local storage and try again.'), {
-        code: 'STORAGE_UNAVAILABLE'
-      });
-    }
-  }
-
-  function clear(kind) {
-    try { root.localStorage.removeItem(keys[kind]); } catch (_) { /* best effort */ }
-    state[kind] = null;
-    if (kind === 'admin') {
-      state.selected = null;
-      state.selectedProfile = null;
-    }
   }
 
   function api(action, data) {
@@ -92,6 +66,79 @@
     });
   }
 
+  // -------------------------------------------------------------------------
+  // Remembered-device cookie — an opaque token only; never the account itself
+  // -------------------------------------------------------------------------
+
+  function secureContext() {
+    return Boolean(root.location && root.location.protocol === 'https:');
+  }
+
+  function cookieName() {
+    return secureContext() ? '__Secure-bpsr-member-session' : 'bpsr-member-session';
+  }
+
+  function cookiePath() {
+    var pathname = (root.location && root.location.pathname) || '/';
+    return pathname.slice(0, pathname.lastIndexOf('/') + 1) || '/';
+  }
+
+  function readCookie() {
+    var target = cookieName() + '=';
+    var parts = String(root.document.cookie || '').split(';');
+    for (var i = 0; i < parts.length; i++) {
+      var candidate = parts[i].trim();
+      if (candidate.indexOf(target) === 0) return decodeURIComponent(candidate.slice(target.length));
+    }
+    return '';
+  }
+
+  function writeCookie(token, expiresAt) {
+    var seconds = Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000);
+    if (!isFinite(seconds) || seconds < 60) seconds = 180 * 24 * 60 * 60;
+    var cookie = cookieName() + '=' + encodeURIComponent(token) +
+      '; Path=' + cookiePath() + '; Max-Age=' + seconds + '; SameSite=Lax';
+    if (secureContext()) cookie += '; Secure';
+    root.document.cookie = cookie;
+  }
+
+  function clearCookie() {
+    var cookie = cookieName() + '=; Path=' + cookiePath() + '; Max-Age=0; SameSite=Lax';
+    if (secureContext()) cookie += '; Secure';
+    root.document.cookie = cookie;
+  }
+
+  function readLegacy(kind) {
+    try {
+      return JSON.parse(root.localStorage.getItem(LEGACY_KEYS[kind]) || 'null');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function removeLegacy() {
+    try {
+      root.localStorage.removeItem(LEGACY_KEYS.member);
+      root.localStorage.removeItem(LEGACY_KEYS.admin);
+    } catch (_) { /* best effort */ }
+  }
+
+  function signedOutLocally() {
+    clearCookie();
+    state.member = null;
+    state.session = null;
+    state.backupCode = null;
+    state.codeAcknowledged = true;
+    state.mySeal = null;
+    syncAdminVisibility(Boolean(state.recoveryToken));
+    renderMember();
+    renderAdmin();
+  }
+
+  // -------------------------------------------------------------------------
+  // Small DOM helpers
+  // -------------------------------------------------------------------------
+
   function E(tag, text) {
     var node = document.createElement(tag);
     if (text != null) node.textContent = text;
@@ -127,12 +174,12 @@
 
   function handleError(kind, failure) {
     if (failure && failure.code === 'SESSION_EXPIRED') {
-      clear(kind);
       if (kind === 'member') {
-        renderMember();
+        signedOutLocally();
+        showGate('returning');
       } else {
-        state.admin = false;
-        syncAdminVisibility(Boolean(get('admin') || (state.member && state.member.isAdmin)));
+        state.recoveryToken = null;
+        syncAdminVisibility(Boolean(state.member && state.member.isAdmin));
         renderAdmin();
       }
       return;
@@ -155,46 +202,273 @@
     return button;
   }
 
-  function acceptAdminSession(result) {
-    if (result && result.member && result.member.isAdmin && result.adminSession) {
-      save('admin', result.adminSession, result.member.characterName);
-      state.admin = true;
-      syncAdminVisibility(true);
+  function copyText(value, done) {
+    var finish = function (ok) { if (done) done(ok); };
+    if (root.navigator && root.navigator.clipboard && root.navigator.clipboard.writeText) {
+      root.navigator.clipboard.writeText(value).then(function () { finish(true); }, function () { finish(false); });
+    } else {
+      finish(false);
     }
   }
 
-  function authForm(mode) {
-    var form = E('form');
-    form.className = 'auth-card';
-    form.appendChild(E('h3', mode === 'register' ? 'Create member account' : 'Member sign in'));
-    var name = field('Character name', 'characterName', 'text', 'Your in-game name');
-    var pin = field('PIN', 'pin', 'password', 'At least 6 digits');
-    name.input.autocomplete = 'username';
-    pin.input.autocomplete = mode === 'register' ? 'new-password' : 'current-password';
-    pin.input.inputMode = 'numeric';
-    form.appendChild(name.wrap);
-    form.appendChild(pin.wrap);
-    var submit = E('button', mode === 'register' ? 'Register' : 'Sign in');
-    submit.type = 'submit';
-    form.appendChild(submit);
-    form.addEventListener('submit', function (event) {
+  function memberToken() {
+    return state.session ? state.session.token : '';
+  }
+
+  function adminToken() {
+    return state.recoveryToken || memberToken();
+  }
+
+  // -------------------------------------------------------------------------
+  // First-visit gate — "Who are you?"
+  // -------------------------------------------------------------------------
+
+  function hideGate() {
+    var gate = document.getElementById('gate');
+    if (gate) {
+      gate.hidden = true;
+      gate.replaceChildren();
+    }
+  }
+
+  function showGate(activeTab) {
+    var gate = document.getElementById('gate');
+    if (!gate || !configured()) return;
+    gate.replaceChildren();
+    gate.hidden = false;
+
+    var card = E('div');
+    card.className = 'gate-card';
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-modal', 'true');
+    card.setAttribute('aria-labelledby', 'gate-title');
+    gate.appendChild(card);
+
+    card.appendChild(E('p', 'ONLYPAWS GUILD')).className = 'eyebrow';
+    var title = E('h2', 'Who are you?');
+    title.id = 'gate-title';
+    card.appendChild(title);
+    card.appendChild(E('p', 'This tracker remembers you on this browser — no password needed.')).className = 'gate-sub';
+
+    var message = E('div');
+    message.className = 'notice';
+    message.setAttribute('role', 'status');
+
+    var tabs = E('div');
+    tabs.className = 'gate-tabs';
+    tabs.setAttribute('role', 'tablist');
+    tabs.setAttribute('aria-label', 'Account paths');
+    var panels = E('div');
+
+    var newTab = E('button', 'New user');
+    var returningTab = E('button', 'Returning user');
+    [newTab, returningTab].forEach(function (tab, index) {
+      tab.type = 'button';
+      tab.className = 'gate-tab';
+      tab.setAttribute('role', 'tab');
+      tab.id = index === 0 ? 'gate-tab-new' : 'gate-tab-returning';
+      tabs.appendChild(tab);
+    });
+    card.appendChild(tabs);
+    card.appendChild(message);
+    card.appendChild(panels);
+
+    var newPanel = E('form');
+    newPanel.className = 'gate-panel';
+    newPanel.setAttribute('role', 'tabpanel');
+    newPanel.setAttribute('aria-labelledby', 'gate-tab-new');
+    newPanel.appendChild(E('h3', 'Create your account'));
+    var newName = field('Character name', 'characterName', 'text', 'Enter your character name');
+    newName.input.autocomplete = 'username';
+    newPanel.appendChild(newName.wrap);
+    var createButton = E('button', 'Create my account');
+    createButton.type = 'submit';
+    newPanel.appendChild(createButton);
+
+    var returningPanel = E('form');
+    returningPanel.className = 'gate-panel';
+    returningPanel.setAttribute('role', 'tabpanel');
+    returningPanel.setAttribute('aria-labelledby', 'gate-tab-returning');
+    returningPanel.appendChild(E('h3', 'Restore your account'));
+    var returningName = field('Character name', 'characterName', 'text', 'Enter your character name');
+    returningName.input.autocomplete = 'username';
+    var codeField = field('Backup code', 'backupCode', 'text', 'BPSR-____-____-____');
+    codeField.input.autocomplete = 'one-time-code';
+    codeField.input.spellcheck = false;
+    returningPanel.appendChild(returningName.wrap);
+    returningPanel.appendChild(codeField.wrap);
+    var restoreButton = E('button', 'Restore access');
+    restoreButton.type = 'submit';
+    returningPanel.appendChild(restoreButton);
+    var lost = E('p', 'Lost your backup code? Contact Dax or another guild administrator.');
+    lost.className = 'gate-hint';
+    returningPanel.appendChild(lost);
+
+    panels.appendChild(newPanel);
+    panels.appendChild(returningPanel);
+
+    function selectTab(which) {
+      var isNew = which !== 'returning';
+      newTab.setAttribute('aria-selected', String(isNew));
+      returningTab.setAttribute('aria-selected', String(!isNew));
+      newTab.tabIndex = isNew ? 0 : -1;
+      returningTab.tabIndex = isNew ? -1 : 0;
+      newPanel.hidden = !isNew;
+      returningPanel.hidden = isNew;
+      (isNew ? newName : returningName).input.focus();
+    }
+    newTab.addEventListener('click', function () { selectTab('new'); });
+    returningTab.addEventListener('click', function () { selectTab('returning'); });
+    tabs.addEventListener('keydown', function (event) {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
       event.preventDefault();
-      if (submit.disabled) return;
-      submit.disabled = true;
-      api(mode, { characterName: name.input.value, pin: pin.input.value }).then(function (result) {
-        save('member', result.session, result.member.characterName);
-        state.member = result.member;
-        acceptAdminSession(result);
-        renderMember();
-        if (result.member.isAdmin) renderAdmin();
+      selectTab(newTab.getAttribute('aria-selected') === 'true' ? 'returning' : 'new');
+    });
+
+    newPanel.addEventListener('submit', function (event) {
+      event.preventDefault();
+      if (createButton.disabled) return;
+      createButton.disabled = true;
+      api('createAccount', { characterName: newName.input.value }).then(function (result) {
+        adoptSession(result, { showCode: true });
       }).catch(function (failure) {
-        handleError('member', failure);
+        if (failure && failure.code === 'DUPLICATE') {
+          selectTab('returning');
+          returningName.input.value = newName.input.value;
+          codeField.input.focus();
+        }
+        message.className = 'notice error';
+        message.textContent = failure && failure.message || 'Request could not be completed.';
       }).finally(function () {
-        submit.disabled = false;
+        createButton.disabled = false;
       });
     });
-    return form;
+
+    returningPanel.addEventListener('submit', function (event) {
+      event.preventDefault();
+      if (restoreButton.disabled) return;
+      restoreButton.disabled = true;
+      api('restore', { characterName: returningName.input.value, backupCode: codeField.input.value }).then(function (result) {
+        adoptSession(result, { showCode: false });
+      }).catch(function (failure) {
+        message.className = 'notice error';
+        message.textContent = failure && failure.message || 'Request could not be completed.';
+      }).finally(function () {
+        restoreButton.disabled = false;
+      });
+    });
+
+    var browse = E('button', 'Continue without an account — view the leaderboards only');
+    browse.type = 'button';
+    browse.className = 'gate-browse';
+    browse.addEventListener('click', hideGate);
+    card.appendChild(browse);
+
+    selectTab(activeTab === 'returning' ? 'returning' : 'new');
   }
+
+  function adoptSession(result, options) {
+    state.session = { token: result.session.token, expiresAt: result.session.expiresAt };
+    state.member = result.member;
+    writeCookie(result.session.token, result.session.expiresAt);
+    removeLegacy();
+    if (options && options.showCode && result.backupCode) {
+      state.backupCode = result.backupCode;
+      state.codeAcknowledged = false;
+    }
+    hideGate();
+    syncAdminVisibility(Boolean(state.member.isAdmin || state.recoveryToken));
+    renderMember();
+    if (state.member.isAdmin) renderAdmin();
+    if (root.load) root.load();
+    if (root.loadMasterSeal) root.loadMasterSeal();
+  }
+
+  // -------------------------------------------------------------------------
+  // Backup-code presentation
+  // -------------------------------------------------------------------------
+
+  function codeSavePanel(host) {
+    var panel = E('section');
+    panel.className = 'code-panel';
+    panel.setAttribute('aria-label', 'Backup code');
+    panel.appendChild(E('h3', 'Please save this somewhere'));
+    panel.appendChild(E('p', 'Your backup code:'));
+    var code = E('strong', state.backupCode);
+    code.className = 'code-value';
+    panel.appendChild(code);
+    panel.appendChild(E('p', 'You will need this code if you lose access to this browser.'));
+    var row = E('div');
+    row.className = 'code-actions';
+    var copy = E('button', 'Copy code');
+    copy.type = 'button';
+    copy.addEventListener('click', function () {
+      copyText(state.backupCode, function (ok) {
+        copy.textContent = ok ? 'Copied' : 'Copy failed — write it down';
+      });
+    });
+    var saved = E('button', 'I have saved it');
+    saved.type = 'button';
+    saved.addEventListener('click', function () {
+      state.codeAcknowledged = true;
+      renderMember();
+    });
+    row.appendChild(copy);
+    row.appendChild(saved);
+    panel.appendChild(row);
+    host.appendChild(panel);
+  }
+
+  function codeInlineControl(host) {
+    var wrap = E('div');
+    wrap.className = 'code-inline';
+    wrap.appendChild(E('span', 'Backup access'));
+    var value = E('code', '••••-••••-••••');
+    var revealed = false;
+    var reveal = E('button', 'Reveal');
+    reveal.type = 'button';
+    reveal.addEventListener('click', function () {
+      if (revealed) {
+        revealed = false;
+        value.textContent = '••••-••••-••••';
+        reveal.textContent = 'Reveal';
+        return;
+      }
+      Promise.resolve(state.backupCode || api('myBackupCode', { token: memberToken() }).then(function (result) {
+        state.backupCode = result.backupCode;
+        return result.backupCode;
+      })).then(function (code) {
+        revealed = true;
+        value.textContent = code || 'No code on file — ask an administrator';
+        reveal.textContent = 'Hide';
+      }).catch(function (failure) {
+        handleError('member', failure);
+      });
+    });
+    var copy = E('button', 'Copy');
+    copy.type = 'button';
+    copy.addEventListener('click', function () {
+      Promise.resolve(state.backupCode || api('myBackupCode', { token: memberToken() }).then(function (result) {
+        state.backupCode = result.backupCode;
+        return result.backupCode;
+      })).then(function (code) {
+        copyText(code, function (ok) {
+          copy.textContent = ok ? 'Copied' : 'Copy failed';
+          root.setTimeout(function () { copy.textContent = 'Copy'; }, 2500);
+        });
+      }).catch(function (failure) {
+        handleError('member', failure);
+      });
+    });
+    wrap.appendChild(value);
+    wrap.appendChild(reveal);
+    wrap.appendChild(copy);
+    host.appendChild(wrap);
+  }
+
+  // -------------------------------------------------------------------------
+  // Member area
+  // -------------------------------------------------------------------------
 
   function renderMember() {
     var host = document.getElementById('member-ui');
@@ -204,59 +478,63 @@
     message.className = 'notice';
     message.setAttribute('role', 'status');
     host.appendChild(message);
-    var session = get('member');
 
-    if (!session) {
-      state.member = null;
-      syncAdminVisibility(Boolean(get('admin')));
+    if (!state.session || !state.member) {
+      syncAdminVisibility(Boolean(state.recoveryToken));
       message.textContent = configured()
-        ? 'Register or sign in with your character name and PIN.'
-        : 'Set the Apps Script URL in config.js to connect registration and progression.';
-      var authGrid = E('div');
-      authGrid.className = 'auth-grid';
-      authGrid.appendChild(authForm('register'));
-      authGrid.appendChild(authForm('login'));
-      host.appendChild(authGrid);
-      var recovery = E('details');
-      recovery.appendChild(E('summary', 'Emergency administrator recovery'));
-      recovery.appendChild(actionButton('Open recovery controls', 'member', function () {
-        var section = document.getElementById('administration');
-        if (section) {
-          section.hidden = false;
-          renderAdmin();
-          section.scrollIntoView({ behavior: 'smooth' });
-        }
-      }));
-      host.appendChild(recovery);
+        ? 'No account is remembered on this browser yet.'
+        : 'Set the Apps Script URL in config.js to connect accounts and progression.';
+      if (configured()) {
+        var open = E('button', 'Create account or restore access');
+        open.type = 'button';
+        open.className = 'btn';
+        open.addEventListener('click', function () { showGate('new'); });
+        host.appendChild(open);
+        var recovery = E('details');
+        recovery.appendChild(E('summary', 'Emergency administrator recovery'));
+        recovery.appendChild(actionButton('Open recovery controls', 'member', function () {
+          var section = document.getElementById('administration');
+          if (section) {
+            section.hidden = false;
+            renderAdmin();
+            if (section.scrollIntoView) section.scrollIntoView({ behavior: 'smooth' });
+          }
+        }));
+        host.appendChild(recovery);
+      }
       return;
     }
 
-    var profile = state.member || {};
-    syncAdminVisibility(Boolean(profile.isAdmin || get('admin')));
-    message.textContent = 'Signed in as ' + (profile.characterName || session.display) +
-      '. Totals are calculated by the server.';
+    var profile = state.member;
+    syncAdminVisibility(Boolean(profile.isAdmin || state.recoveryToken));
+    message.textContent = 'Signed in as ' + profile.characterName + ' on this remembered device.';
     if (profile.isAdmin) {
       var badge = E('span', 'Administrator');
       badge.className = 'pill';
       message.appendChild(badge);
     }
 
+    if (state.backupCode && !state.codeAcknowledged) codeSavePanel(host);
+    else codeInlineControl(host);
+
     var metrics = E('div');
     metrics.className = 'metric-grid compact';
-    var svMetric = E('div');
-    svMetric.className = 'metric-card';
-    svMetric.appendChild(E('span', 'SV floor'));
-    svMetric.appendChild(E('strong', String(profile.svFloor || 0)));
-    var masterMetric = E('div');
-    masterMetric.className = 'metric-card';
-    masterMetric.appendChild(E('span', 'Master points'));
-    masterMetric.appendChild(E('strong', String(profile.masterPoints || 0)));
-    metrics.appendChild(svMetric);
-    metrics.appendChild(masterMetric);
+    [['SV floor', String(profile.svFloor || 0)],
+     ['Master points', String(profile.masterPoints || 0)],
+     ['Master Seal', state.mySeal ? String(state.mySeal.totals.totalScore) + ' / ' + String(state.mySeal.season.maxScore) : '—']]
+      .forEach(function (pair) {
+        var cardNode = E('div');
+        cardNode.className = 'metric-card';
+        cardNode.appendChild(E('span', pair[0]));
+        cardNode.appendChild(E('strong', pair[1]));
+        metrics.appendChild(cardNode);
+      });
     host.appendChild(metrics);
 
+    // -- SV and Master activity progression (unchanged model) --
     var form = E('form');
     form.className = 'progress-card';
+    form.appendChild(E('h3', 'SV and Masters progression'));
     var sv = field('Highest SV floor (1–60)', 'svFloor', 'number', 'Leave blank if unchanged');
     sv.input.min = '1';
     sv.input.max = '60';
@@ -299,7 +577,7 @@
         masterRanks[rank.dataset.activity] = rank.value;
       });
       api('progress', {
-        token: session.token,
+        token: memberToken(),
         svFloor: sv.input.value || undefined,
         masterRanks: masterRanks
       }).then(function (result) {
@@ -314,14 +592,160 @@
       });
     });
     host.appendChild(form);
-    host.appendChild(actionButton('Sign out', 'member', function () {
-      return api('logout', { token: session.token, kind: 'member' }).finally(function () {
-        clear('member');
-        syncAdminVisibility(Boolean(get('admin')));
-        renderMember();
+
+    host.appendChild(buildSealForm());
+
+    var sessionRow = E('div');
+    sessionRow.className = 'session-actions';
+    sessionRow.appendChild(actionButton('Sign out of this device', 'member', function () {
+      return api('logout', { token: memberToken(), kind: 'member' }).catch(function () { /* revoke is best effort */ })
+        .then(function () {
+          signedOutLocally();
+          showGate('returning');
+        });
+    }));
+    sessionRow.appendChild(actionButton('Revoke all devices', 'member', function () {
+      if (!root.confirm('Sign this account out of every remembered browser? You will need your backup code to return.')) return;
+      return api('revokeAllDevices', { token: memberToken() }).then(function () {
+        signedOutLocally();
+        showGate('returning');
       });
     }));
+    host.appendChild(sessionRow);
   }
+
+  // -------------------------------------------------------------------------
+  // Master Seal — the member edits only their own six dungeons
+  // -------------------------------------------------------------------------
+
+  function buildSealForm() {
+    var form = E('form');
+    form.className = 'progress-card seal-form';
+    form.appendChild(E('h3', 'Master Seal — Season 3'));
+    var hint = E('p', 'Record your best Master level and points for each dungeon. Totals are calculated by the server.');
+    hint.className = 'seal-hint';
+    form.appendChild(hint);
+    var grid = E('div');
+    grid.className = 'seal-edit-grid';
+    grid.textContent = 'Loading your Master Seal progress…';
+    form.appendChild(grid);
+    var submit = E('button', 'Save Master Seal progress');
+    submit.type = 'submit';
+    submit.disabled = true;
+    form.appendChild(submit);
+
+    api('myMasterSeal', { token: memberToken() }).then(function (mine) {
+      state.mySeal = mine;
+      grid.replaceChildren();
+      mine.season.dungeons.forEach(function (dungeon) {
+        var record = null;
+        mine.dungeons.forEach(function (d) { if (d.dungeonId === dungeon.id) record = d; });
+        var group = E('fieldset');
+        group.className = 'seal-edit';
+        group.dataset.dungeon = dungeon.id;
+        var legend = E('legend', dungeon.number + '. ' + dungeon.name);
+        group.appendChild(legend);
+
+        var clearedLabel = E('label');
+        clearedLabel.className = 'seal-cleared';
+        var cleared = E('input');
+        cleared.type = 'checkbox';
+        cleared.name = 'cleared-' + dungeon.id;
+        cleared.checked = Boolean(record && record.cleared);
+        clearedLabel.appendChild(cleared);
+        clearedLabel.appendChild(E('span', 'Cleared'));
+
+        var levelWrap = E('label');
+        levelWrap.className = 'field';
+        levelWrap.appendChild(E('span', 'Master level'));
+        var level = document.createElement('select');
+        level.name = 'level-' + dungeon.id;
+        var none = document.createElement('option');
+        none.value = '';
+        none.textContent = 'Not cleared';
+        level.appendChild(none);
+        for (var i = 0; i <= mine.season.maxMasterLevel; i++) {
+          var option = document.createElement('option');
+          option.value = String(i);
+          option.textContent = 'M' + i;
+          level.appendChild(option);
+        }
+        level.value = record && record.bestMasterLevel !== null ? String(record.bestMasterLevel) : '';
+        levelWrap.appendChild(level);
+
+        var points = field('Points', 'points-' + dungeon.id, 'number', '0');
+        points.input.min = '0';
+        points.input.max = String(mine.season.maxScore);
+        points.input.inputMode = 'numeric';
+        points.input.value = record ? String(record.points) : '0';
+
+        function syncCleared() {
+          level.disabled = !cleared.checked;
+          points.input.disabled = !cleared.checked;
+          if (!cleared.checked) {
+            level.value = '';
+            points.input.value = '0';
+          }
+        }
+        cleared.addEventListener('change', syncCleared);
+        syncCleared();
+
+        group.appendChild(clearedLabel);
+        group.appendChild(levelWrap);
+        group.appendChild(points.wrap);
+        grid.appendChild(group);
+      });
+      submit.disabled = false;
+      renderSealMetric();
+    }).catch(function (failure) {
+      grid.textContent = '';
+      handleError('member', failure);
+    });
+
+    form.addEventListener('submit', function (event) {
+      event.preventDefault();
+      if (submit.disabled) return;
+      submit.disabled = true;
+      var dungeons = {};
+      grid.querySelectorAll('fieldset[data-dungeon]').forEach(function (group) {
+        var id = group.dataset.dungeon;
+        var cleared = group.querySelector('input[type="checkbox"]').checked;
+        var level = group.querySelector('select').value;
+        var points = group.querySelector('input[type="number"]').value;
+        dungeons[id] = {
+          cleared: cleared,
+          bestMasterLevel: cleared && level !== '' ? Number(level) : null,
+          points: cleared ? Number(points || 0) : 0
+        };
+      });
+      api('masterSealUpdate', { token: memberToken(), dungeons: dungeons }).then(function (result) {
+        if (state.mySeal) {
+          state.mySeal.dungeons = result.dungeons;
+          state.mySeal.totals = result.totals;
+        }
+        notice('member', result.changed ? 'Master Seal progress saved.' : 'No Master Seal changes.');
+        renderSealMetric();
+        if (root.loadMasterSeal) root.loadMasterSeal();
+      }).catch(function (failure) {
+        handleError('member', failure);
+      }).finally(function () {
+        submit.disabled = false;
+      });
+    });
+    return form;
+  }
+
+  function renderSealMetric() {
+    var cards = document.querySelectorAll('#member-ui .metric-card');
+    if (cards.length >= 3 && state.mySeal) {
+      cards[2].querySelector('strong').textContent =
+        String(state.mySeal.totals.totalScore) + ' / ' + String(state.mySeal.season.maxScore);
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Administration — the member session is the credential; role is live
+  // -------------------------------------------------------------------------
 
   function selectedDetails(profile) {
     state.selectedProfile = profile;
@@ -330,10 +754,14 @@
       details.replaceChildren();
       var rows = [
         ['Character', profile.characterName],
+        ['Member ID', profile.memberId],
         ['SV floor', profile.svFloor],
         ['Master points', profile.masterPoints],
         ['Role', profile.isAdmin ? 'Administrator' : 'Member'],
-        ['Status', profile.disabled ? 'Disabled' : 'Active']
+        ['Status', profile.disabled ? 'Disabled' : 'Active'],
+        ['Backup code', profile.backupCodeSet ? 'Set · updated ' + (profile.backupCodeUpdatedAt || '').slice(0, 10) : 'Missing'],
+        ['Last access', profile.lastAccessAt ? profile.lastAccessAt.slice(0, 10) : '—'],
+        ['Active devices', profile.activeSessions]
       ];
       rows.forEach(function (row) {
         var item = E('div');
@@ -352,6 +780,8 @@
     var disabled = document.getElementById('admin-disabled-toggle');
     if (role) role.textContent = profile.isAdmin ? 'Remove administrator role' : 'Make administrator';
     if (disabled) disabled.textContent = profile.disabled ? 'Enable member' : 'Disable member';
+    var codeValue = document.getElementById('admin-code-value');
+    if (codeValue) codeValue.textContent = 'Hidden — use Reveal';
   }
 
   function adminCard(title, description) {
@@ -370,13 +800,12 @@
     message.className = 'notice';
     message.setAttribute('role', 'status');
     host.appendChild(message);
-    var session = get('admin');
 
-    if (!session) {
-      state.admin = false;
-      message.textContent = get('member') && state.member && state.member.isAdmin
-        ? 'Your administrator role is active, but this browser has no administrator session. Sign out of your member account and sign in again to reopen administrator controls.'
-        : 'Administrator access comes from a member account with the administrator role.';
+    var token = adminToken();
+    var isAdminMember = Boolean(state.member && state.member.isAdmin && state.session);
+
+    if (!isAdminMember && !state.recoveryToken) {
+      message.textContent = 'Administrator access comes from a member account whose live role is administrator.';
       var recovery = E('details');
       var summary = E('summary', 'Emergency recovery');
       var recoveryForm = E('form');
@@ -385,7 +814,7 @@
       var recover = E('button', 'Use recovery secret');
       recover.type = 'submit';
       recovery.appendChild(summary);
-      recoveryForm.appendChild(E('p', 'Use only if no member administrator can sign in.'));
+      recoveryForm.appendChild(E('p', 'Use only if no member administrator can sign in. The recovery session lives in memory and ends when this page closes.'));
       recoveryForm.appendChild(secret.wrap);
       recoveryForm.appendChild(recover);
       recovery.appendChild(recoveryForm);
@@ -394,8 +823,7 @@
         if (recover.disabled) return;
         recover.disabled = true;
         api('adminLogin', { secret: secret.input.value }).then(function (result) {
-          save('admin', result.session, 'Emergency recovery');
-          state.admin = true;
+          state.recoveryToken = result.session.token;
           syncAdminVisibility(true);
           renderAdmin();
         }).catch(function (failure) {
@@ -408,9 +836,10 @@
       return;
     }
 
-    state.admin = true;
     syncAdminVisibility(true);
-    message.textContent = 'Administrator session active. Every change is authorized and audited server-side.';
+    message.textContent = state.recoveryToken
+      ? 'Emergency recovery session active. Every change is authorized and audited server-side.'
+      : 'Administrator role active. Every change is authorized and audited server-side.';
     var adminGrid = E('div');
     adminGrid.className = 'admin-grid';
     host.appendChild(adminGrid);
@@ -431,14 +860,17 @@
 
     function loadMembers() {
       memberList.textContent = 'Loading members…';
-      return api('adminMembers', { token: session.token, query: search.input.value }).then(function (members) {
+      return api('adminMembers', { token: token, query: search.input.value }).then(function (members) {
         memberList.replaceChildren();
         members.forEach(function (member) {
           var label = member.characterName + ' — SV ' + member.svFloor +
-            (member.isAdmin ? ' — Administrator' : '') + (member.disabled ? ' — Disabled' : '');
+            (member.isAdmin ? ' — Administrator' : '') +
+            (member.disabled ? ' — Disabled' : '') +
+            (member.backupCodeSet ? '' : ' — No backup code') +
+            ' — ' + member.activeSessions + ' device' + (member.activeSessions === 1 ? '' : 's');
           var select = actionButton(label, 'admin', function () {
             state.selected = member.memberId;
-            return api('adminRead', { token: session.token, memberId: member.memberId })
+            return api('adminRead', { token: token, memberId: member.memberId })
               .then(selectedDetails);
           });
           select.className = 'member-row';
@@ -452,7 +884,50 @@
       loadMembers().catch(function (failure) { handleError('admin', failure); });
     });
 
-    var editCard = adminCard('Selected member', 'Edit permitted fields or change account status and role.');
+    var recoveryCard = adminCard('Backup access', 'Reveal, copy or regenerate a member’s backup code, or revoke their devices. Reveals and changes are audited.');
+    var codeRow = E('div');
+    codeRow.className = 'code-inline admin-code';
+    codeRow.appendChild(E('span', 'Backup code'));
+    var codeValue = E('code', 'Hidden — use Reveal');
+    codeValue.id = 'admin-code-value';
+    codeRow.appendChild(codeValue);
+    recoveryCard.appendChild(codeRow);
+    recoveryCard.appendChild(actionButton('Reveal backup code', 'admin', function () {
+      if (!state.selected) throw new Error('Select a member first.');
+      return api('adminBackupCode', { token: token, memberId: state.selected }).then(function (result) {
+        codeValue.textContent = result.backupCodeSet ? result.backupCode : 'No code on file — regenerate one';
+      });
+    }));
+    recoveryCard.appendChild(actionButton('Copy backup code', 'admin', function () {
+      if (!state.selected) throw new Error('Select a member first.');
+      return api('adminBackupCode', { token: token, memberId: state.selected }).then(function (result) {
+        if (!result.backupCodeSet) throw new Error('No code on file — regenerate one.');
+        copyText(result.backupCode, function (ok) {
+          notice('admin', ok ? 'Backup code copied.' : 'Copy failed — use Reveal and copy manually.', !ok);
+        });
+      });
+    }));
+    recoveryCard.appendChild(actionButton('Regenerate backup code', 'admin', function () {
+      if (!state.selectedProfile) throw new Error('Select a member first.');
+      if (!root.confirm('Regenerate the backup code for ' + state.selectedProfile.characterName + '? The old code stops working immediately.')) return;
+      var revoke = root.confirm('Also sign this member out of every remembered device?');
+      return api('adminRegenerateBackupCode', { token: token, memberId: state.selected, revokeSessions: revoke }).then(function (result) {
+        selectedDetails(result.profile);
+        codeValue.textContent = result.backupCode;
+        notice('admin', 'Backup code regenerated' + (revoke ? ' and devices revoked.' : '.'));
+      });
+    }));
+    recoveryCard.appendChild(actionButton('Revoke all devices', 'admin', function () {
+      if (!state.selectedProfile) throw new Error('Select a member first.');
+      if (!root.confirm('Sign ' + state.selectedProfile.characterName + ' out of every remembered device?')) return;
+      return api('adminRevokeSessions', { token: token, memberId: state.selected }).then(function (profile) {
+        selectedDetails(profile);
+        notice('admin', 'All remembered devices revoked.');
+      });
+    }));
+    adminGrid.appendChild(recoveryCard);
+
+    var editCard = adminCard('Selected member', 'Rename, correct SV or change account status and role.');
     var editForm = E('form');
     var characterName = field('Character name', 'characterName', 'text', 'Character name');
     var svFloor = field('SV floor', 'svFloor', 'number', '1–60');
@@ -469,7 +944,7 @@
       if (saveMember.disabled) return;
       saveMember.disabled = true;
       api('adminEdit', {
-        token: session.token,
+        token: token,
         memberId: state.selected,
         characterName: characterName.input.value || undefined,
         svFloor: svFloor.input.value || undefined
@@ -492,14 +967,20 @@
       if (!root.confirm(warning + 'Confirm ' + (desired ? 'promotion' : 'demotion') +
         ' for ' + state.selectedProfile.characterName + '?')) return;
       return api('adminSetRole', {
-        token: session.token,
+        token: token,
         memberId: state.selected,
         isAdmin: desired,
         confirmSelf: self && !desired
       }).then(function (profile) {
         selectedDetails(profile);
+        if (self && !desired) {
+          state.member.isAdmin = false;
+          syncAdminVisibility(Boolean(state.recoveryToken));
+          renderMember();
+          return;
+        }
         return refreshAll(desired ? 'Member promoted to administrator.' :
-          'Administrator role removed and administrator sessions revoked.');
+          'Administrator role removed; their session no longer authorizes admin actions.');
       });
     });
     roleButton.id = 'admin-role-toggle';
@@ -512,7 +993,7 @@
       if (!root.confirm((disabled ? 'Disable ' : 'Enable ') +
         state.selectedProfile.characterName + '?' + warning)) return;
       return api('adminSetDisabled', {
-        token: session.token,
+        token: token,
         memberId: state.selected,
         disabled: disabled
       }).then(function (profile) {
@@ -535,7 +1016,7 @@
     var remove = field('Member ID to remove', 'removeMemberId', 'text', 'Choose from a duplicate group');
     keep.input.readOnly = true;
     remove.input.readOnly = true;
-    var mergeWarning = E('p', 'Merging reassigns progression history to the kept member and disables the removed member.');
+    var mergeWarning = E('p', 'Merging reassigns progression history (including Master Seal records) to the kept member and disables the removed member.');
     mergeWarning.className = 'notice warning';
     var mergeButton = E('button', 'Merge selected duplicates');
     mergeButton.type = 'submit';
@@ -550,7 +1031,7 @@
 
     function loadDuplicates() {
       duplicates.textContent = 'Loading duplicate groups…';
-      return api('adminDuplicates', { token: session.token }).then(function (groups) {
+      return api('adminDuplicates', { token: token }).then(function (groups) {
         duplicates.replaceChildren();
         groups.forEach(function (group) {
           var groupNode = E('div');
@@ -586,7 +1067,7 @@
       if (!root.confirm('Merge these records? This cannot be undone from the browser.')) return;
       mergeButton.disabled = true;
       api('adminMerge', {
-        token: session.token,
+        token: token,
         keepMemberId: keep.input.value,
         removeMemberId: remove.input.value
       }).then(function (profile) {
@@ -604,17 +1085,17 @@
     var achievementForm = E('form');
     var achievementId = field('Achievement ID', 'achievementId', 'text', 'Achievement ID');
     var achievementName = field('Correct character name', 'achievementName', 'text', 'Character name');
-    var notes = field('Audit notes', 'notes', 'text', 'Why this correction is needed');
+    var notesField = field('Audit notes', 'notes', 'text', 'Why this correction is needed');
     var correct = E('button', 'Save achievement correction');
     correct.type = 'submit';
     achievementForm.appendChild(achievementId.wrap);
     achievementForm.appendChild(achievementName.wrap);
-    achievementForm.appendChild(notes.wrap);
+    achievementForm.appendChild(notesField.wrap);
     achievementForm.appendChild(correct);
     toolsCard.appendChild(achievementForm);
     toolsCard.appendChild(actionButton('Start new update period', 'admin', function () {
       if (!root.confirm('Start a new First Guildie period?')) return;
-      return api('adminReset', { token: session.token }).then(function () {
+      return api('adminReset', { token: token }).then(function () {
         return refreshAll('New update period started.');
       });
     }));
@@ -624,10 +1105,10 @@
       if (correct.disabled) return;
       correct.disabled = true;
       api('adminCorrectAchievement', {
-        token: session.token,
+        token: token,
         achievementId: achievementId.input.value,
         characterName: achievementName.input.value,
-        notes: notes.input.value
+        notes: notesField.input.value
       }).then(function () {
         return refreshAll('Achievement correction audited.');
       }).catch(function (failure) {
@@ -646,7 +1127,7 @@
     adminGrid.appendChild(auditCard);
     function loadAudit() {
       audit.textContent = 'Loading audit entries…';
-      return api('adminAudit', { token: session.token }).then(function (rows) {
+      return api('adminAudit', { token: token }).then(function (rows) {
         audit.replaceChildren();
         rows.forEach(function (entry) {
           audit.appendChild(E('li', (entry.at || '') + ' — ' + entry.action + ' — ' +
@@ -656,24 +1137,27 @@
       });
     }
 
-    host.appendChild(actionButton('End administrator session', 'admin', function () {
-      return api('logout', { token: session.token, kind: 'admin' }).finally(function () {
-        clear('admin');
-        state.admin = false;
-        syncAdminVisibility(Boolean(state.member && state.member.isAdmin));
-        renderAdmin();
-      });
-    }));
+    if (state.recoveryToken) {
+      host.appendChild(actionButton('End recovery session', 'admin', function () {
+        return api('logout', { token: state.recoveryToken, kind: 'admin' }).catch(function () { /* best effort */ })
+          .then(function () {
+            state.recoveryToken = null;
+            syncAdminVisibility(Boolean(state.member && state.member.isAdmin));
+            renderAdmin();
+          });
+      }));
+    }
 
     function refreshAll(successMessage) {
       var jobs = [loadMembers(), loadDuplicates(), loadAudit()];
       if (state.selected) {
-        jobs.push(api('adminRead', { token: session.token, memberId: state.selected })
+        jobs.push(api('adminRead', { token: token, memberId: state.selected })
           .then(selectedDetails));
       }
       return Promise.all(jobs).then(function () {
         if (successMessage) notice('admin', successMessage);
         if (root.load) root.load();
+        if (root.loadMasterSeal) root.loadMasterSeal();
       });
     }
 
@@ -682,28 +1166,53 @@
     });
   }
 
-  function restore(kind) {
-    var session = get(kind);
-    if (!session || !session.token || new Date(session.expiresAt) <= new Date()) {
-      clear(kind);
-      if (kind === 'member') renderMember(); else renderAdmin();
+  // -------------------------------------------------------------------------
+  // Boot: cookie first, then one-time migration of the legacy local session
+  // -------------------------------------------------------------------------
+
+  function boot() {
+    if (!configured()) {
+      renderMember();
+      renderAdmin();
       return Promise.resolve(null);
     }
-    return api('refresh', { token: session.token, kind: kind }).then(function (result) {
-      if (kind === 'member') {
+    var token = readCookie();
+    if (token) {
+      return api('refresh', { token: token, kind: 'member' }).then(function (result) {
+        state.session = { token: token, expiresAt: result.expiresAt };
         state.member = result.profile;
+        hideGate();
+        syncAdminVisibility(Boolean(result.profile.isAdmin));
         renderMember();
-      } else {
-        state.admin = true;
-        syncAdminVisibility(true);
         renderAdmin();
-      }
-      return result;
-    }).catch(function () {
-      clear(kind);
-      if (kind === 'member') renderMember(); else renderAdmin();
-      return null;
-    });
+        return result;
+      }).catch(function () {
+        clearCookie();
+        return migrateLegacy();
+      });
+    }
+    return migrateLegacy();
+  }
+
+  function migrateLegacy() {
+    var legacy = readLegacy('member');
+    if (legacy && legacy.token && new Date(legacy.expiresAt) > new Date()) {
+      return api('migrate', { token: legacy.token }).then(function (result) {
+        adoptSession(result, { showCode: true });
+        return result;
+      }).catch(function () {
+        removeLegacy();
+        renderMember();
+        renderAdmin();
+        showGate('new');
+        return null;
+      });
+    }
+    removeLegacy();
+    renderMember();
+    renderAdmin();
+    showGate('new');
+    return Promise.resolve(null);
   }
 
   function clearDemoPreview() {
@@ -741,16 +1250,19 @@
     api: api,
     renderMember: renderMember,
     renderAdmin: renderAdmin,
-    restore: restore,
+    boot: boot,
+    showGate: showGate,
+    hideGate: hideGate,
     state: state,
-    clear: clear,
-    configured: configured
+    configured: configured,
+    cookieName: cookieName,
+    cookiePath: cookiePath
   };
 
   document.addEventListener('DOMContentLoaded', function () {
     var preview = document.getElementById('preview-notice');
     if (preview) preview.hidden = configured();
     clearDemoPreview();
-    restore('member').then(function () { return restore('admin'); });
+    boot();
   });
 }(window));
