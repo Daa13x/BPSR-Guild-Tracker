@@ -1170,6 +1170,22 @@
   // Boot: cookie first, then one-time migration of the legacy local session
   // -------------------------------------------------------------------------
 
+  /** True only when the server itself rejected the session or identity.
+   * Network failures, timeouts and backend outages must never destroy the
+   * cookie or the one-time legacy migration credential. */
+  function definitiveSessionFailure(failure) {
+    return Boolean(failure && (failure.code === 'SESSION_EXPIRED' || failure.code === 'IDENTITY_MISMATCH'));
+  }
+
+  function retryLater() {
+    hideGate();
+    renderMember();
+    renderAdmin();
+    notice('member', 'The tracker could not reach the API to restore your remembered session. ' +
+      'Your saved access is kept — reload the page to try again.', true);
+    return null;
+  }
+
   function boot() {
     if (!configured()) {
       renderMember();
@@ -1186,7 +1202,8 @@
         renderMember();
         renderAdmin();
         return result;
-      }).catch(function () {
+      }).catch(function (failure) {
+        if (!definitiveSessionFailure(failure)) return retryLater();
         clearCookie();
         return migrateLegacy();
       });
@@ -1200,7 +1217,8 @@
       return api('migrate', { token: legacy.token }).then(function (result) {
         adoptSession(result, { showCode: true });
         return result;
-      }).catch(function () {
+      }).catch(function (failure) {
+        if (!definitiveSessionFailure(failure)) return retryLater();
         removeLegacy();
         renderMember();
         renderAdmin();

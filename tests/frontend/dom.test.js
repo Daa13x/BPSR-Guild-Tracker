@@ -458,6 +458,36 @@ test('a remembered cookie restores the account silently; an expired one reopens 
   assert.equal(expired.gate.hidden, false);
 });
 
+test('a transient failure during migration keeps the legacy session for a later retry', async () => {
+  const app = createHarness((action) => {
+    if (action === 'migrate') throw new Error('network unreachable');
+  }, { store: {
+    'bpsr.member.session': JSON.stringify({ token: 'legacy-token', expiresAt: future(), kind: 'member', display: 'Dax' })
+  } });
+  await app.ready();
+  assert.ok(app.calls.some(call => call.action === 'migrate'));
+  assert.ok(app.store['bpsr.member.session'], 'a network failure must not destroy the only migration credential');
+  assert.equal(app.gate.hidden, true, 'no gate: creating a new account here would strand the legacy identity');
+  assert.match(app.member.querySelector('.notice').textContent, /could not reach|try again/i);
+});
+
+test('a transient failure while restoring the cookie session keeps the cookie for a later retry', async () => {
+  const app = createHarness((action) => {
+    if (action === 'refresh') throw new Error('network unreachable');
+  }, { cookies: { [COOKIE]: 'still-valid-token' } });
+  await app.ready();
+  assert.equal(app.cookies[COOKIE], 'still-valid-token', 'a network failure must not clear a possibly valid cookie');
+  assert.equal(app.gate.hidden, true);
+  assert.match(app.member.querySelector('.notice').textContent, /could not reach|try again/i);
+
+  const dead = createHarness((action) => {
+    if (action === 'refresh') throw new ApiFailure('SESSION_EXPIRED', 'Session expired.');
+  }, { cookies: { [COOKIE]: 'definitely-dead-token' } });
+  await dead.ready();
+  assert.equal(dead.cookies[COOKIE], undefined, 'a definitive server rejection still clears the cookie');
+  assert.equal(dead.gate.hidden, false);
+});
+
 test('a valid legacy local-storage session migrates once to the cookie and shows the code', async () => {
   const app = createHarness((action, data) => {
     if (action === 'migrate') {
