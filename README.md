@@ -5,47 +5,60 @@ A build-free guild progression tracker backed by Google Sheets and Google Apps S
 ## Architecture
 
 - `Code.gs` owns the Sheets schema, server-calculated totals, rankings, progression events, achievements, reset periods, caching, audit utilities and the safe `GET /exec` health response.
-- `AuthApi.gs` exposes the JSON `POST /exec` API, character-name/PIN authentication, opaque sessions and protected member/administrator actions.
-- `Leaderboard.html`, `styles.css`, `config.js` and `AppFrontend.js` are the static HTML/CSS/vanilla-JavaScript application. No React, bundler or production Node server is used.
+- `AuthApi.gs` exposes the JSON `POST /exec` API, passwordless remembered-device accounts, backup-code restore, opaque hashed sessions and protected member/administrator actions.
+- `MasterSeal.gs` holds the one authoritative Master Seal Season 3 configuration and the per-dungeon progress, validation, scoring and public-board logic.
+- `Leaderboard.html`, `styles.css`, `config.js`, `AppFrontend.js` and `MasterSeal.js` are the static HTML/CSS/vanilla-JavaScript application. No React, bundler or production Node server is used.
 - `index.html` opens `Leaderboard.html` with repository-relative paths suitable for the GitHub Pages project path.
 
 ```text
 Code.gs                         Sheets/domain implementation
-AuthApi.gs                      JSON API, PIN, session and role enforcement
+AuthApi.gs                      JSON API, accounts, sessions and role enforcement
+MasterSeal.gs                   Master Seal Season 3 config, scoring and board
 index.html                      GitHub Pages entry point
 Leaderboard.html               Dashboard and public leaderboard
 styles.css                      OnlyPaws application-shell design
 config.js                       One authoritative Apps Script URL
-AppFrontend.js                  Member and administrator controller
+AppFrontend.js                  Account gate, member and administrator controller
+MasterSeal.js                   Public Master Seal board and detail panel
 assets/guild-logo.png           Supplied transparent OnlyPaws logo
+assets/master-seal/             Dungeon and reward artwork (webp)
+scripts/dev-server.js           Local mock backend for development/smoke tests
 .github/workflows/pages.yml     Root-folder Pages deployment
 tests/                          Apps Script runtime and DOM-controller tests
 ```
 
-## Authentication and administration
+## Accounts: remembered devices and backup codes
 
-Members register and sign in with a unique character name and PIN. The API stores a unique salt and derived PIN hash, never the plaintext PIN. Public responses never contain PIN material, token hashes, salts, session tokens, spreadsheet IDs or raw rows. Sessions expire after 12 hours; five failed attempts create a 15-minute failed-login window.
+The tracker is passwordless. A first visit shows **Who are you?** with two visible paths: **New user** creates an account from only a character name; **Returning user** restores an existing account with the character name plus its backup code. There is no PIN or password anywhere in the active flow.
 
-`Players.IsAdmin` is the authoritative role flag. `Members.MemberId` and `Players.UserId` must be the same stable identifier and each member must map to exactly one player row. An administrator signs in through the normal member form. A fresh sign-in returns one separate member-bound administrator session after rechecking `IsAdmin`; member refresh returns the current profile and role without minting or replacing an administrator session. The browser restores a stored administrator token separately through the protected administrator refresh path, and every protected route rechecks the live member state and role.
+Creating an account generates a `BPSR-XXXX-XXXX-XXXX` backup code (strong randomness, no ambiguous characters) and a long-lived remembered-device session. The browser keeps only the opaque session token in a first-party cookie (`__Secure-bpsr-member-session` on HTTPS, path-scoped to the deployment); the backend stores only the token hash and decides identity and role on every request. The cookie never contains the character name, member ID, backup code, role or progression. Sessions default to 180 days (`MEMBER_SESSION_DAYS` in `Config`), track last use, and support sign-out of one device, revoke-all-devices, expiry and revocation.
 
-If an administrator closes the administrator session while keeping the member session open, ordinary page restoration does not silently reopen it. Sign out of the member account and sign in again to obtain a new administrator session. Emergency recovery remains a separate last-resort path, not the normal solution.
+Backup codes are compared case- and separator-insensitively. Restore failures return only “Character name or backup code is incorrect.” and five failures start a 15-minute throttle window. **This is a trusted-guild convenience system, not high-security identity proof.**
 
-The prepared spreadsheet’s initial administrator is Dax because Dax’s `Players.IsAdmin` value is `TRUE`. Confirm Dax’s `Members.MemberId` exactly matches Dax’s `Players.UserId`. Dax uses the existing normal PIN flow—there is no default or repository-stored PIN.
+An explicit product decision: the readable backup code is stored in the private `Members` sheet so administrators can recover locked-out members. Consequences to accept and manage: spreadsheet editors can read codes and therefore impersonate members; the `Members`, `Sessions` and `LoginAttempts` sheets must stay protected and private; public API responses never contain codes; repository files never contain real codes; admin reveals and regenerations are audited without writing the code into the log.
 
-Administrators can promote and demote registered members in the protected interface. Role changes are audited and clear caches; demotion revokes that member’s administrator sessions. Disabling a member revokes all of that member’s sessions. The last active administrator cannot be demoted, disabled or removed. Member and administrator logout each revoke only the submitted token, leaving unrelated sessions intact.
+`Players.IsAdmin` is the authoritative role flag. `Members.MemberId` and `Players.UserId` must be the same stable identifier and each member must map to exactly one player row. Administrator access requires a valid member session **and** a live `IsAdmin` check on every protected action — no admin flag is ever trusted from a cookie, and demotion or disabling takes effect immediately. Administrators can view, copy and regenerate a member’s backup code (regeneration kills the old code instantly and can optionally revoke every remembered device), revoke devices, rename, disable and merge members. Disabling revokes all of that member’s sessions; the last active administrator cannot be demoted, disabled or removed.
 
-`BPSR_ADMIN_SECRET` is optional emergency recovery only. If retained, store a long random value in Apps Script Script Properties. It is throttled and must not be used as the normal administrator login or committed to Git.
+The initial administrator is Dax (`Players.IsAdmin=TRUE` on the row whose `UserId` equals Dax’s `Members.MemberId`). `BPSR_ADMIN_SECRET` remains optional, throttled, emergency-only recovery via Script Properties; the recovery session lives in browser memory only.
 
-Character-name/PIN authentication is suitable for a small trusted guild, not high-security identity verification. Keep private sheets protected, restrict Apps Script access appropriately and maintain spreadsheet backups.
+### Migration from the PIN system
+
+Existing member IDs, progression, roles and achievements are preserved. On the first visit after the upgrade, a browser holding a still-valid legacy localStorage session exchanges it (`migrate` action) for a remembered-device cookie; the member’s backup code is generated if missing and shown once with “Please save this somewhere”, and the legacy storage is removed. A browser without a valid legacy session uses **Returning user** with the backup code — members without one contact an administrator, who generates or reveals it from the admin tools or the private sheet. PIN registration and login actions are removed from the API and UI; the dormant `PinSalt`/`PinHash` columns remain untouched for one release as rollback safety and may be cleared after live acceptance.
+
+## Master Seal — Season 3
+
+`MasterSeal.gs` defines the single authoritative season: six Chaotic Realm dungeons (Void - Towering Ruin, Void - Tina's Mindrealm, Cursed Radiant Tomb, Mech Facility, Mistveil Hunting Ground, Sea-Ringed Reef), a 3,650 maximum score and seven reward milestones (4 × 50 Rose Orbs, Avatar Frame, Namecard, and Mount: Neon Sonic at 3,650). Members record a best Master level (0–20 or Not cleared) and points per dungeon; no level-to-points formula is invented. The server derives every total: sum of the six point values, remaining (never below zero), progress (never above 100%), cleared count and mount unlock at exactly 3,650. Unknown dungeons, negative points, out-of-range levels and points on uncleared dungeons are rejected; identical updates write nothing.
+
+The public board (`masterSeal` action) lists every active member — names only, no IDs — ranked by total score with all six dungeon values visible per row, search, sorting, filters, keyboard row selection and a detail panel with dungeon artwork and the reward track. Members edit only their own six dungeons through their session; administrators can correct any member with an audited action. Merging duplicates reassigns Master Seal rows to the kept member.
 
 ## Backend setup and redeployment
 
 1. Back up the production spreadsheet and open **Extensions → Apps Script**.
-2. Copy the final `Code.gs` and `AuthApi.gs` into the bound Apps Script project. `Leaderboard.html` is not required or served there: GitHub Pages hosts the interface, while Apps Script `/exec` hosts only the JSON API.
-3. Run `setupSpreadsheet()` once. It is idempotent and does not seed demo members.
-4. Verify every `Members.MemberId` has exactly one matching `Players.UserId`. In particular, verify Dax’s matching player row has `IsAdmin=TRUE` before relying on normal administrator login.
-5. Review `Config`, configure `MasterActivities`, and protect `Members`, `Sessions`, `LoginAttempts`, events, achievements, resets and audit sheets.
-6. Optionally set Script Property `BPSR_ADMIN_SECRET` for emergency recovery. Do not set any PIN, hash, salt or token in repository files.
+2. Copy the final `Code.gs`, `AuthApi.gs` and `MasterSeal.gs` into the bound Apps Script project. `Leaderboard.html` is not required or served there: GitHub Pages hosts the interface, while Apps Script `/exec` hosts only the JSON API.
+3. Run `setupSpreadsheet()` once. It is idempotent, does not seed demo members, appends the new `Members` columns (`BackupCode`, `BackupCodeCreatedAt`, `BackupCodeUpdatedAt`, `LastAccessAt`), adds `Sessions.LastUsedAt` and creates the `MasterSeal` sheet without touching existing data.
+4. Verify every `Members.MemberId` has exactly one matching `Players.UserId`. In particular, verify Dax’s matching player row has `IsAdmin=TRUE` before relying on normal administrator access.
+5. Review `Config` (including `MEMBER_SESSION_DAYS`), configure `MasterActivities`, and protect `Members`, `Sessions`, `LoginAttempts`, `MasterSeal`, events, achievements, resets and audit sheets. `Members` now holds readable backup codes and must stay private.
+6. Optionally set Script Property `BPSR_ADMIN_SECRET` for emergency recovery. Never place a real backup code, hash, salt or token in repository files.
 7. Choose **Deploy → Manage deployments**, edit the web-app deployment, select **New version**, and deploy with the access policy intended for the guild.
 8. Copy the resulting HTTPS URL ending in `/exec`. A source edit is not live until a new Apps Script deployment version is created.
 
@@ -72,7 +85,7 @@ var configuredApiUrl = 'https://script.google.com/macros/s/.../exec';
 
 A fresh fork may instead carry the documented `PASTE_APPS_SCRIPT_EXEC_URL_HERE` placeholder until its own deployment exists; `npm run check` accepts exactly those two forms and still rejects deployment URLs anywhere else in the repository. Do not invent an URL and do not place credentials in it. `BPSR_CONFIG.apiUrl` sends JSON `POST` requests for public leaderboard, member and administrator actions; direct browser navigation to the same URL is only the GET health diagnostic.
 
-For one-browser setup, `?api=https%3A%2F%2Fscript.google.com%2Fmacros%2Fs%2F...%2Fexec` is also accepted. Only an explicitly supplied, valid HTTPS Apps Script `/exec` URL is stored under `bpsrApiUrl`; invalid or unrelated URLs fail closed. Clear the site’s local storage if an obsolete test deployment was saved. Editing the constant is the recommended shared Pages configuration.
+For one-browser setup, `?api=https%3A%2F%2Fscript.google.com%2Fmacros%2Fs%2F...%2Fexec` is also accepted. Only an explicitly supplied, valid Apps Script `/exec` URL — or, for development only, a `localhost`/`127.0.0.1` `/exec` URL such as the one `scripts/dev-server.js` prints — is stored under `bpsrApiUrl`; invalid or unrelated URLs fail closed. A persisted explicit override outranks the committed constant on later visits, so clear the site’s `bpsrApiUrl` local storage to return to the production deployment. Editing the constant is the recommended shared Pages configuration.
 
 The sidebar reports **Not configured**, **Connecting**, **Connected**, or **API error**. The preview notice appears only while no valid API URL is configured. The public leaderboard interface remains viewable, but registration and saving are unavailable until the backend is connected.
 
@@ -99,4 +112,4 @@ npm run check
 git diff --check
 ```
 
-Automated tests execute the real Apps Script sources in a mocked Sheets/Apps Script runtime and execute the frontend’s actual DOM event handlers and state transitions. Local automation cannot prove Google authorization, the production spreadsheet’s contents and protections, the deployed `/exec` CORS behavior, or the final Pages workflow. Complete `docs/DEPLOYMENT_CHECKLIST.md`, record the Apps Script deployment version and Git commit, and test the live origin before release.
+Automated tests execute the real Apps Script sources in a mocked Sheets/Apps Script runtime and execute the frontend’s actual DOM event handlers and state transitions. For a full in-browser rehearsal without touching production data, run `node scripts/dev-server.js` and open the URL it prints — it serves the static frontend and exposes the same mocked backend as a real `POST /exec` endpoint, so account creation, backup-code restore, cookies, admin recovery and Master Seal editing can be driven end to end (mock recovery secret: `secret`; state resets on restart). Local automation cannot prove Google authorization, the production spreadsheet’s contents and protections, the deployed `/exec` CORS behavior, or the final Pages workflow. Complete `docs/DEPLOYMENT_CHECKLIST.md`, record the Apps Script deployment version and Git commit, and test the live origin before release.

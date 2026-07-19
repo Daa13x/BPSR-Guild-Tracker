@@ -136,6 +136,11 @@ test('committed constant configures the production Apps Script URL and still yie
   const overridden = runConfig('?api=' + encodeURIComponent(override), {}, false, true);
   assert.equal(overridden.config.apiUrl, override);
   assert.equal(overridden.config.source, 'query');
+
+  // The persisted explicit override keeps winning on later visits.
+  const persisted = runConfig('', overridden.store, false, true);
+  assert.equal(persisted.config.apiUrl, override);
+  assert.equal(persisted.config.source, 'storage');
 });
 
 test('local mock backends are accepted for development while other origins fail closed', () => {

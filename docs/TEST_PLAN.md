@@ -2,18 +2,21 @@
 
 Automated tests must exercise the real backend implementation through a mocked Google Apps Script runtime rather than duplicating business logic in a separate model.
 
-## Authentication
+## Accounts
 
-- Valid registration
-- Normalized duplicate name
-- Invalid name and PIN
-- Valid login
-- Incorrect PIN
-- Unknown account
-- Failed-login throttling
+- Valid name-only account creation with generated backup code
+- Normalized duplicate name rejected and routed to restore
+- Invalid character name rejected
+- Restore with correct code (case- and separator-insensitive)
+- Incorrect code and unknown account return the same generic failure
+- Failed-restore throttling
+- Remembered-device session default and configured lifetimes
 - Session expiry
-- Member-token logout isolation
+- Member-token logout isolation and revoke-all-devices
 - Reuse of invalidated session
+- Legacy-session migration preserving IDs, data and roles; code generated when missing
+- Own-code access through a valid session only
+- PIN register/login actions removed
 
 ## Authorization
 
@@ -21,9 +24,9 @@ Automated tests must exercise the real backend implementation through a mocked G
 - Member updates own progress
 - Member cannot update another member
 - Anonymous and expired sessions rejected
-- Non-admin cannot call admin actions
-- Normal IsAdmin member receives a member-bound admin session
-- Live role recheck rejects stale/demoted admin sessions
+- Non-admin cannot call admin actions (including code reveal/regenerate/revoke)
+- IsAdmin member session authorizes admin actions directly with a live role recheck per action
+- Demoted or disabled members lose admin access immediately
 
 ## Progress
 
@@ -47,11 +50,23 @@ Automated tests must exercise the real backend implementation through a mocked G
 - Mount timestamp and position immutable
 - Public payload privacy
 
+## Master Seal
+
+- Exact Season 3 configuration (six dungeon IDs/names, 3,650 maximum, seven rewards)
+- Own-member six-dungeon update with server-derived totals
+- Partial updates touch only submitted dungeons; identical updates change nothing
+- Mount unlocks at exactly 3,650; remaining clamps at zero; progress clamps at 100%
+- Unknown dungeons, negative/oversized points, invalid levels, non-boolean cleared and points-on-uncleared rejected
+- Public board ranks by total, includes zero-progress members, hides member IDs
+- Admin correction audited; non-admin correction rejected
+- Merge reassigns seal rows
+
 ## Administration
 
-- Normal administrator member login and optional recovery authentication
-- Profile/list/details return `isAdmin` without authentication material
-- Promotion, fresh-login-issued access, role-only member refresh, repeated-refresh row stability, demotion and demotion-session revocation
+- Recovery authentication and member-session admin access
+- Profile/list/details return `isAdmin` and recovery metadata without authentication material
+- Backup-code reveal, regenerate (old code invalidated, optional device revocation) and device revocation, audited without codes
+- Promotion, refresh row stability, demotion taking effect immediately
 - Strict boolean role/disabled payload validation
 - Self-demotion confirmation and last-active-admin demote/disable/merge protection
 - Admin edit and delete
@@ -75,8 +90,10 @@ Automated tests must exercise the real backend implementation through a mocked G
 
 ## Frontend
 
-- Registration/login/update flows
-- Normal administrator login and role-state restoration
+- First-visit Who are you? gate with both visible paths and no PIN
+- Account creation, one-time backup-code panel, compact reveal/copy control
+- Cookie holds only the opaque token; restore, refresh restoration, migration
+- Master Seal board rendering, member editing and escaping
 - Tabs, search, and filters
 - Selected-member details/edit/role/disable controls and confirmations
 - Duplicate keep/remove choice and confirmed merge payload
