@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OnlyPaws Guild Tracker</title>
 <link rel="icon" type="image/png" href="assets/guild-logo.png">
-<script src="config.js?v=3"></script>
+<script src="config.js?v=4"></script>
 <style>
 /* =========================================================
    GUILD THEME — edit these variables to match your colours
@@ -203,7 +203,7 @@ dialog h3{color:var(--brass-hi);margin-bottom:12px}
   .hall-meta{text-align:left}
 }
 </style>
-<link rel="stylesheet" href="styles.css?v=3">
+<link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
 <div class="app-shell">
@@ -268,9 +268,13 @@ dialog h3{color:var(--brass-hi);margin-bottom:12px}
 
   <!-- Master Seal — Season 3 -->
   <section class="panel seal-panel" id="master-seal" aria-labelledby="seal-h">
-    <div class="panel-heading">
-      <div><p class="eyebrow">SEASON 3 · SIX CHAOTIC REALM DUNGEONS</p><h2 id="seal-h">Master Seal</h2></div>
-      <span class="pill" id="seal-max">Maximum score 3,650</span>
+    <div class="seal-header">
+      <span class="seal-emblem" aria-hidden="true"><svg viewBox="0 0 40 40" width="40" height="40"><defs><linearGradient id="sealg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c084fc"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs><path d="M20 2 L36 20 L20 38 L4 20 Z" fill="none" stroke="url(#sealg)" stroke-width="2.5"/><path d="M20 10 L29 20 L20 30 L11 20 Z" fill="url(#sealg)" opacity=".85"/></svg></span>
+      <div class="seal-title">
+        <h2 id="seal-h">Master Seal <span class="seal-season">Season 3</span></h2>
+        <p>Compete across the six Chaotic Realm dungeons to earn points and unlock exclusive rewards.</p>
+      </div>
+      <div class="seal-max-badge"><span>Max season score</span><strong id="seal-max">3,650 pts</strong></div>
     </div>
     <div id="seal-ui"><div class="empty">Loading Master Seal…</div></div>
   </section>
@@ -628,7 +632,7 @@ function demoData(){
 
 load();
 </script>
-<script src="MasterSeal.js?v=3"></script>
-<script src="AppFrontend.js?v=3"></script>
+<script src="MasterSeal.js?v=4"></script>
+<script src="AppFrontend.js?v=4"></script>
 </body>
 </html>

@@ -81,11 +81,12 @@
     var season = DATA.season;
     var filtered = rows();
     var max = document.getElementById('seal-max');
-    if (max) max.textContent = 'Maximum score ' + num(season.maxScore);
+    if (max) max.textContent = num(season.maxScore) + ' pts';
 
     var html = '';
     html += '<div class="seal-controls">' +
-      '<input class="search" id="seal-search" type="search" placeholder="Search character name…" aria-label="Search Master Seal members" value="' + esc(view.q) + '">' +
+      '<span class="seal-members-label">Guild members <span class="seal-count" role="status">' + filtered.length + ' / ' + DATA.board.length + '</span></span>' +
+      '<input class="search" id="seal-search" type="search" placeholder="Search members…" aria-label="Search Master Seal members" value="' + esc(view.q) + '">' +
       '<label class="seal-select">Sort' +
       '<select id="seal-sort" aria-label="Sort members">' +
       opt('rank', 'Rank') + opt('name', 'Character') + opt('total', 'Total score') +
@@ -96,7 +97,6 @@
       fopt('all', 'All members') + fopt('mount', 'Mount unlocked') + fopt('locked', 'Mount locked') +
       fopt('six', 'Six of six cleared') + fopt('uncleared', 'Has uncleared dungeons') + fopt('stale', 'No update in ' + STALE_DAYS + ' days') +
       '</select></label>' +
-      '<span class="seal-count" role="status">' + filtered.length + ' of ' + DATA.board.length + ' members</span>' +
       '</div>';
 
     html += '<div class="seal-layout">';
@@ -106,31 +106,38 @@
     } else if (!filtered.length) {
       html += '<div class="empty">No members match — clear a filter or search.</div>';
     } else {
-      html += '<table class="seal-table"><thead><tr>' +
+      html += '<table class="seal-table"><thead>' +
+        '<tr class="seal-group-row"><th scope="colgroup" colspan="8" aria-hidden="true"></th>' +
+        '<th scope="colgroup" colspan="6" class="seal-group">Chaotic Realm dungeons <span>(best Master clear)</span></th></tr>' +
+        '<tr>' +
         '<th scope="col">Rank</th><th scope="col">Character</th><th scope="col">Total</th>' +
         '<th scope="col">Progress</th><th scope="col">Remaining</th><th scope="col">Cleared</th>' +
         '<th scope="col">Mount</th><th scope="col">Updated</th>' +
         season.dungeons.map(function (d) {
-          return '<th scope="col" class="seal-dth"><span title="' + esc(d.name) + '">' + d.number + '</span></th>';
+          return '<th scope="col" class="seal-dth" title="' + esc(d.name) + '">' +
+            '<span class="seal-dnum">' + d.number + '</span><span class="seal-dname">' + esc(d.shortName) + '</span></th>';
         }).join('') +
         '</tr></thead><tbody>';
       filtered.forEach(function (r) {
         var selected = r.name === view.selected;
         html += '<tr tabindex="0" data-member="' + esc(r.name) + '" aria-selected="' + selected + '"' + (selected ? ' class="selected"' : '') + '>' +
-          '<td class="rank' + (r.rank <= 3 ? ' top' : '') + '" data-l="Rank">' + r.rank + '</td>' +
-          '<td data-l="Character"><span class="pname">' + esc(r.name) + '</span></td>' +
+          '<td class="rank' + (r.rank <= 3 ? ' top medal-' + r.rank : '') + '" data-l="Rank"><span class="seal-rank">' + r.rank + '</span></td>' +
+          '<td data-l="Character"><span class="seal-avatar sm" aria-hidden="true">' + esc(r.name.charAt(0).toUpperCase()) + '</span><span class="pname">' + esc(r.name) + '</span></td>' +
           '<td data-l="Total"><span class="num">' + num(r.totalScore) + '</span> <span class="dim">/ ' + num(season.maxScore) + '</span></td>' +
           '<td data-l="Progress">' + r.progressPercent + '%<div class="bar"><i style="width:' + r.progressPercent + '%"></i></div></td>' +
-          '<td data-l="Remaining"><span class="dim">' + num(r.remainingScore) + '</span></td>' +
-          '<td data-l="Cleared"><span class="dim">' + r.clearedCount + ' / 6</span></td>' +
-          '<td data-l="Mount">' + (r.mountUnlocked ? '<span class="badge gold">Neon Sonic</span>' : '<span class="dim">Locked</span>') + '</td>' +
+          '<td data-l="Remaining"><span class="seal-remaining">' + num(r.remainingScore) + '</span></td>' +
+          '<td data-l="Cleared"><span class="seal-cleared-count">' + r.clearedCount + ' / 6</span></td>' +
+          '<td data-l="Mount">' + (r.mountUnlocked
+            ? '<img class="seal-mount-ico" src="assets/master-seal/rewards/reward-mount-neon-sonic.webp" alt="Neon Sonic unlocked" loading="lazy" onerror="this.replaceWith(document.createTextNode(\'Unlocked\'))">'
+            : '<span class="dim">Locked</span>') + '</td>' +
           '<td data-l="Updated"><span class="dim">' + fmtDate(r.lastUpdated) + '</span></td>' +
           r.dungeons.map(function (d, i) {
             var def = season.dungeons[i];
             return '<td class="seal-cell' + (d.cleared ? '' : ' un') + '" data-l="' + esc(def.shortName) + '">' +
               '<span class="sr-only">' + esc(cellLabel(def, d)) + '</span>' +
-              '<span aria-hidden="true" class="seal-m">' + (d.cleared && d.bestMasterLevel !== null ? 'M' + d.bestMasterLevel : '—') + '</span>' +
-              '<span aria-hidden="true" class="seal-p">' + num(d.points) + '</span></td>';
+              '<span aria-hidden="true" class="seal-chip">' +
+              '<span class="seal-m">' + (d.cleared && d.bestMasterLevel !== null ? 'M' + d.bestMasterLevel : '—') + '</span>' +
+              '<span class="seal-p">' + num(d.points) + '</span></span></td>';
           }).join('') +
           '</tr>';
       });
@@ -153,19 +160,21 @@
     if (!member) return '<div class="empty">Select a member to inspect their Master Seal progress.</div>';
     var season = DATA.season;
     var html = '<div class="seal-member">' +
-      '<span class="seal-avatar" aria-hidden="true">' + esc(member.name.charAt(0).toUpperCase()) + '</span>' +
-      '<div><h3>' + esc(member.name) + '</h3>' +
-      '<p class="dim">Rank ' + member.rank + ' · ' + season.displayName + '</p></div></div>';
-    html += '<div class="seal-summary">' +
-      stat('Total score', num(member.totalScore) + ' / ' + num(season.maxScore)) +
-      stat('Remaining', num(member.remainingScore)) +
-      stat('Cleared', member.clearedCount + ' / 6') +
-      stat('Mount', member.mountUnlocked ? 'Neon Sonic unlocked' : 'Locked') +
-      '</div>';
+      '<span class="seal-avatar lg" aria-hidden="true">' + esc(member.name.charAt(0).toUpperCase()) + '</span>' +
+      '<div class="seal-member-id"><h3>' + esc(member.name) + '</h3>' +
+      '<p class="dim">Rank ' + member.rank + ' · ' + esc(season.displayName) + ' Master Seal</p></div>' +
+      '<div class="seal-total"><span>Total score</span>' +
+      '<strong>' + num(member.totalScore) + '<i> / ' + num(season.maxScore) + '</i></strong></div></div>';
     html += '<div class="seal-progressbar"><div class="bar"><i style="width:' + member.progressPercent + '%"></i></div>' +
-      '<span class="dim">' + member.progressPercent + '% · updated ' + fmtDate(member.lastUpdated) + '</span></div>';
+      '<span class="dim">' + member.progressPercent + '% · progress to ' + num(season.maxScore) + '</span></div>';
+    html += '<div class="seal-summary">' +
+      stat('Remaining', num(member.remainingScore), 'accent') +
+      stat('Cleared', member.clearedCount + ' / 6', 'ok') +
+      stat('Mount status', member.mountUnlocked ? 'Neon Sonic' : 'Locked', member.mountUnlocked ? 'gold' : '') +
+      stat('Last updated', fmtDate(member.lastUpdated), '') +
+      '</div>';
 
-    html += '<h4>Chaotic Realm dungeons</h4><div class="seal-cards">';
+    html += '<h4>Chaotic Realm dungeons <span class="seal-h4-sub">(best Master clear)</span></h4><div class="seal-cards">';
     member.dungeons.forEach(function (d, i) {
       var def = season.dungeons[i];
       html += '<article class="seal-card' + (d.cleared ? '' : ' un') + '">' +
@@ -174,13 +183,13 @@
         '<span class="seal-card-no">' + def.number + '</span>' +
         '<strong>' + esc(def.name) + '</strong>' +
         (d.cleared
-          ? '<span class="seal-card-stat">' + (d.bestMasterLevel !== null ? 'Master M' + d.bestMasterLevel : 'Cleared') + ' · ' + num(d.points) + ' pts</span>'
-          : '<span class="seal-card-stat dim">Not cleared · 0 pts</span>') +
+          ? '<span class="seal-card-stat"><b>' + (d.bestMasterLevel !== null ? 'Master M' + d.bestMasterLevel : 'Cleared') + '</b><em>' + num(d.points) + ' pts</em></span>'
+          : '<span class="seal-card-stat dim"><b>Not cleared</b><em>0 pts</em></span>') +
         '</div></article>';
     });
     html += '</div>';
 
-    html += '<h4>Season 3 rewards</h4><div class="seal-rewards">';
+    html += '<h4>' + esc(season.displayName) + ' rewards <span class="seal-h4-sub">Max score ' + num(season.maxScore) + '</span></h4><div class="seal-rewards">';
     var nextFound = false;
     season.rewards.forEach(function (reward) {
       var earned = member.totalScore >= reward.score;
@@ -188,7 +197,8 @@
       if (current) nextFound = true;
       var stateLabel = earned ? 'Earned' : current ? 'Next' : 'Locked';
       html += '<div class="seal-reward ' + (earned ? 'earned' : current ? 'current' : 'locked') + '">' +
-        '<img src="' + rewardImage(reward) + '" alt="" loading="lazy" onerror="this.hidden=true">' +
+        '<span class="seal-reward-art"><img src="' + rewardImage(reward) + '" alt="" loading="lazy" onerror="this.hidden=true">' +
+        (earned ? '<span class="seal-check" aria-hidden="true">✓</span>' : '') + '</span>' +
         '<span class="seal-reward-score">' + num(reward.score) + '</span>' +
         '<span class="seal-reward-name">' + esc(reward.rewardName) + '</span>' +
         '<span class="seal-reward-state">' + stateLabel + '</span></div>';
@@ -197,8 +207,8 @@
     return html;
   }
 
-  function stat(label, value) {
-    return '<div class="seal-stat"><span>' + esc(label) + '</span><strong>' + esc(value) + '</strong></div>';
+  function stat(label, value, tone) {
+    return '<div class="seal-stat' + (tone ? ' ' + tone : '') + '"><span>' + esc(label) + '</span><strong>' + esc(value) + '</strong></div>';
   }
 
   function wire(el) {
