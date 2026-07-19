@@ -77,7 +77,7 @@ test('the board renders six dungeon cells per member with accessible labels and 
   assert.equal((html.match(/Void - Towering Ruin: Master level 5, 316 points/g) || []).length, 1);
   assert.match(html, /Mech Facility: not cleared/);
   assert.match(html, /1,896<\/span> <span class="dim">\/ 3,650/);
-  assert.match(app.captured.max, /Maximum score 3,650/);
+  assert.match(app.captured.max, /3,650 pts/);
   assert.match(html, /aria-selected="true"/);
 });
 
