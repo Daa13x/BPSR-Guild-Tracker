@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OnlyPaws Guild Tracker</title>
 <link rel="icon" type="image/png" href="assets/guild-logo.png">
-<script src="config.js?v=2"></script>
+<script src="config.js?v=3"></script>
 <style>
 /* =========================================================
    GUILD THEME — edit these variables to match your colours
@@ -203,7 +203,7 @@ dialog h3{color:var(--brass-hi);margin-bottom:12px}
   .hall-meta{text-align:left}
 }
 </style>
-<link rel="stylesheet" href="styles.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
 <div class="app-shell">
@@ -213,6 +213,7 @@ dialog h3{color:var(--brass-hi);margin-bottom:12px}
       <a class="nav-item selected" href="#overview" aria-current="page">Overview</a>
       <a class="nav-item" href="#leaderboards" data-board-tab="sv">SV Leaderboard</a>
       <a class="nav-item" href="#leaderboards" data-board-tab="mp">Masters</a>
+      <a class="nav-item" href="#master-seal">Master Seal</a>
       <a class="nav-item" href="#achievements">Achievements</a>
       <a class="nav-item" href="#feed-panel">Activity</a>
       <a class="nav-item" href="#my-progress">My Progress</a>
@@ -265,6 +266,15 @@ dialog h3{color:var(--brass-hi);margin-bottom:12px}
   <!-- Board -->
   <div class="tablewrap" id="board" role="tabpanel" aria-labelledby="tab-sv"></div>
 
+  <!-- Master Seal — Season 3 -->
+  <section class="panel seal-panel" id="master-seal" aria-labelledby="seal-h">
+    <div class="panel-heading">
+      <div><p class="eyebrow">SEASON 3 · SIX CHAOTIC REALM DUNGEONS</p><h2 id="seal-h">Master Seal</h2></div>
+      <span class="pill" id="seal-max">Maximum score 3,650</span>
+    </div>
+    <div id="seal-ui"><div class="empty">Loading Master Seal…</div></div>
+  </section>
+
   <!-- First-to-achieve records -->
   <section class="panel" id="achievements" aria-labelledby="firsts-h">
     <h2 id="firsts-h">First-to-Achieve Records</h2>
@@ -282,6 +292,7 @@ dialog h3{color:var(--brass-hi);margin-bottom:12px}
 </div>
 
 <div class="toast" id="toast" role="status"></div>
+<div class="gate" id="gate" hidden></div>
 
 <script>
 'use strict';
@@ -617,6 +628,7 @@ function demoData(){
 
 load();
 </script>
-<script src="AppFrontend.js?v=2"></script>
+<script src="MasterSeal.js?v=3"></script>
+<script src="AppFrontend.js?v=3"></script>
 </body>
 </html>

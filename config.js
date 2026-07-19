@@ -11,8 +11,11 @@
   function validExecUrl(value) {
     try {
       var parsed = new root.URL(String(value || ''));
-      return parsed.protocol === 'https:' && parsed.hostname === 'script.google.com' &&
-        /^\/macros\/s\/[A-Za-z0-9_-]+\/exec\/?$/.test(parsed.pathname);
+      if (parsed.protocol === 'https:' && parsed.hostname === 'script.google.com' &&
+        /^\/macros\/s\/[A-Za-z0-9_-]+\/exec\/?$/.test(parsed.pathname)) return true;
+      // Local mock backend for development and smoke tests only.
+      return (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') &&
+        /^\/exec\/?$/.test(parsed.pathname);
     } catch (_) {
       return false;
     }

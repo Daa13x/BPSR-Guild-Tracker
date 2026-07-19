@@ -8,7 +8,9 @@ const root = path.resolve(__dirname, '..');
 const required = [
   'Code.gs',
   'AuthApi.gs',
+  'MasterSeal.gs',
   'AppFrontend.js',
+  'MasterSeal.js',
   'config.js',
   'styles.css',
   'index.html',
@@ -17,6 +19,16 @@ const required = [
   'appsscript.json',
   '.nojekyll',
   'assets/guild-logo.png',
+  'assets/master-seal/dungeons/dungeon-01-void-towering-ruin.webp',
+  'assets/master-seal/dungeons/dungeon-02-void-tinas-mindrealm.webp',
+  'assets/master-seal/dungeons/dungeon-03-cursed-radiant-tomb.webp',
+  'assets/master-seal/dungeons/dungeon-04-mech-facility.webp',
+  'assets/master-seal/dungeons/dungeon-05-mistveil-hunting-ground.webp',
+  'assets/master-seal/dungeons/dungeon-06-sea-ringed-reef.webp',
+  'assets/master-seal/rewards/reward-rose-orb.webp',
+  'assets/master-seal/rewards/reward-avatar-frame.webp',
+  'assets/master-seal/rewards/reward-namecard.webp',
+  'assets/master-seal/rewards/reward-mount-neon-sonic.webp',
   '.github/workflows/pages.yml',
   'CODEX_TASK.md',
   'docs/ARCHITECTURE.md',
@@ -50,6 +62,7 @@ requireText('Leaderboard.html', [
   { label: 'must load repository-relative config.js with a cache version token', regex: /<script src="config\.js\?v=[\w.-]+"><\/script>/ },
   { label: 'must load repository-relative styles.css with a cache version token', regex: /<link rel="stylesheet" href="styles\.css\?v=[\w.-]+">/ },
   { label: 'must load repository-relative AppFrontend.js with a cache version token', regex: /<script src="AppFrontend\.js\?v=[\w.-]+"><\/script>/ },
+  { label: 'must load repository-relative MasterSeal.js with a cache version token', regex: /<script src="MasterSeal\.js\?v=[\w.-]+"><\/script>/ },
   { label: 'must reference repository-relative supplied logo', regex: /(?:src|href)="assets\/guild-logo\.png"/ },
   { label: 'must provide a visible logo fallback', regex: /onerror="[^"]*nextElementSibling[^"]*"/ }
 ]);
@@ -70,7 +83,7 @@ requireText('.github/workflows/pages.yml', [
   { label: 'must use deploy-pages', regex: /actions\/deploy-pages@v\d+/ }
 ]);
 
-for (const relative of ['Code.gs', 'AuthApi.gs', 'config.js', 'AppFrontend.js']) {
+for (const relative of ['Code.gs', 'AuthApi.gs', 'MasterSeal.gs', 'config.js', 'AppFrontend.js', 'MasterSeal.js']) {
   const absolute = path.join(root, relative);
   if (!fs.existsSync(absolute)) continue;
   try {
