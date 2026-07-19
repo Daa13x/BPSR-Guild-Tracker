@@ -53,7 +53,8 @@ var DEFAULT_CONFIG = {
   OVERALL_SCORE_FORMULA: '',        // e.g. "sv*10+points" (only used if enabled)
   ADMIN_EMAILS: '',                 // comma-separated admin emails
   CUSTOM_MILESTONES: '[]',          // JSON: [{"id":"MP1000","label":"1,000 Master points","type":"points","value":1000}]
-  CACHE_SECONDS: '90'               // public leaderboard cache TTL
+  CACHE_SECONDS: '90',              // public leaderboard cache TTL
+  MEMBER_SESSION_DAYS: '180'        // remembered-device session lifetime
 };
 
 var ACH = {
@@ -96,8 +97,9 @@ function setupSpreadsheet() {
     'FirstUpdaterUserId', 'FirstUpdaterCharacterNameSnapshot', 'WinningEventId', 'CreatedBy'
   ]);
   ensureSheet_(ss, SHEETS.AUDIT, ['Timestamp', 'Actor', 'Action', 'Target', 'Details']);
-  // Character/PIN data is kept separately from public leaderboard rows.
+  // Account data is kept separately from public leaderboard rows.
   ensureAuthSheets_();
+  ensureMasterSealSheet_();
 
   // Seed config defaults without overwriting existing values.
   var cfgSheet = ss.getSheetByName(SHEETS.CONFIG);

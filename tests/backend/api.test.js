@@ -1,26 +1,187 @@
-const test=require('node:test'); const assert=require('node:assert/strict'); const fs=require('node:fs'); const vm=require('node:vm'); const crypto=require('node:crypto');
-function runtime(){const sheets={};let seq=0;class Sheet{constructor(){this.rows=[];}getLastRow(){return this.rows.length}getLastColumn(){return this.rows[0]?this.rows[0].length:0}appendRow(r){this.rows.push(r)}setFrozenRows(){}getRange(r,c,n=1,m=1){const s=this;return{getValues(){return Array.from({length:n},(_,i)=>Array.from({length:m},(_,j)=>(s.rows[r-1+i]||[])[c-1+j]??''))},setValues(v){v.forEach((row,i)=>{s.rows[r-1+i]=s.rows[r-1+i]||[];row.forEach((x,j)=>s.rows[r-1+i][c-1+j]=x)})},setValue(v){s.rows[r-1]=s.rows[r-1]||[];s.rows[r-1][c-1]=v}}}}const ss={getSheetByName:n=>sheets[n],insertSheet:n=>sheets[n]=new Sheet()};const ctx={console,Date,JSON,Math,String,Number,Object,Array,RegExp,isFinite,SpreadsheetApp:{getActiveSpreadsheet:()=>ss},Utilities:{DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,s)=>[...crypto.createHash('sha256').update(s).digest()],getUuid:()=>String(++seq).padStart(12,'0')+'-0000-0000-0000-000000000000'},LockService:{getScriptLock:()=>({waitLock(){},releaseLock(){}})},CacheService:{getScriptCache:()=>({get(){},put(){},remove(){}})},PropertiesService:{getScriptProperties:()=>({getProperty:k=>k==='BPSR_ADMIN_SECRET'?'secret':null})},ContentService:{MimeType:{JSON:'json'},createTextOutput:t=>({text:t,mimeType:null,setMimeType(m){this.mimeType=m;return this}})},HtmlService:{createHtmlOutputFromFile:()=>({setTitle(){return this},addMetaTag(){return this}})},Session:{getActiveUser:()=>({getEmail:()=>''})}};vm.createContext(ctx);vm.runInContext(fs.readFileSync('Code.gs','utf8'),ctx);vm.runInContext(fs.readFileSync('AuthApi.gs','utf8'),ctx);ctx.ensureActivePeriod_=()=>({ResetPeriodId:'RP1',_row:2,FirstUpdaterUserId:''});ctx.setupSpreadsheet();return ctx;}
-function call(c,action,data){return c.api_(action,data||{})}
-function sessions(c,kind,memberId){return c.readTable_(c.AUTH_SHEETS.SESSIONS).rows.filter(r=>(!kind||String(r.Kind)===kind)&&(!memberId||String(r.MemberId)===String(memberId)))}
-test('GET returns a safe JSON health response without loading HTML or private services',()=>{const c=runtime();let htmlCalls=0,sheetReads=0,propertyReads=0,sessionReads=0;c.HtmlService.createHtmlOutputFromFile=()=>{htmlCalls++;throw new Error('HTML hosting must not be used')};c.SpreadsheetApp.getActiveSpreadsheet=()=>{sheetReads++;throw new Error('GET must not read Sheets')};c.PropertiesService.getScriptProperties=()=>{propertyReads++;throw new Error('GET must not read Script Properties')};c.Session.getActiveUser=()=>{sessionReads++;throw new Error('GET must not read user data')};const response=c.doGet({parameter:{action:'adminMembers',token:'DO_NOT_ECHO'}}),body=JSON.parse(response.text);assert.deepEqual([htmlCalls,sheetReads,propertyReads,sessionReads],[0,0,0,0]);assert.equal(response.mimeType,c.ContentService.MimeType.JSON);assert.deepEqual(body,{ok:true,service:'BPSR Guild Tracker API',status:'ready',message:'Use POST requests for API actions.'});const serialized=response.text.toLowerCase();['do_not_echo','spreadsheet','memberid','pin','hash','salt','session','script properties','deployment','administrator'].forEach(term=>assert.equal(serialized.includes(term),false));});
-test('real Apps Script sources register, normalize, login and revoke sessions',()=>{const c=runtime(),r=call(c,'register',{characterName:' Alpha  One ',pin:'123456'});assert.equal(r.member.characterName,'Alpha One');assert.throws(()=>call(c,'register',{characterName:'alpha one',pin:'123456'}),/unavailable/);const login=call(c,'login',{characterName:'ALPHA ONE',pin:'123456'});assert.ok(login.session.token.length>40);assert.equal(call(c,'me',{token:login.session.token}).svFloor,0);call(c,'logout',{token:login.session.token});assert.throws(()=>call(c,'me',{token:login.session.token}),/expired/);});
-test('real backend validates SV, ownership and genuine updates',()=>{const c=runtime(),a=call(c,'register',{characterName:'Alpha One',pin:'123456'}),b=call(c,'register',{characterName:'Beta Two',pin:'123456'});assert.throws(()=>call(c,'progress',{token:a.session.token,svFloor:0}),/Invalid/);assert.throws(()=>call(c,'progress',{token:a.session.token,svFloor:61}),/Invalid/);assert.equal(call(c,'progress',{token:a.session.token,svFloor:1}).changed,true);assert.equal(call(c,'progress',{token:a.session.token,svFloor:1}).changed,false);assert.equal(call(c,'me',{token:b.session.token}).characterName,'Beta Two');});
-test('master activities, ranks, throttle, admin authorization and safe API envelope work',()=>{const c=runtime(),m=call(c,'register',{characterName:'Gamma Three',pin:'123456'});assert.ok(call(c,'activities').length);assert.throws(()=>call(c,'progress',{token:m.session.token,masterRanks:{NOPE:1}}),/Invalid/);assert.equal(call(c,'progress',{token:m.session.token,masterRanks:{ACT1:1}}).changed,true);for(let i=0;i<5;i++)assert.throws(()=>call(c,'login',{characterName:'Gamma Three',pin:'000000'}),/Invalid/);assert.throws(()=>call(c,'adminMembers',{token:m.session.token}),/expired/);const ad=call(c,'adminLogin',{secret:'secret'});assert.equal(call(c,'adminMembers',{token:ad.session.token}).length,1);const bad=JSON.parse(c.doPost({postData:{contents:'{'}}).text);assert.equal(bad.ok,false);assert.equal(bad.error.code,'REQUEST_FAILED');});
-test('member roles authorize admins, support audited promotion and protect the last admin',()=>{const c=runtime(),dax=call(c,'register',{characterName:'Dax',pin:'123456'}),other=call(c,'register',{characterName:'Guildie',pin:'654321'}),recovery=call(c,'adminLogin',{secret:'secret'}).session;const daxId=c.memberName_('Dax').MemberId,otherId=c.memberName_('Guildie').MemberId;call(c,'adminSetRole',{token:recovery.token,memberId:daxId,isAdmin:true});const daxLogin=call(c,'login',{characterName:'Dax',pin:'123456'});assert.equal(daxLogin.member.isAdmin,true);assert.ok(daxLogin.adminSession.token);assert.equal(call(c,'adminMembers',{token:daxLogin.adminSession.token}).length,2);assert.throws(()=>call(c,'adminMembers',{token:other.session.token}),/expired/);assert.throws(()=>call(c,'adminSetRole',{token:daxLogin.adminSession.token,memberId:daxId,isAdmin:false,confirmSelf:true}),/last active/i);call(c,'adminSetRole',{token:daxLogin.adminSession.token,memberId:otherId,isAdmin:true});const promoted=call(c,'refresh',{token:other.session.token,kind:'member'});assert.equal(promoted.profile.isAdmin,true);assert.equal(Object.hasOwn(promoted,'adminSession'),false);assert.equal(sessions(c,'admin',otherId).length,0);const promotedLogin=call(c,'login',{characterName:'Guildie',pin:'654321'});assert.ok(promotedLogin.adminSession.token);assert.equal(sessions(c,'admin',otherId).length,1);call(c,'adminSetRole',{token:daxLogin.adminSession.token,memberId:otherId,isAdmin:false});assert.throws(()=>call(c,'adminMembers',{token:promotedLogin.adminSession.token}),/expired|Administrator/);assert.ok(c.readTable_(c.SHEETS.AUDIT).rows.some(r=>r.Action==='SET_ADMIN_ROLE'));});
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { runtime, call, sessions } = require('./runtime');
 
-test('member refresh never creates or replaces administrator sessions',()=>{const c=runtime();call(c,'register',{characterName:'Dax',pin:'123456'});const recovery=call(c,'adminLogin',{secret:'secret'}).session,daxId=c.memberName_('Dax').MemberId;call(c,'adminSetRole',{token:recovery.token,memberId:daxId,isAdmin:true});const login=call(c,'login',{characterName:'Dax',pin:'123456'}),adminToken=login.adminSession.token,rowCount=sessions(c).length,adminRows=sessions(c,'admin',daxId).length;assert.equal(adminRows,1);for(let i=0;i<3;i++){const refreshed=call(c,'refresh',{token:login.session.token,kind:'member'});assert.equal(refreshed.profile.isAdmin,true);assert.equal(Object.hasOwn(refreshed,'adminSession'),false);assert.equal(sessions(c).length,rowCount);assert.equal(sessions(c,'admin',daxId).length,adminRows);}assert.equal(call(c,'refresh',{token:adminToken,kind:'admin'}).expiresAt,login.adminSession.expiresAt);call(c,'logout',{token:adminToken,kind:'admin'});assert.throws(()=>call(c,'refresh',{token:adminToken,kind:'admin'}),/expired/);const afterLogoutRows=sessions(c).length,afterLogoutRefresh=call(c,'refresh',{token:login.session.token,kind:'member'});assert.equal(afterLogoutRefresh.profile.isAdmin,true);assert.equal(Object.hasOwn(afterLogoutRefresh,'adminSession'),false);assert.equal(sessions(c).length,afterLogoutRows);assert.throws(()=>call(c,'adminMembers',{token:adminToken}),/expired/);});
+test('GET returns a safe JSON health response without loading HTML or private services', () => {
+  const c = runtime();
+  let htmlCalls = 0, sheetReads = 0, propertyReads = 0, sessionReads = 0;
+  c.HtmlService.createHtmlOutputFromFile = () => { htmlCalls++; throw new Error('HTML hosting must not be used'); };
+  c.SpreadsheetApp.getActiveSpreadsheet = () => { sheetReads++; throw new Error('GET must not read Sheets'); };
+  c.PropertiesService.getScriptProperties = () => { propertyReads++; throw new Error('GET must not read Script Properties'); };
+  c.Session.getActiveUser = () => { sessionReads++; throw new Error('GET must not read user data'); };
+  const response = c.doGet({ parameter: { action: 'adminMembers', token: 'DO_NOT_ECHO' } }), body = JSON.parse(response.text);
+  assert.deepEqual([htmlCalls, sheetReads, propertyReads, sessionReads], [0, 0, 0, 0]);
+  assert.equal(response.mimeType, c.ContentService.MimeType.JSON);
+  assert.deepEqual(body, { ok: true, service: 'BPSR Guild Tracker API', status: 'ready', message: 'Use POST requests for API actions.' });
+  const serialized = response.text.toLowerCase();
+  ['do_not_echo', 'spreadsheet', 'memberid', 'pin', 'hash', 'salt', 'session', 'script properties', 'deployment', 'administrator'].forEach(term => assert.equal(serialized.includes(term), false));
+});
 
-test('fresh administrator login creates one admin session while ordinary members receive none',()=>{const c=runtime();call(c,'register',{characterName:'Dax',pin:'123456'});call(c,'register',{characterName:'Guildie',pin:'654321'});const recovery=call(c,'adminLogin',{secret:'secret'}).session,daxId=c.memberName_('Dax').MemberId,guildieId=c.memberName_('Guildie').MemberId;call(c,'adminSetRole',{token:recovery.token,memberId:daxId,isAdmin:true});const before=sessions(c,'admin',daxId).length,adminLogin=call(c,'login',{characterName:'Dax',pin:'123456'});assert.ok(adminLogin.session.token);assert.ok(adminLogin.adminSession.token);assert.equal(sessions(c,'admin',daxId).length,before+1);const ordinaryLogin=call(c,'login',{characterName:'Guildie',pin:'654321'});assert.equal(Object.hasOwn(ordinaryLogin,'adminSession'),false);const rowCount=sessions(c).length;for(let i=0;i<2;i++){const refreshed=call(c,'refresh',{token:ordinaryLogin.session.token,kind:'member'});assert.equal(refreshed.profile.isAdmin,false);assert.equal(Object.hasOwn(refreshed,'adminSession'),false);}assert.equal(sessions(c,'admin',guildieId).length,0);assert.equal(sessions(c).length,rowCount);});
-test('logout revokes only one token and disabled members cannot log in',()=>{const c=runtime();call(c,'register',{characterName:'Sessions',pin:'123456'});const one=call(c,'login',{characterName:'Sessions',pin:'123456'}),two=call(c,'login',{characterName:'Sessions',pin:'123456'});call(c,'logout',{token:one.session.token,kind:'member'});assert.throws(()=>call(c,'me',{token:one.session.token}),/expired/);assert.equal(call(c,'me',{token:two.session.token}).characterName,'Sessions');const recovery=call(c,'adminLogin',{secret:'secret'}).session,id=c.memberName_('Sessions').MemberId;call(c,'adminDisable',{token:recovery.token,memberId:id});assert.throws(()=>call(c,'me',{token:two.session.token}),/expired/);assert.throws(()=>call(c,'login',{characterName:'Sessions',pin:'123456'}),/Invalid/);});
+test('accounts create with only a character name, normalize it and restore with the backup code', () => {
+  const c = runtime();
+  const created = call(c, 'createAccount', { characterName: ' Alpha  One ' });
+  assert.equal(created.member.characterName, 'Alpha One');
+  assert.match(created.backupCode, /^BPSR-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+  assert.throws(() => call(c, 'createAccount', { characterName: 'alpha one' }), /already has an account/);
+  const restored = call(c, 'restore', { characterName: 'ALPHA ONE', backupCode: created.backupCode.toLowerCase() });
+  assert.equal(restored.member.memberId, created.member.memberId);
+  assert.ok(restored.session.token.length > 40);
+  assert.equal(call(c, 'me', { token: restored.session.token }).svFloor, 0);
+  call(c, 'logout', { token: restored.session.token });
+  assert.throws(() => call(c, 'me', { token: restored.session.token }), /expired/);
+});
 
-test('role and disabled payloads are strict booleans and last-admin disable is blocked',()=>{const c=runtime(),dax=call(c,'register',{characterName:'Dax',pin:'123456'}),recovery=call(c,'adminLogin',{secret:'secret'}).session,id=c.memberName_('Dax').MemberId;assert.throws(()=>call(c,'adminSetRole',{token:recovery.token,memberId:id,isAdmin:'true'}),/true or false/);call(c,'adminSetRole',{token:recovery.token,memberId:id,isAdmin:true});const admin=call(c,'login',{characterName:'Dax',pin:'123456'}).adminSession;assert.throws(()=>call(c,'adminSetDisabled',{token:admin.token,memberId:id,disabled:'false'}),/true or false/);assert.throws(()=>call(c,'adminSetDisabled',{token:admin.token,memberId:id,disabled:true}),/last active/i);assert.equal(call(c,'me',{token:dax.session.token}).isAdmin,true);});
+test('backend validates SV, ownership and genuine updates', () => {
+  const c = runtime();
+  const a = call(c, 'createAccount', { characterName: 'Alpha One' });
+  const b = call(c, 'createAccount', { characterName: 'Beta Two' });
+  assert.throws(() => call(c, 'progress', { token: a.session.token, svFloor: 0 }), /Invalid/);
+  assert.throws(() => call(c, 'progress', { token: a.session.token, svFloor: 61 }), /Invalid/);
+  assert.equal(call(c, 'progress', { token: a.session.token, svFloor: 1 }).changed, true);
+  assert.equal(call(c, 'progress', { token: a.session.token, svFloor: 1 }).changed, false);
+  assert.equal(call(c, 'me', { token: b.session.token }).characterName, 'Beta Two');
+});
 
-test('self-demotion needs confirmation and live role checks reject stale administrator sessions',()=>{const c=runtime();call(c,'register',{characterName:'Dax',pin:'123456'});call(c,'register',{characterName:'Second Admin',pin:'654321'});const recovery=call(c,'adminLogin',{secret:'secret'}).session,daxId=c.memberName_('Dax').MemberId,secondId=c.memberName_('Second Admin').MemberId;call(c,'adminSetRole',{token:recovery.token,memberId:daxId,isAdmin:true});call(c,'adminSetRole',{token:recovery.token,memberId:secondId,isAdmin:true});const dax=call(c,'login',{characterName:'Dax',pin:'123456'});assert.throws(()=>call(c,'adminSetRole',{token:dax.adminSession.token,memberId:daxId,isAdmin:false}),/Self-demotion/);call(c,'adminSetRole',{token:dax.adminSession.token,memberId:daxId,isAdmin:false,confirmSelf:true});assert.throws(()=>call(c,'adminMembers',{token:dax.adminSession.token}),/expired|Administrator/);assert.equal(call(c,'me',{token:dax.session.token}).isAdmin,false);});
+test('master activities, restore throttling, admin authorization and the safe API envelope work', () => {
+  const c = runtime();
+  const m = call(c, 'createAccount', { characterName: 'Gamma Three' });
+  assert.ok(call(c, 'activities').length);
+  assert.throws(() => call(c, 'progress', { token: m.session.token, masterRanks: { NOPE: 1 } }), /Invalid/);
+  assert.equal(call(c, 'progress', { token: m.session.token, masterRanks: { ACT1: 1 } }).changed, true);
+  for (let i = 0; i < 5; i++) assert.throws(() => call(c, 'restore', { characterName: 'Gamma Three', backupCode: 'BPSR-WRNG-WRNG-WRN2' }), /incorrect/);
+  assert.throws(() => call(c, 'restore', { characterName: 'Gamma Three', backupCode: m.backupCode }), /incorrect/);
+  assert.throws(() => call(c, 'adminMembers', { token: m.session.token }), /Administrator access required/);
+  const ad = call(c, 'adminLogin', { secret: 'secret' });
+  assert.equal(call(c, 'adminMembers', { token: ad.session.token }).length, 1);
+  const bad = JSON.parse(c.doPost({ postData: { contents: '{' } }).text);
+  assert.equal(bad.ok, false);
+  assert.equal(bad.error.code, 'REQUEST_FAILED');
+});
 
-test('administrator logout revokes only the submitted admin token',()=>{const c=runtime();call(c,'register',{characterName:'Dax',pin:'123456'});const recovery=call(c,'adminLogin',{secret:'secret'}).session,id=c.memberName_('Dax').MemberId;call(c,'adminSetRole',{token:recovery.token,memberId:id,isAdmin:true});const one=call(c,'login',{characterName:'Dax',pin:'123456'}),two=call(c,'login',{characterName:'Dax',pin:'123456'});call(c,'logout',{token:one.adminSession.token,kind:'admin'});assert.throws(()=>call(c,'adminMembers',{token:one.adminSession.token}),/expired/);assert.equal(call(c,'adminMembers',{token:two.adminSession.token}).length,1);assert.equal(call(c,'me',{token:one.session.token}).characterName,'Dax');});
+test('member roles authorize the member session live, support audited promotion and protect the last admin', () => {
+  const c = runtime();
+  const dax = call(c, 'createAccount', { characterName: 'Dax' });
+  const other = call(c, 'createAccount', { characterName: 'Guildie' });
+  const recovery = call(c, 'adminLogin', { secret: 'secret' }).session;
+  call(c, 'adminSetRole', { token: recovery.token, memberId: dax.member.memberId, isAdmin: true });
+  assert.equal(call(c, 'adminMembers', { token: dax.session.token }).length, 2);
+  assert.throws(() => call(c, 'adminMembers', { token: other.session.token }), /Administrator access required/);
+  assert.throws(() => call(c, 'adminSetRole', { token: dax.session.token, memberId: dax.member.memberId, isAdmin: false, confirmSelf: true }), /last active/i);
+  call(c, 'adminSetRole', { token: dax.session.token, memberId: other.member.memberId, isAdmin: true });
+  assert.equal(call(c, 'refresh', { token: other.session.token, kind: 'member' }).profile.isAdmin, true);
+  assert.equal(call(c, 'adminMembers', { token: other.session.token }).length, 2);
+  call(c, 'adminSetRole', { token: dax.session.token, memberId: other.member.memberId, isAdmin: false });
+  assert.throws(() => call(c, 'adminMembers', { token: other.session.token }), /Administrator access required/);
+  assert.ok(c.readTable_(c.SHEETS.AUDIT).rows.some(r => r.Action === 'SET_ADMIN_ROLE'));
+});
 
-test('disabling an administrator revokes that member sessions and preserves other administrators',()=>{const c=runtime();call(c,'register',{characterName:'Dax',pin:'123456'});call(c,'register',{characterName:'Second Admin',pin:'654321'});const recovery=call(c,'adminLogin',{secret:'secret'}).session,daxId=c.memberName_('Dax').MemberId,secondId=c.memberName_('Second Admin').MemberId;call(c,'adminSetRole',{token:recovery.token,memberId:daxId,isAdmin:true});call(c,'adminSetRole',{token:recovery.token,memberId:secondId,isAdmin:true});const dax=call(c,'login',{characterName:'Dax',pin:'123456'}),second=call(c,'login',{characterName:'Second Admin',pin:'654321'});call(c,'adminSetDisabled',{token:second.adminSession.token,memberId:daxId,disabled:true});assert.throws(()=>call(c,'me',{token:dax.session.token}),/expired/);assert.throws(()=>call(c,'adminMembers',{token:dax.adminSession.token}),/expired/);assert.equal(call(c,'adminMembers',{token:second.adminSession.token}).length,2);});
+test('refresh restores the profile without creating or replacing sessions', () => {
+  const c = runtime();
+  const m = call(c, 'createAccount', { characterName: 'Dax' });
+  const rows = sessions(c).length;
+  for (let i = 0; i < 3; i++) {
+    const refreshed = call(c, 'refresh', { token: m.session.token, kind: 'member' });
+    assert.equal(refreshed.profile.characterName, 'Dax');
+    assert.equal(sessions(c).length, rows);
+  }
+});
 
-test('profiles expose role and stable ID without PIN material, and identity mismatches fail closed',()=>{const c=runtime(),registered=call(c,'register',{characterName:'Safe Profile',pin:'123456'}),json=JSON.stringify(registered.member).toLowerCase();assert.equal(registered.member.isAdmin,false);assert.match(registered.member.memberId,/^MEM/);['pin','salt','hash','token'].forEach(secret=>assert.equal(json.includes(secret),false));const id=c.memberName_('Safe Profile').MemberId,players=c.readTable_(c.SHEETS.PLAYERS);players.sheet.rows.splice(players.rows.find(r=>String(r.UserId)===String(id))._row-1,1);assert.throws(()=>call(c,'me',{token:registered.session.token}),/exactly one progression record/);});
+test('creating an account issues exactly one remembered-device session and never an admin-kind session', () => {
+  const c = runtime();
+  const dax = call(c, 'createAccount', { characterName: 'Dax' });
+  assert.equal(sessions(c, 'member', dax.member.memberId).length, 1);
+  const recovery = call(c, 'adminLogin', { secret: 'secret' }).session;
+  call(c, 'adminSetRole', { token: recovery.token, memberId: dax.member.memberId, isAdmin: true });
+  assert.equal(call(c, 'adminMembers', { token: dax.session.token }).length, 1);
+  assert.equal(sessions(c, 'admin').length, 1); // only the bootstrap recovery session
+  assert.equal(sessions(c, 'admin', dax.member.memberId).length, 0);
+});
 
-test('recovery login shares the failed-attempt window and returns safe errors',()=>{const c=runtime();for(let i=0;i<5;i++)assert.throws(()=>call(c,'adminLogin',{secret:'wrong'}),/Invalid/);assert.throws(()=>call(c,'adminLogin',{secret:'secret'}),/Invalid/);const response=JSON.parse(c.doPost({postData:{contents:JSON.stringify({action:'adminLogin',data:{secret:'wrong'}})}}).text);assert.equal(response.ok,false);assert.equal(response.error.code,'INVALID_CREDENTIALS');assert.equal(JSON.stringify(response).includes('secret'),false);});
+test('logout revokes only one token and disabled members cannot restore', () => {
+  const c = runtime();
+  const acc = call(c, 'createAccount', { characterName: 'Sessions' });
+  const two = call(c, 'restore', { characterName: 'Sessions', backupCode: acc.backupCode });
+  call(c, 'logout', { token: acc.session.token, kind: 'member' });
+  assert.throws(() => call(c, 'me', { token: acc.session.token }), /expired/);
+  assert.equal(call(c, 'me', { token: two.session.token }).characterName, 'Sessions');
+  const recovery = call(c, 'adminLogin', { secret: 'secret' }).session;
+  call(c, 'adminDisable', { token: recovery.token, memberId: acc.member.memberId });
+  assert.throws(() => call(c, 'me', { token: two.session.token }), /expired/);
+  assert.throws(() => call(c, 'restore', { characterName: 'Sessions', backupCode: acc.backupCode }), /incorrect/);
+});
+
+test('role and disabled payloads are strict booleans and last-admin disable is blocked', () => {
+  const c = runtime();
+  const dax = call(c, 'createAccount', { characterName: 'Dax' });
+  const recovery = call(c, 'adminLogin', { secret: 'secret' }).session;
+  assert.throws(() => call(c, 'adminSetRole', { token: recovery.token, memberId: dax.member.memberId, isAdmin: 'true' }), /true or false/);
+  call(c, 'adminSetRole', { token: recovery.token, memberId: dax.member.memberId, isAdmin: true });
+  assert.throws(() => call(c, 'adminSetDisabled', { token: dax.session.token, memberId: dax.member.memberId, disabled: 'false' }), /true or false/);
+  assert.throws(() => call(c, 'adminSetDisabled', { token: dax.session.token, memberId: dax.member.memberId, disabled: true }), /last active/i);
+  assert.equal(call(c, 'me', { token: dax.session.token }).isAdmin, true);
+});
+
+test('self-demotion needs confirmation and demoted member tokens lose admin access immediately', () => {
+  const c = runtime();
+  const dax = call(c, 'createAccount', { characterName: 'Dax' });
+  const second = call(c, 'createAccount', { characterName: 'Second Admin' });
+  const recovery = call(c, 'adminLogin', { secret: 'secret' }).session;
+  call(c, 'adminSetRole', { token: recovery.token, memberId: dax.member.memberId, isAdmin: true });
+  call(c, 'adminSetRole', { token: recovery.token, memberId: second.member.memberId, isAdmin: true });
+  assert.throws(() => call(c, 'adminSetRole', { token: dax.session.token, memberId: dax.member.memberId, isAdmin: false }), /Self-demotion/);
+  call(c, 'adminSetRole', { token: dax.session.token, memberId: dax.member.memberId, isAdmin: false, confirmSelf: true });
+  assert.throws(() => call(c, 'adminMembers', { token: dax.session.token }), /Administrator access required/);
+  assert.equal(call(c, 'me', { token: dax.session.token }).isAdmin, false);
+});
+
+test('signing out one device keeps an administrator’s other remembered devices working', () => {
+  const c = runtime();
+  const dax = call(c, 'createAccount', { characterName: 'Dax' });
+  const recovery = call(c, 'adminLogin', { secret: 'secret' }).session;
+  call(c, 'adminSetRole', { token: recovery.token, memberId: dax.member.memberId, isAdmin: true });
+  const second = call(c, 'restore', { characterName: 'Dax', backupCode: dax.backupCode });
+  call(c, 'logout', { token: dax.session.token, kind: 'member' });
+  assert.throws(() => call(c, 'adminMembers', { token: dax.session.token }), /expired|Administrator/);
+  assert.equal(call(c, 'adminMembers', { token: second.session.token }).length, 1);
+});
+
+test('disabling an administrator revokes that member’s sessions and preserves other administrators', () => {
+  const c = runtime();
+  const dax = call(c, 'createAccount', { characterName: 'Dax' });
+  const second = call(c, 'createAccount', { characterName: 'Second Admin' });
+  const recovery = call(c, 'adminLogin', { secret: 'secret' }).session;
+  call(c, 'adminSetRole', { token: recovery.token, memberId: dax.member.memberId, isAdmin: true });
+  call(c, 'adminSetRole', { token: recovery.token, memberId: second.member.memberId, isAdmin: true });
+  call(c, 'adminSetDisabled', { token: second.session.token, memberId: dax.member.memberId, disabled: true });
+  assert.throws(() => call(c, 'me', { token: dax.session.token }), /expired/);
+  assert.throws(() => call(c, 'adminMembers', { token: dax.session.token }), /expired|Administrator/);
+  assert.equal(call(c, 'adminMembers', { token: second.session.token }).length, 2);
+});
+
+test('profiles expose role and stable ID without secrets, and identity mismatches fail closed', () => {
+  const c = runtime();
+  const registered = call(c, 'createAccount', { characterName: 'Safe Profile' });
+  const json = JSON.stringify(registered.member).toLowerCase();
+  assert.equal(registered.member.isAdmin, false);
+  assert.match(registered.member.memberId, /^MEM/);
+  ['pin', 'salt', 'hash', 'token', 'backup'].forEach(secret => assert.equal(json.includes(secret), false));
+  const players = c.readTable_(c.SHEETS.PLAYERS);
+  players.sheet.rows.splice(players.rows.find(r => String(r.UserId) === String(registered.member.memberId))._row - 1, 1);
+  assert.throws(() => call(c, 'me', { token: registered.session.token }), /exactly one progression record/);
+});
+
+test('recovery login shares the failed-attempt window and returns safe errors', () => {
+  const c = runtime();
+  for (let i = 0; i < 5; i++) assert.throws(() => call(c, 'adminLogin', { secret: 'wrong' }), /Invalid/);
+  assert.throws(() => call(c, 'adminLogin', { secret: 'secret' }), /Invalid/);
+  const response = JSON.parse(c.doPost({ postData: { contents: JSON.stringify({ action: 'adminLogin', data: { secret: 'wrong' } }) } }).text);
+  assert.equal(response.ok, false);
+  assert.equal(response.error.code, 'INVALID_CREDENTIALS');
+  assert.equal(JSON.stringify(response).includes('secret'), false);
+});
+
+test('PIN registration and login are no longer API actions', () => {
+  const c = runtime();
+  assert.throws(() => call(c, 'register', { characterName: 'Old Way', pin: '123456' }), /Unknown action/);
+  assert.throws(() => call(c, 'login', { characterName: 'Old Way', pin: '123456' }), /Unknown action/);
+});
