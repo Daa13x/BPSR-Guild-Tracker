@@ -3,15 +3,15 @@
 ## Google Sheet and stable identities
 
 - [ ] Back up the production spreadsheet before setup, migration, merge or role work.
-- [ ] Open **Extensions → Apps Script** and add the final `Code.gs` and `AuthApi.gs`.
+- [ ] Open **Extensions → Apps Script** and add the final `Code.gs`, `AuthApi.gs` and `MasterSeal.gs`.
 - [ ] Run the idempotent `setupSpreadsheet()` function and confirm no demo members were inserted.
-- [ ] Confirm all required sheets and exact headers exist.
+- [ ] Confirm all required sheets and exact headers exist, including the appended `Members` columns (`BackupCode`, `BackupCodeCreatedAt`, `BackupCodeUpdatedAt`, `LastAccessAt`), `Sessions.LastUsedAt` and the new `MasterSeal` sheet, with all existing data intact.
 - [ ] Confirm each `Members.MemberId` maps to exactly one `Players.UserId`; resolve missing or duplicate mappings before deployment.
 - [ ] Confirm Dax’s `Members.MemberId` equals Dax’s `Players.UserId` and that exact Players row has `IsAdmin=TRUE`.
-- [ ] Confirm Dax uses the existing normal member PIN flow; do not create or document a default PIN.
+- [ ] Confirm no default backup code is created or documented anywhere; codes are generated per member.
 - [ ] Configure real Master activities, active states and maximum ranks.
-- [ ] Review `Config`, including Europe/London timezone and reset settings.
-- [ ] Protect member-authentication, session, throttle, event, achievement, reset and audit sheets as appropriate.
+- [ ] Review `Config`, including Europe/London timezone, reset settings and `MEMBER_SESSION_DAYS`.
+- [ ] Protect the `Members` (now holding readable backup codes), `Sessions`, `LoginAttempts`, `MasterSeal`, event, achievement, reset and audit sheets; restrict spreadsheet editors to trusted administrators and record that editors can read codes and impersonate members.
 
 ## Script Properties and recovery
 
@@ -29,29 +29,39 @@
 - [ ] Open `/exec` directly and confirm the `GET` health response is JSON with `ok: true` and `status: "ready"`.
 - [ ] Confirm the health payload contains only the four static `ok`, `service`, `status` and `message` fields, with no Sheet, member, administrator or session data.
 - [ ] Treat the health response as a reachability check only; it does not replace live POST, authorization, redirect or Pages-origin verification.
-- [ ] Confirm public and protected API operations use JSON `POST` requests; never place PINs, session tokens or other credentials in the URL.
+- [ ] Confirm public and protected API operations use JSON `POST` requests; never place backup codes, session tokens or other credentials in the URL.
 - [ ] From the live Pages origin, test the public leaderboard POST and confirm CORS/redirect behavior.
-- [ ] Test normal registration, login, own profile, SV update, Master update, identical update and member logout.
-- [ ] Test session restoration, 12-hour expiry behavior and five-failure/15-minute throttling.
+- [ ] On a fresh browser, confirm the Who are you? screen shows both the New user and Returning user paths, create a test account from only a character name, and confirm the backup code is displayed once with “Please save this somewhere”.
+- [ ] Refresh and confirm the remembered-device cookie restores the account without any prompt; confirm the cookie contains only the opaque token.
+- [ ] Clear the cookie (or sign out) and restore with character name + backup code; confirm the same member ID and progression return and that a wrong code returns only the generic failure.
+- [ ] Test SV update, Master update, Master Seal six-dungeon update, identical updates and member sign-out.
+- [ ] Test five-failure/15-minute restore throttling and session expiry/revocation behavior.
+- [ ] On a browser still holding a valid legacy PIN-era session, confirm it migrates automatically to the cookie, shows the backup code once, and removes the old local storage; confirm no PIN is requested anywhere.
 - [ ] Confirm browser-supplied totals are ignored and server-calculated totals are returned.
 - [ ] Confirm malformed, oversized and unknown requests return safe JSON errors with no stack trace.
 
 ## Member-based administrator verification
 
-- [ ] Sign in as Dax through the normal character-name/PIN form and confirm the Administrator badge and protected view appear.
-- [ ] Confirm an ordinary member cannot call any administrator action, even if browser controls are manually exposed.
+- [ ] Restore as Dax and confirm the Administrator badge and protected view appear from the live role on the member session.
+- [ ] Confirm an ordinary member cannot call any administrator action (including backup-code reveal/regenerate/revoke), even if browser controls are manually exposed.
 - [ ] Promote a registered test member and confirm the audit entry identifies the acting member ID.
-- [ ] Sign in afresh as that member and confirm exactly one member-bound administrator session is issued.
-- [ ] Refresh the page repeatedly and confirm the existing administrator token is restored through the administrator refresh route without adding administrator rows to `Sessions`.
-- [ ] End that administrator session, refresh the member view and confirm administrator controls stay closed until the member signs out and signs in again.
-- [ ] With at least two active administrators, demote the test administrator and confirm all of their administrator sessions fail immediately while member sessions remain valid.
+- [ ] Refresh the page repeatedly and confirm sessions are restored without adding rows to `Sessions`.
+- [ ] With at least two active administrators, demote the test administrator and confirm their session stops authorizing admin actions immediately while member access remains valid.
 - [ ] Confirm self-demotion requires the stronger warning and explicit confirmation.
 - [ ] Confirm the final active administrator cannot be demoted, disabled or removed/merged away.
 - [ ] Disable a test member and confirm all of that member’s sessions are revoked; re-enable only after verifying intent.
-- [ ] Confirm member logout revokes only the submitted member token and administrator logout revokes only the submitted administrator token.
-- [ ] Exercise member edit, duplicate keep/remove merge, achievement correction, manual reset and audit-log viewing.
+- [ ] Confirm sign-out revokes only the submitted token; confirm Revoke all devices ends every remembered session for that member only.
+- [ ] Reveal a member’s backup code, copy it, regenerate it, confirm the old code fails immediately and the new one restores, and confirm the audit log records the actions without the codes.
+- [ ] Exercise member edit/rename, duplicate keep/remove merge (including Master Seal reassignment), achievement correction, manual reset and audit-log viewing.
 - [ ] Confirm every administrative mutation appears in `AuditLog` with the authenticated actor’s stable ID.
 - [ ] If configured, test emergency recovery separately and confirm failed attempts are throttled. Do not use it for routine sign-in.
+
+## Master Seal verification
+
+- [ ] Confirm the Master Seal board lists every active member with all six dungeon values visible per row and a working detail panel.
+- [ ] Confirm search, sorting, filters and keyboard row selection work and the reward track shows earned/next/locked states with Mount: Neon Sonic at 3,650.
+- [ ] Update the signed-in member’s six dungeons, confirm totals/remaining/cleared/mount update, refresh and confirm persistence.
+- [ ] Confirm a member cannot edit another member’s seal and that admin corrections are audited.
 
 ## One frontend API configuration
 

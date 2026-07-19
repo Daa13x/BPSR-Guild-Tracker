@@ -24,38 +24,44 @@
 Expected logical tables:
 
 - Config
-- Members
+- Members (includes readable backup codes and access metadata — must stay private)
 - MasterActivities
 - MemberMasterProgress
+- MasterSeal (MemberId, DungeonId, BestMasterLevel, Points, Cleared, UpdatedAt)
 - ProgressEvents
 - AchievementHistory
 - ResetPeriods
 - AuditLog
-- Sessions
+- Sessions (token hashes only, with kind, expiry, revocation and last use)
 - LoginAttempts or equivalent throttle storage
 
 Stable IDs must be used instead of row numbers as permanent identity.
 
-## Authentication
+## Authentication — passwordless remembered devices
 
 ### Member
 
-1. Member registers a normalized unique character name and PIN.
-2. Backend creates a stable member ID, unique salt, and derived PIN hash.
-3. Login returns an opaque expiring session token.
-4. Every protected action validates the token server-side.
-5. Logout, PIN change, member deletion, or expiry invalidates the session.
+1. A new member submits only a normalized unique character name.
+2. Backend creates a stable member ID, the linked player row, and a strong random `BPSR-XXXX-XXXX-XXXX` backup code stored readable in the private Members sheet (explicit trusted-guild product decision).
+3. Backend issues a long-lived opaque remembered-device session (default 180 days, `MEMBER_SESSION_DAYS`); only the token hash is stored.
+4. The browser keeps only the opaque token in a first-party, path-scoped cookie (`__Secure-` prefixed on HTTPS) and sends it in the JSON POST body. The cookie never holds names, IDs, codes, roles or progression.
+5. A returning browser without the cookie restores access with character name + backup code; failures are generic and throttled.
+6. Every protected action validates the token server-side; sign-out revokes one token, revoke-all revokes every device, disabling revokes all sessions.
+7. A still-valid legacy PIN-era session can be exchanged once (`migrate`) for a remembered-device session; the backup code is generated if missing and shown once. PIN authentication is removed; dormant PinSalt/PinHash columns remain one release for rollback only.
 
 ### Admin
 
 1. `Players.IsAdmin` is authoritative and the corresponding `Members.MemberId` must equal `Players.UserId`.
-2. An administrator signs in through the normal character-name/PIN flow.
-3. The backend returns a separate opaque administrator session tied to that real member ID.
-4. Every admin action independently validates the session, active member and live Players role.
-5. Demotion revokes administrator sessions; disabling revokes all sessions for that member; logout revokes only its submitted token.
-6. Atomic last-administrator checks prevent the final active administrator from being demoted, disabled or merged away.
-7. `BPSR_ADMIN_SECRET`, when configured, is throttled emergency recovery only.
-8. Frontend visibility is never treated as authorization.
+2. Administrator access is the member's own remembered-device session: every admin action validates the session **and** rechecks the live role — no separate admin credential and no trust in any browser flag.
+3. Demotion or disabling therefore takes effect on the next request; disabling also revokes all sessions; logout revokes only its submitted token.
+4. Atomic last-administrator checks prevent the final active administrator from being demoted, disabled or merged away.
+5. Administrators can reveal, copy and regenerate member backup codes and revoke member devices; reveals and changes are audited without writing codes into the log.
+6. `BPSR_ADMIN_SECRET`, when configured, is throttled emergency recovery only; its session lives in browser memory.
+7. Frontend visibility is never treated as authorization.
+
+## Master Seal
+
+`MasterSeal.gs` owns one authoritative Season 3 configuration (six exact dungeons, 3,650 maximum, seven reward milestones ending in Mount: Neon Sonic). Members write only their own six per-dungeon records (best Master level 0–20 or not cleared, points, cleared flag); the server validates every value, rejects unknown dungeons and points on uncleared dungeons, and derives total, remaining (≥0), progress (≤100%), cleared count and the 3,650 mount unlock. The public board projects names only. Duplicate merges reassign seal rows.
 
 ## Public data
 

@@ -33,12 +33,14 @@
   if (validExecUrl(supplied)) storeExplicit(supplied);
   var stored = readStored();
   var constantIsReal = configuredApiUrl.indexOf('PASTE_') < 0 && validExecUrl(configuredApiUrl);
+  // An explicitly supplied override (persisted from ?api=) outranks the
+  // committed constant on every later visit; clear bpsrApiUrl to return.
   var apiUrl = validExecUrl(supplied) ? supplied :
-    (constantIsReal ? configuredApiUrl : (validExecUrl(stored) ? stored : ''));
+    (validExecUrl(stored) ? stored : (constantIsReal ? configuredApiUrl : ''));
   root.BPSR_CONFIG = {
     apiUrl: apiUrl,
     timeoutMs: 15000,
-    source: validExecUrl(supplied) ? 'query' : (constantIsReal ? 'constant' : (validExecUrl(stored) ? 'storage' : 'none')),
+    source: validExecUrl(supplied) ? 'query' : (validExecUrl(stored) ? 'storage' : (constantIsReal ? 'constant' : 'none')),
     invalidQuery: Boolean(supplied && !validExecUrl(supplied)),
     isConfigured: function () { return validExecUrl(apiUrl); }
   };
