@@ -5,36 +5,36 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OnlyPaws Guild Tracker</title>
 <link rel="icon" type="image/png" href="assets/guild-logo.png">
-<script src="config.js?v=4"></script>
+<script src="config.js?v=5"></script>
 <style>
 /* =========================================================
    GUILD THEME — edit these variables to match your colours
    ========================================================= */
 :root{
-  --ink:        #260D19;   /* BPSR dark                  */
-  --cloth:      #261D21;   /* BPSR panel                 */
-  --cloth-edge: #4C3945;   /* BPSR border                */
-  --oxblood:    #4C3945;   /* BPSR primary               */
-  --brass:      #D9BFCB;   /* BPSR accent                */
-  --brass-hi:   #D9D9D9;   /* BPSR light                 */
-  --parchment:  #D9D9D9;   /* main text                  */
-  --parch-dim:  #D9BFCB;   /* secondary text             */
-  --sv:         #8fb3d1;   /* SV steel-blue accent       */
-  --ember:      #d2703f;   /* warnings / outdated        */
-  --ok:         #8fbb7a;   /* success / complete         */
-  --radius: 10px;
+  --ink:        #070812;   /* page background            */
+  --cloth:      #10101a;   /* panel                      */
+  --cloth-edge: #352037;   /* border                     */
+  --oxblood:    #6c2f8c;   /* primary                    */
+  --brass:      #cf82ef;   /* accent                     */
+  --brass-hi:   #f5eff8;   /* light text                 */
+  --parchment:  #f5eff8;   /* main text                  */
+  --parch-dim:  #aaa1b0;   /* secondary text             */
+  --sv:         #8b9ff5;   /* SV accent                  */
+  --ember:      #e9be69;   /* warnings / outdated        */
+  --ok:         #49e58a;   /* success / complete         */
+  --radius: 12px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 body{
   background:var(--ink);
-  background-image:radial-gradient(1200px 500px at 50% -10%, rgba(92,31,39,.35), transparent 70%);
+  background-image:radial-gradient(1100px 520px at 22% -8%, rgba(124,47,160,.30), transparent 62%),radial-gradient(900px 460px at 96% 4%, rgba(60,34,120,.24), transparent 60%);background-attachment:fixed;
   color:var(--parchment);
-  font-family:"Alegreya Sans",system-ui,sans-serif;
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
   font-size:16px;line-height:1.5;
   min-height:100vh;
 }
-h1,h2,h3,.display{font-family:"Cinzel",serif;letter-spacing:.04em}
+h1,h2,h3,.display{font-family:'Philosopher','Iowan Old Style',Georgia,serif;letter-spacing:.02em}
 a{color:var(--brass-hi)}
 button{font:inherit;cursor:pointer}
 :focus-visible{outline:2px solid var(--brass-hi);outline-offset:2px}
@@ -61,12 +61,12 @@ header.site h1{font-size:clamp(1.6rem,4.5vw,2.4rem);font-weight:900;color:var(--
 .fg-card{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
 .fg-badge{
   flex:0 0 auto;width:64px;height:64px;border-radius:50%;
-  background:radial-gradient(circle at 35% 30%, var(--brass-hi), var(--brass) 60%, #7a5c22);
-  display:grid;place-items:center;color:#241a08;font-family:Cinzel,serif;font-weight:900;font-size:1.3rem;
+  background:radial-gradient(circle at 35% 30%, #e9b8ff, var(--brass) 55%, #4c1d63);
+  display:grid;place-items:center;color:#1a0725;font-family:'Philosopher',Georgia,serif;font-weight:900;font-size:1.3rem;
   box-shadow:0 0 0 3px var(--oxblood), 0 0 0 4px var(--brass);
 }
 .fg-main{flex:1;min-width:220px}
-.fg-name{font-family:Cinzel,serif;font-weight:700;font-size:1.2rem;color:var(--brass-hi)}
+.fg-name{font-family:'Philosopher',Georgia,serif;font-weight:700;font-size:1.2rem;color:var(--brass-hi)}
 .fg-what{color:var(--parchment)}
 .fg-meta{color:var(--parch-dim);font-size:.85rem}
 .fg-empty{color:var(--parch-dim);font-style:italic}
@@ -80,7 +80,7 @@ details.fg-prev summary{cursor:pointer;color:var(--brass);font-size:.9rem}
 .tabs{display:flex;gap:8px;margin-top:22px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
 .tab{
   flex:0 0 auto;background:transparent;border:1px solid var(--cloth-edge);color:var(--parch-dim);
-  border-radius:999px;padding:8px 16px;font-family:Cinzel,serif;font-weight:700;font-size:.82rem;
+  border-radius:999px;padding:8px 16px;font-family:'Philosopher',Georgia,serif;font-weight:700;font-size:.82rem;
   letter-spacing:.08em;text-transform:uppercase;transition:color .15s,border-color .15s,background .15s;
 }
 .tab:hover{color:var(--parchment)}
@@ -90,19 +90,19 @@ details.fg-prev summary{cursor:pointer;color:var(--brass);font-size:.9rem}
 .podium{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:start;margin:26px 0 6px;position:relative}
 .podium::before{ /* the rail the banners hang from */
   content:"";position:absolute;top:-8px;left:2%;right:2%;height:4px;border-radius:2px;
-  background:linear-gradient(90deg,#7a5c22,var(--brass-hi),#7a5c22);
+  background:linear-gradient(90deg,#4c1d63,var(--brass),#4c1d63);
 }
 .banner{
-  position:relative;background:linear-gradient(180deg,var(--oxblood),#3d151b 78%);
+  position:relative;background:linear-gradient(180deg,rgba(76,34,110,.85),#140c1e 78%);
   border:1px solid var(--brass);border-top-width:3px;
   clip-path:polygon(0 0,100% 0,100% calc(100% - 26px),50% 100%,0 calc(100% - 26px));
   padding:20px 12px 44px;text-align:center;min-height:190px;
   animation:hang .6s ease-out both;
 }
 .banner.gold{min-height:230px;border-color:var(--brass-hi)}
-.banner .medal{font-family:Cinzel,serif;font-weight:900;font-size:1.6rem;color:var(--brass-hi)}
+.banner .medal{font-family:'Philosopher',Georgia,serif;font-weight:900;font-size:1.6rem;color:var(--brass-hi)}
 .banner.gold .medal{font-size:2rem}
-.banner .b-name{font-family:Cinzel,serif;font-weight:700;font-size:1.02rem;color:var(--parchment);margin-top:6px;overflow-wrap:anywhere}
+.banner .b-name{font-family:'Philosopher',Georgia,serif;font-weight:700;font-size:1.02rem;color:var(--parchment);margin-top:6px;overflow-wrap:anywhere}
 .banner .b-stat{margin-top:8px;font-size:1.35rem;font-weight:700;color:var(--brass-hi);font-variant-numeric:tabular-nums}
 .banner .b-sub{color:var(--parch-dim);font-size:.8rem;margin-top:2px}
 .banner .b-badges{margin-top:8px}
@@ -128,12 +128,12 @@ details.fg-prev summary{cursor:pointer;color:var(--brass);font-size:.9rem}
 .tablewrap{overflow-x:auto;margin-top:14px}
 table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 th{
-  text-align:left;font-family:Cinzel,serif;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;
+  text-align:left;font-family:'Philosopher',Georgia,serif;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;
   color:var(--brass);padding:10px 10px;border-bottom:1px solid var(--brass);white-space:nowrap;
 }
 td{padding:11px 10px;border-bottom:1px solid var(--cloth-edge);vertical-align:middle}
-tr:hover td{background:rgba(201,162,75,.05)}
-.rank{font-family:Cinzel,serif;font-weight:700;color:var(--parch-dim);width:3ch}
+tr:hover td{background:rgba(207,130,239,.06)}
+.rank{font-family:'Philosopher',Georgia,serif;font-weight:700;color:var(--parch-dim);width:3ch}
 .rank.top{color:var(--brass-hi)}
 .pname{font-weight:700;color:var(--parchment)}
 .dim{color:var(--parch-dim);font-size:.85rem}
@@ -152,14 +152,14 @@ tr:hover td{background:rgba(201,162,75,.05)}
 /* Hall of fame */
 .hall{display:grid;gap:10px;margin-top:8px}
 .hall-row{display:flex;gap:12px;align-items:center;border:1px solid var(--cloth-edge);border-radius:8px;padding:10px 12px;background:var(--ink)}
-.hall-pos{font-family:Cinzel,serif;font-weight:900;color:var(--brass-hi);font-size:1.15rem;width:2.4ch;text-align:center}
+.hall-pos{font-family:'Philosopher',Georgia,serif;font-weight:900;color:var(--brass-hi);font-size:1.15rem;width:2.4ch;text-align:center}
 .hall-name{font-weight:700;flex:1}
 .hall-meta{color:var(--parch-dim);font-size:.85rem;text-align:right}
 
 /* Firsts + feed */
 .firsts{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
 .first-card{border:1px solid var(--cloth-edge);border-left:3px solid var(--brass);border-radius:8px;padding:10px 12px;background:var(--ink)}
-.first-type{font-family:Cinzel,serif;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--brass)}
+.first-type{font-family:'Philosopher',Georgia,serif;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--brass)}
 .first-name{font-weight:700;margin-top:2px}
 .first-date{color:var(--parch-dim);font-size:.8rem}
 .feed{list-style:none;display:grid;gap:8px}
@@ -170,7 +170,7 @@ tr:hover td{background:rgba(201,162,75,.05)}
 .actions{display:flex;gap:10px;justify-content:center;margin-top:14px;flex-wrap:wrap}
 .btn{
   background:var(--oxblood);border:1px solid var(--brass);color:var(--brass-hi);
-  border-radius:8px;padding:10px 18px;font-family:Cinzel,serif;font-weight:700;letter-spacing:.06em;
+  border-radius:8px;padding:10px 18px;font-family:'Philosopher',Georgia,serif;font-weight:700;letter-spacing:.06em;
 }
 .btn:hover{background:#6d2530}
 .btn.ghost{background:transparent;color:var(--parch-dim);border-color:var(--cloth-edge)}
@@ -198,12 +198,12 @@ dialog h3{color:var(--brass-hi);margin-bottom:12px}
   tr{border:1px solid var(--cloth-edge);border-radius:8px;margin-bottom:10px;background:var(--ink);padding:10px 12px}
   td{border:none;padding:3px 0}
   td[data-l]::before{content:attr(data-l);display:inline-block;min-width:9ch;color:var(--brass);
-    font-family:Cinzel,serif;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;margin-right:8px}
+    font-family:'Philosopher',Georgia,serif;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;margin-right:8px}
   .rank{width:auto;font-size:1.1rem}
   .hall-meta{text-align:left}
 }
 </style>
-<link rel="stylesheet" href="styles.css?v=4">
+<link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
 <div class="app-shell">
@@ -633,7 +633,7 @@ function demoData(){
 
 load();
 </script>
-<script src="MasterSeal.js?v=4"></script>
-<script src="AppFrontend.js?v=4"></script>
+<script src="MasterSeal.js?v=5"></script>
+<script src="AppFrontend.js?v=5"></script>
 </body>
 </html>
