@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Master Seal — Season 3 · BPSR Guild Tracker</title>
+<link rel="icon" type="image/png" href="assets/guild-logo.png">
+<link rel="stylesheet" href="master-seal.css?v=5">
+<script src="config.js?v=5"></script>
+</head>
+<body class="ms-body">
+<a class="ms-skip" href="#ms-main">Skip to leaderboard</a>
+
+<button class="ms-drawer-toggle" id="ms-drawer-toggle" type="button" aria-expanded="false" aria-controls="ms-sidebar">
+  <span aria-hidden="true">☰</span> Menu
+</button>
+
+<div class="ms-shell">
+  <!-- ---------------------------------------------------------------- -->
+  <!-- Sidebar                                                          -->
+  <!-- ---------------------------------------------------------------- -->
+  <aside class="ms-sidebar" id="ms-sidebar" aria-label="Guild tracker navigation">
+    <a class="ms-brand" href="index.html">
+      <span class="ms-brand-crest" aria-hidden="true">
+        <svg viewBox="0 0 44 44" width="34" height="34">
+          <defs><linearGradient id="crest" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#e9b8ff"/><stop offset="1" stop-color="#8b3fb5"/>
+          </linearGradient></defs>
+          <path d="M22 2 L40 12 V26 Q40 36 22 42 Q4 36 4 26 V12 Z" fill="none" stroke="url(#crest)" stroke-width="2.2"/>
+          <path d="M22 11 L30 16 V25 Q30 30 22 33 Q14 30 14 25 V16 Z" fill="url(#crest)" opacity=".9"/>
+        </svg>
+      </span>
+      <span class="ms-brand-text"><strong>BPSR</strong><small>Guild Tracker</small></span>
+    </a>
+
+    <nav class="ms-nav">
+      <p class="ms-nav-group">Overview</p>
+      <a class="ms-nav-item" href="index.html"><span class="ms-ico" aria-hidden="true">◆</span>Guild Dashboard</a>
+      <a class="ms-nav-item" href="Leaderboard.html#feed-panel"><span class="ms-ico" aria-hidden="true">≋</span>Activity Feed</a>
+
+      <p class="ms-nav-group">Leaderboards</p>
+      <a class="ms-nav-item selected" href="MasterSeal.html" aria-current="page"><span class="ms-ico" aria-hidden="true">✦</span>Master Seal</a>
+      <a class="ms-nav-item" href="Leaderboard.html#leaderboards"><span class="ms-ico" aria-hidden="true">⚔</span>Challenge Mode</a>
+
+      <p class="ms-nav-group">Analytics</p>
+      <a class="ms-nav-item" href="Leaderboard.html#leaderboards"><span class="ms-ico" aria-hidden="true">▤</span>Performance</a>
+      <a class="ms-nav-item" href="Leaderboard.html#achievements"><span class="ms-ico" aria-hidden="true">↗</span>Trends</a>
+
+      <p class="ms-nav-group">Manage</p>
+      <a class="ms-nav-item" href="Leaderboard.html#my-progress"><span class="ms-ico" aria-hidden="true">◉</span>Members</a>
+      <a class="ms-nav-item" href="Leaderboard.html#administration"><span class="ms-ico" aria-hidden="true">⚙</span>Settings</a>
+    </nav>
+
+    <div class="ms-guild-card">
+      <span class="ms-guild-crest" aria-hidden="true">
+        <img src="assets/guild-logo.png" alt="" onerror="this.replaceWith(document.createTextNode('◈'))">
+      </span>
+      <div class="ms-guild-body">
+        <p class="ms-guild-label">Your Guild</p>
+        <p class="ms-guild-name">BPSR <span id="ms-guild-level">Lv. 12</span></p>
+        <div class="ms-xp" role="progressbar" id="ms-guild-xp" aria-label="Guild experience"
+             aria-valuemin="0" aria-valuemax="12000" aria-valuenow="8340"><i style="width:69.5%"></i></div>
+        <p class="ms-guild-xp-text" id="ms-guild-xp-text">8,340 / 12,000 XP</p>
+      </div>
+    </div>
+
+    <div class="ms-countdown" id="ms-countdown">
+      <p class="ms-countdown-label"><span class="ms-ico" aria-hidden="true">⏳</span> Season 3 ends in</p>
+      <p class="ms-countdown-value" id="ms-countdown-value" aria-live="polite">—</p>
+    </div>
+
+    <div class="ms-sidebar-foot">
+      <span class="ms-dot" id="ms-conn-dot" aria-hidden="true"></span>
+      <span id="ms-conn-status" role="status">Connecting…</span>
+    </div>
+  </aside>
+
+  <!-- ---------------------------------------------------------------- -->
+  <!-- Central column: header, toolbar, leaderboard                     -->
+  <!-- ---------------------------------------------------------------- -->
+  <main class="ms-main" id="ms-main">
+    <header class="ms-header">
+      <span class="ms-seal-emblem" aria-hidden="true">
+        <svg viewBox="0 0 64 64" width="56" height="56">
+          <defs><linearGradient id="sealgrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#e9b8ff"/><stop offset="1" stop-color="#7b2fa8"/>
+          </linearGradient></defs>
+          <circle cx="32" cy="32" r="28" fill="none" stroke="url(#sealgrad)" stroke-width="2"/>
+          <path d="M32 8 L52 32 L32 56 L12 32 Z" fill="none" stroke="url(#sealgrad)" stroke-width="1.6" opacity=".7"/>
+          <path d="M32 17 L45 32 L32 47 L19 32 Z" fill="url(#sealgrad)" opacity=".9"/>
+        </svg>
+      </span>
+      <div class="ms-header-text">
+        <h1>Master Seal <span class="ms-season-tag" id="ms-season-tag">Season 3</span></h1>
+        <p>Compete across the six Chaotic Realm dungeons to earn points and unlock exclusive rewards.</p>
+      </div>
+      <div class="ms-maxscore">
+        <span>Max season score</span>
+        <strong id="ms-maxscore-value">—</strong>
+      </div>
+    </header>
+
+    <section class="ms-panel ms-board-panel" aria-labelledby="ms-board-h">
+      <div class="ms-toolbar">
+        <h2 id="ms-board-h">Guild Members</h2>
+        <span class="ms-count-badge" id="ms-count-badge">—</span>
+        <div class="ms-search">
+          <span class="ms-search-ico" aria-hidden="true">⌕</span>
+          <input id="ms-search" type="search" placeholder="Search members…" aria-label="Search members by character name">
+        </div>
+        <label class="ms-field"><span class="sr-only">Sort members</span>
+          <select id="ms-sort" aria-label="Sort members">
+            <option value="rank">Sort by Rank</option>
+            <option value="total">Total Score</option>
+            <option value="progress">Progress</option>
+            <option value="remaining">Remaining</option>
+            <option value="updated">Last Updated</option>
+            <option value="name">Character Name</option>
+          </select>
+        </label>
+        <label class="ms-field"><span class="sr-only">Filter members</span>
+          <select id="ms-filter" aria-label="Filter members">
+            <option value="all">All Members</option>
+            <option value="online">Recently Active</option>
+            <option value="offline">Not Active Recently</option>
+            <option value="mount">Mount Unlocked</option>
+            <option value="locked">Mount Locked</option>
+            <option value="six">All Six Cleared</option>
+            <option value="incomplete">Incomplete</option>
+          </select>
+        </label>
+        <button class="ms-icon-btn" id="ms-advanced" type="button" aria-label="Advanced filters" title="Advanced filters" aria-expanded="false">⚟</button>
+      </div>
+
+      <div class="ms-advanced-panel" id="ms-advanced-panel" hidden>
+        <label class="ms-check"><input type="checkbox" id="ms-adv-stale"> Not updated in 14 days</label>
+        <label class="ms-check"><input type="checkbox" id="ms-adv-zero"> No score yet</label>
+        <label class="ms-field ms-adv-size"><span>Rows</span>
+          <select id="ms-page-size" aria-label="Rows per page">
+            <option value="10">10</option><option value="15">15</option><option value="25">25</option><option value="50">50</option>
+          </select>
+        </label>
+        <button class="ms-reset" id="ms-reset" type="button">Reset filters</button>
+      </div>
+
+      <p class="ms-select-hint">Select a member to inspect their Master Seal progress and dungeon details.</p>
+
+      <div class="ms-tablewrap" id="ms-tablewrap" tabindex="0" role="region" aria-labelledby="ms-board-h">
+        <div id="ms-table-host"><div class="ms-skeleton" aria-hidden="true"></div></div>
+      </div>
+
+      <div class="ms-pagination">
+        <p class="ms-showing" id="ms-showing" role="status">Loading members…</p>
+        <div class="ms-pages" id="ms-pages"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ---------------------------------------------------------------- -->
+  <!-- Right column: selected member detail                             -->
+  <!-- ---------------------------------------------------------------- -->
+  <aside class="ms-detail" id="ms-detail" aria-label="Selected member details" aria-live="polite">
+    <div class="ms-skeleton tall" aria-hidden="true"></div>
+  </aside>
+</div>
+
+<div class="ms-tooltip" id="ms-tooltip" role="tooltip" hidden></div>
+
+<script src="MasterSealPage.js?v=5"></script>
+</body>
+</html>

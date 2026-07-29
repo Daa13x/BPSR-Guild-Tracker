@@ -255,6 +255,8 @@ tr:hover td { background: rgba(217,191,203,.035); }
 .seal-title h2 { display: flex; align-items: center; gap: 10px; color: var(--sl-text); font-size: 24px; font-weight: 800; letter-spacing: .01em; }
 .seal-season { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--sl-accent); background: rgba(168, 85, 247, .14); color: var(--sl-accent-hi); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .seal-title p { margin: 4px 0 0; color: var(--sl-muted); font-size: 13px; }
+.seal-open-dashboard { padding: 8px 13px; border: 1px solid var(--sl-accent); border-radius: 10px; background: rgba(168, 85, 247, .16); color: var(--sl-accent-hi); font-size: 12px; font-weight: 800; text-decoration: none; white-space: nowrap; }
+.seal-open-dashboard:hover { background: rgba(168, 85, 247, .3); }
 .seal-max-badge { display: grid; gap: 2px; justify-items: end; padding: 10px 14px; border: 1px solid var(--sl-line); border-radius: 12px; background: var(--sl-panel); }
 .seal-max-badge span { color: var(--sl-muted); font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 .seal-max-badge strong { color: var(--sl-accent-hi); font-size: 22px; font-weight: 800; text-shadow: 0 0 18px var(--sl-glow); }

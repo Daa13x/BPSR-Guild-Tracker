@@ -10,6 +10,7 @@ var MASTER_SEAL_SEASON = {
   displayName: 'Season 3',
   maxScore: 3650,
   maxMasterLevel: 20,
+  endsAt: '2026-08-22T03:00:00Z',
   dungeons: [
     { id: 'towering-ruin', number: 1, name: 'Void - Towering Ruin', shortName: 'Towering Ruin' },
     { id: 'tinas-mindrealm', number: 2, name: "Void - Tina's Mindrealm", shortName: "Tina's Mindrealm" },

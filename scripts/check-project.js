@@ -11,6 +11,11 @@ const required = [
   'MasterSeal.gs',
   'AppFrontend.js',
   'MasterSeal.js',
+  'MasterSeal.html',
+  'MasterSealPage.js',
+  'master-seal.css',
+  'assets/fonts/Philosopher-Bold.woff',
+  'assets/fonts/Philosopher-Regular.woff',
   'config.js',
   'styles.css',
   'index.html',
@@ -73,6 +78,11 @@ requireText('config.js', [
   },
   { label: 'must expose the authoritative BPSR_CONFIG object', regex: /root\.BPSR_CONFIG\s*=/ }
 ]);
+requireText('MasterSeal.html', [
+  { label: 'must load repository-relative config.js with a cache version token', regex: /<script src="config\.js\?v=[\w.-]+"><\/script>/ },
+  { label: 'must load the dashboard stylesheet with a cache version token', regex: /<link rel="stylesheet" href="master-seal\.css\?v=[\w.-]+">/ },
+  { label: 'must load MasterSealPage.js with a cache version token', regex: /<script src="MasterSealPage\.js\?v=[\w.-]+"><\/script>/ }
+]);
 requireText('.github/workflows/pages.yml', [
   { label: 'must deploy on main pushes', regex: /branches:\s*\[main\]/ },
   { label: 'must support workflow_dispatch', regex: /workflow_dispatch:/ },
@@ -83,7 +93,7 @@ requireText('.github/workflows/pages.yml', [
   { label: 'must use deploy-pages', regex: /actions\/deploy-pages@v\d+/ }
 ]);
 
-for (const relative of ['Code.gs', 'AuthApi.gs', 'MasterSeal.gs', 'config.js', 'AppFrontend.js', 'MasterSeal.js']) {
+for (const relative of ['Code.gs', 'AuthApi.gs', 'MasterSeal.gs', 'config.js', 'AppFrontend.js', 'MasterSeal.js', 'MasterSealPage.js']) {
   const absolute = path.join(root, relative);
   if (!fs.existsSync(absolute)) continue;
   try {
