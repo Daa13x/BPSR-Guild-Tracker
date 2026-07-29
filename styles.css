@@ -281,10 +281,6 @@ tr:hover td { background: rgba(207,130,239,.05); }
 .seal-select select { min-height: 38px; padding: 6px 9px; border-radius: 9px; color: var(--sl-text); background: #0c0a14; border: 1px solid var(--sl-line); }
 
 .seal-layout { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(280px, 1fr); gap: 14px; align-items: start; }
-/* On wide screens the seal dashboard escapes the site column, like the mockup. */
-@media (min-width: 1500px) {
-  .seal-panel { margin-left: calc(-1 * ((100vw - 288px) - 1388px) / 2); margin-right: calc(-1 * ((100vw - 288px) - 1388px) / 2); }
-}
 .seal-tablewrap { max-height: 600px; overflow: auto; border: 1px solid var(--sl-line-soft); border-radius: 14px; background: var(--sl-panel); }
 .seal-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .seal-table th { position: sticky; top: 26px; z-index: 2; padding: 7px 8px; text-align: left; white-space: nowrap; background: #17101f; color: var(--sl-muted); font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; border-bottom: 1px solid var(--sl-line); }

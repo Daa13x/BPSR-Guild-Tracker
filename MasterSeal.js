@@ -44,7 +44,15 @@
       if (view.selected === null && data.board.length) view.selected = data.board[0].name;
       render();
     }).catch(function (failure) {
-      el.innerHTML = '<div class="empty">Master Seal could not load: ' + esc(failure.message || 'API error') + '</div>';
+      // A deployed-but-outdated Apps Script backend answers UNKNOWN_ACTION;
+      // say so plainly instead of showing a bare API string.
+      var stale = failure && (failure.code === 'UNKNOWN_ACTION' || /unknown action/i.test(failure.message || ''));
+      el.innerHTML = '<div class="empty">' + (stale
+        ? '<strong>Master Seal is not live on the backend yet</strong>' +
+          '<p>The tracker is running the new interface, but the Apps Script deployment still needs ' +
+          'MasterSeal.gs and a new web-app version before Season 3 data can load.</p>'
+        : '<strong>Master Seal could not load</strong><p>' + esc(failure.message || 'The API is unavailable.') + '</p>') +
+        '</div>';
     });
   }
 
