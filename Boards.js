@@ -4,7 +4,13 @@
  * every section. */
 'use strict';
 var DATA = null;
-var state = { tab:'sv', q:'', active:false, outdated:false, mount:false, svdone:false };
+// Each board owns its own search and filter state so the SV and Masters
+// sections behave as two independent leaderboards.
+var BOARDS = ['sv', 'mp'];
+var state = {
+  sv: { q:'', active:false, outdated:false, mount:false, svdone:false },
+  mp: { q:'', active:false, outdated:false, mount:false, svdone:false }
+};
 // GitHub Pages and the protected controller share this one configuration source.
 var API_URL = window.BPSR_CONFIG ? window.BPSR_CONFIG.apiUrl : '';
 function api(action,data){ if(!API_URL) return Promise.reject(new Error('API URL is not configured. Add ?api=YOUR_EXEC_URL once.'));
@@ -30,49 +36,38 @@ function render(){
     'Updated ' + fmtDateTime(d.generatedAt) + (API_URL ? '' : ' · preview only');
 
   renderFirstGuildie();
-  renderBoard();
+  BOARDS.forEach(renderBoard);
   renderFirsts();
   renderFeed();
 }
 
-function boardRows(){
-  var d = DATA, rows;
-  if (state.tab === 'sv') rows = d.svBoard;
-  else if (state.tab === 'mp') rows = d.mpBoard;
-  else if (state.tab === 'mc') rows = d.mcBoard;
-  else return null;
+function boardRows(key){
+  var d = DATA, f = state[key];
+  var rows = key === 'sv' ? d.svBoard : d.mpBoard;
   return rows.filter(function(p){
-    if (state.q && p.name.toLowerCase().indexOf(state.q) === -1) return false;
-    if (state.active && p.outdated) return false;
-    if (state.outdated && !p.outdated) return false;
-    if (state.mount && !p.mount) return false;
-    if (state.svdone && !p.svComplete) return false;
+    if (f.q && p.name.toLowerCase().indexOf(f.q) === -1) return false;
+    if (f.active && p.outdated) return false;
+    if (f.outdated && !p.outdated) return false;
+    if (f.mount && !p.mount) return false;
+    if (f.svdone && !p.svComplete) return false;
     return true;
   });
 }
 
-function renderBoard(){
-  var el = document.getElementById('board');
-  var pod = document.getElementById('podium');
-  var controls = document.getElementById('controls');
+function renderBoard(key){
+  var el = document.getElementById('board-' + key);
+  var pod = document.getElementById('podium-' + key);
+  if (!el || !pod) return;
+  var rows = boardRows(key);
+  var full = key === 'sv' ? DATA.svBoard : DATA.mpBoard;
 
-  if (state.tab === 'hall'){
-    pod.innerHTML = ''; controls.style.display = 'none';
-    el.innerHTML = renderHall();
-    return;
-  }
-  controls.style.display = '';
-  var rows = boardRows();
-
-  // Top-3 podium banners (unfiltered board order, spec: podium then full table)
-  var full = state.tab==='sv' ? DATA.svBoard : state.tab==='mp' ? DATA.mpBoard : DATA.mcBoard;
+  // Top-three podium banners use the unfiltered board order.
   pod.innerHTML = full.slice(0,3).map(function(p,i){
     var medal = ['I','II','III'][i];
     var stat, sub;
-    if (state.tab==='sv'){ stat='Floor '+p.sv; sub=p.svPct+'% of '+DATA.config.svMax; }
-    else if (state.tab==='mp'){ stat=num(p.points)+' pts'; sub=num(p.pointsRemaining)+' to the mount'; }
-    else { stat=p.mastersAtMax+' at max'; sub=p.totalRanks+' ranks total'; }
-    return '<div class="banner pod-'+(i+1)+(i===0?' gold':'')+'" style="animation-delay:'+(i*0.08)+'s">' +
+    if (key === 'sv'){ stat='Floor '+p.sv; sub=p.svPct+'% of '+DATA.config.svMax; }
+    else { stat=num(p.points)+' pts'; sub=num(p.pointsRemaining)+' to the mount'; }
+    return '<div class="banner pod-'+(i+1)+(i===0?' gold':'')+'">' +
       '<div class="medal">'+medal+'</div>' +
       '<div class="b-name">'+esc(p.name)+'</div>' +
       '<div class="b-stat">'+stat+'</div>' +
@@ -81,10 +76,13 @@ function renderBoard(){
   }).join('');
   if (!full.length) pod.innerHTML='';
 
-  if (!rows.length){ el.innerHTML = '<div class="empty">No guildies match — clear a filter or be the first to register.</div>'; return; }
+  if (!rows.length){
+    el.innerHTML = '<div class="empty">No guildies match — clear a filter or be the first to register.</div>';
+    return;
+  }
 
   var head, body;
-  if (state.tab === 'sv'){
+  if (key === 'sv'){
     head = th(['Rank','Character','SV Floor','Progress','Floor achieved','Badges','Last updated']);
     body = rows.map(function(p){
       var r = DATA.svBoard.indexOf(p)+1;
@@ -97,7 +95,7 @@ function renderBoard(){
         td('Updated', updated(p))
       ]);
     }).join('');
-  } else if (state.tab === 'mp'){
+  } else {
     head = th(['Rank','Character','Master points','Progress to '+num(DATA.config.mountTarget),'Remaining','Mount','Score achieved','Last updated']);
     body = rows.map(function(p){
       var r = DATA.mpBoard.indexOf(p)+1;
@@ -111,33 +109,8 @@ function renderBoard(){
         td('Updated', updated(p))
       ]);
     }).join('');
-  } else {
-    head = th(['Rank','Character','Masters at max','Total ranks','Master points','Badges','Last updated']);
-    body = rows.map(function(p){
-      var r = DATA.mcBoard.indexOf(p)+1;
-      return tr(r, [
-        td('Character','<span class="pname">'+esc(p.name)+'</span>'),
-        td('At max','<span class="num">'+p.mastersAtMax+'</span> <span class="dim">/ '+DATA.activities.length+'</span>'),
-        td('Ranks','<span class="dim">'+p.totalRanks+'</span>'),
-        td('Points','<span class="dim">'+num(p.points)+'</span>'),
-        td('Badges', badges(p)),
-        td('Updated', updated(p))
-      ]);
-    }).join('');
   }
   el.innerHTML = '<table>'+head+'<tbody>'+body+'</tbody></table>';
-}
-
-function renderHall(){
-  var h = DATA.hallOfFame;
-  var html = '<section class="panel" style="margin-top:6px"><h2>Mount Hall of Fame</h2>';
-  if (!h.length) return html + '<div class="empty">No one has earned the mount yet. History awaits.</div></section>';
-  html += '<div class="hall">' + h.map(function(m){
-    return '<div class="hall-row"><div class="hall-pos">'+m.position+'</div>' +
-      '<div class="hall-name">'+esc(m.name)+(m.corrected?' <span class="badge ember">corrected</span>':'')+'</div>' +
-      '<div class="hall-meta">'+(m.points!=null?num(m.points)+' pts · ':'')+fmtDateTime(m.at)+'</div></div>';
-  }).join('') + '</div></section>';
-  return html;
 }
 
 function renderFirstGuildie(){
@@ -228,50 +201,31 @@ function periodLabel(c){
 }
 
 // ---------- interactions ----------
-function selectBoardTab(button, moveFocus){
-  document.querySelectorAll('.tab').forEach(function(tab){
-    var selected = tab === button;
-    tab.setAttribute('aria-selected', String(selected));
-    tab.tabIndex = selected ? 0 : -1;
-  });
-  state.tab = button.dataset.tab;
-  document.getElementById('board').setAttribute('aria-labelledby', button.id);
-  if (moveFocus) button.focus();
-  if (DATA) renderBoard();
-}
-document.querySelectorAll('.tab').forEach(function(button){
-  button.addEventListener('click', function(){ selectBoardTab(button, false); });
-  button.addEventListener('keydown', function(event){
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') return;
-    event.preventDefault();
-    var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab'));
-    var index = tabs.indexOf(button);
-    if (event.key === 'Home') index = 0;
-    else if (event.key === 'End') index = tabs.length - 1;
-    else index = (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
-    selectBoardTab(tabs[index], true);
-  });
-});
-document.querySelectorAll('.nav-item').forEach(function(link){
+document.querySelectorAll('.ms-nav-item').forEach(function(link){
   link.addEventListener('click', function(){
-    document.querySelectorAll('.nav-item').forEach(function(item){item.classList.remove('selected');item.removeAttribute('aria-current');});
+    document.querySelectorAll('.ms-nav-item').forEach(function(item){
+      item.classList.remove('selected'); item.removeAttribute('aria-current');
+    });
     link.classList.add('selected');
     link.setAttribute('aria-current','page');
-    if (link.dataset.boardTab) {
-      var tab = document.querySelector('.tab[data-tab="'+link.dataset.boardTab+'"]');
-      if (tab) selectBoardTab(tab, false);
-    }
   });
 });
-document.getElementById('search').addEventListener('input', function(e){
-  state.q = e.target.value.trim().toLowerCase(); renderBoard();
-});
-[['f-active','active'],['f-outdated','outdated'],['f-mount','mount'],['f-svdone','svdone']].forEach(function(pair){
-  var el = document.getElementById(pair[0]);
-  el.addEventListener('click', function(){
-    state[pair[1]] = !state[pair[1]];
-    el.setAttribute('aria-pressed', String(state[pair[1]]));
-    renderBoard();
+
+// Each leaderboard section wires its own search box and filter chips.
+BOARDS.forEach(function(key){
+  var search = document.getElementById('search-' + key);
+  if (search) search.addEventListener('input', function(e){
+    state[key].q = e.target.value.trim().toLowerCase();
+    if (DATA) renderBoard(key);
+  });
+  [['f-active','active'],['f-outdated','outdated'],['f-mount','mount'],['f-svdone','svdone']].forEach(function(pair){
+    var el = document.getElementById(pair[0] + '-' + key);
+    if (!el) return;
+    el.addEventListener('click', function(){
+      state[key][pair[1]] = !state[key][pair[1]];
+      el.setAttribute('aria-pressed', String(state[key][pair[1]]));
+      if (DATA) renderBoard(key);
+    });
   });
 });
 document.getElementById('btn-refresh').addEventListener('click', load);

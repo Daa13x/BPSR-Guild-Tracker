@@ -70,7 +70,8 @@ requireText('Leaderboard.html', [
   { label: 'must load repository-relative AppFrontend.js with a cache version token', regex: /<script src="AppFrontend\.js\?v=[\w.-]+"><\/script>/ },
   { label: 'must load the shared board script with a cache version token', regex: /<script src="Boards\.js\?v=[\w.-]+"><\/script>/ },
   { label: 'must load MasterSealPage.js with a cache version token', regex: /<script src="MasterSealPage\.js\?v=[\w.-]+"><\/script>/ },
-  { label: 'must host both the Master Seal and the SV/Masters boards on one page', regex: /id="master-seal"[\s\S]*id="leaderboards"/ },
+  { label: 'must host the Master Seal and both leaderboards on one page', regex: /id="master-seal"[\s\S]*id="sv-board"[\s\S]*id="masters-board"/ },
+  { label: 'must give each leaderboard its own board host', regex: /id="board-sv"[\s\S]*id="board-mp"/ },
   { label: 'must reference repository-relative supplied logo', regex: /(?:src|href)="assets\/guild-logo\.png"/ },
   { label: 'must show the OnlyPaws logo in the sidebar brand', regex: /class="ms-brand-logo" src="assets\/guild-logo\.png"/ },
   { label: 'must provide a visible logo fallback', regex: /onerror="[^"]*nextElementSibling[^"]*"/ }

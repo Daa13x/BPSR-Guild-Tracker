@@ -17,7 +17,7 @@ test('supplied OnlyPaws logo is a non-empty transparent PNG shown in the sidebar
   assert.match(css, /\.ms-brand-logo \{[^}]*object-fit: contain/);
 });
 
-test('one dashboard page hosts Master Seal and the SV/Masters boards in the same shell', () => {
+test('one dashboard page hosts Master Seal and two separate leaderboards in the same shell', () => {
   const html = fs.readFileSync('Leaderboard.html', 'utf8');
   // Dashboard shell, not the old app-shell.
   assert.match(html, /<body class="ms-body">/);
@@ -30,15 +30,19 @@ test('one dashboard page hosts Master Seal and the SV/Masters boards in the same
   assert.match(html, /id="ms-table-host"/);
   assert.match(html, /id="ms-pages"/);
   assert.match(html, /id="ms-countdown-value"/);
-  // SV / Masters region on the same page, below the seal.
-  assert.match(html, /id="leaderboards"/);
-  assert.match(html, /data-tab="sv"/);
-  assert.match(html, /data-tab="mp"/);
-  assert.match(html, /data-tab="mc"/);
-  assert.match(html, /data-tab="hall"/);
-  assert.match(html, /id="podium"/);
-  assert.match(html, /id="board"/);
-  assert.ok(html.indexOf('id="master-seal"') < html.indexOf('id="leaderboards"'), 'Master Seal leads, SV follows');
+  // SV and Masters are two independent sections, each with its own podium,
+  // search, filter chips and table — not one tabbed board.
+  assert.match(html, /id="sv-board"/);
+  assert.match(html, /id="masters-board"/);
+  ['podium-sv', 'podium-mp', 'board-sv', 'board-mp', 'search-sv', 'search-mp']
+    .forEach(id => assert.match(html, new RegExp(`id="${id}"`), `missing #${id}`));
+  assert.ok(html.indexOf('id="sv-board"') < html.indexOf('id="masters-board"'), 'SV leads, Masters follows');
+  assert.equal(/data-tab="mc"/.test(html), false, 'Master Completion tab removed');
+  assert.equal(/data-tab="hall"/.test(html), false, 'Mount Hall of Fame tab removed');
+  assert.equal(/class="tabs"/.test(html), false, 'boards are separate sections, not tabs');
+  // Sidebar: no Overview group, no redundant Master Seal entry.
+  assert.equal(/>Overview</.test(html), false, 'Overview nav group removed');
+  assert.equal(/ms-nav-item[^>]*>[\s\S]{0,80}Master Seal</.test(html), false, 'Master Seal nav entry removed');
   // Member area, admin, achievements, feed and the account gate all live here too.
   ['my-progress', 'administration', 'achievements', 'feed-panel', 'member-ui', 'admin-ui', 'firsts', 'feed']
     .forEach(id => assert.match(html, new RegExp(`id="${id}"`), `missing #${id}`));

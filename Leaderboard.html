@@ -26,18 +26,13 @@
     </a>
 
     <nav class="ms-nav">
-      <p class="ms-nav-group">Overview</p>
-      <a class="ms-nav-item" href="#overview"><span class="ms-ico" aria-hidden="true">◆</span>Guild Dashboard</a>
-      <a class="ms-nav-item" href="#feed-panel"><span class="ms-ico" aria-hidden="true">≋</span>Activity Feed</a>
-
       <p class="ms-nav-group">Leaderboards</p>
-      <a class="ms-nav-item selected" href="#master-seal" data-nav="master-seal"><span class="ms-ico" aria-hidden="true">✦</span>Master Seal</a>
-      <a class="ms-nav-item" href="#leaderboards" data-nav="leaderboards" data-board-tab="sv"><span class="ms-ico" aria-hidden="true">⛰</span>SV Leaderboard</a>
-      <a class="ms-nav-item" href="#leaderboards" data-nav="leaderboards" data-board-tab="mp"><span class="ms-ico" aria-hidden="true">⚔</span>Masters</a>
+      <a class="ms-nav-item selected" href="#sv-board"><span class="ms-ico" aria-hidden="true">⛰</span>SV Leaderboard</a>
+      <a class="ms-nav-item" href="#masters-board"><span class="ms-ico" aria-hidden="true">⚔</span>Masters</a>
 
       <p class="ms-nav-group">Analytics</p>
       <a class="ms-nav-item" href="#achievements"><span class="ms-ico" aria-hidden="true">▤</span>Achievements</a>
-      <a class="ms-nav-item" href="#leaderboards" data-board-tab="hall"><span class="ms-ico" aria-hidden="true">↗</span>Hall of Fame</a>
+      <a class="ms-nav-item" href="#feed-panel"><span class="ms-ico" aria-hidden="true">≋</span>Activity Feed</a>
 
       <p class="ms-nav-group">Manage</p>
       <a class="ms-nav-item" href="#my-progress"><span class="ms-ico" aria-hidden="true">◉</span>My Progress</a>
@@ -158,29 +153,46 @@
       <div class="fg-card" id="fg-card"></div>
     </section>
 
-    <!-- SV / Masters leaderboards -->
-    <section class="ms-panel ms-section" id="leaderboards" aria-labelledby="boards-h">
+    <!-- SV Leaderboard -->
+    <section class="ms-panel ms-section" id="sv-board" aria-labelledby="sv-board-h">
       <div class="ms-section-head">
-        <h2 id="boards-h">SV &amp; Masters Leaderboards</h2>
-        <div class="tabs" role="tablist" aria-label="Leaderboards">
-          <button class="tab" id="tab-sv" role="tab" data-tab="sv" aria-selected="true" aria-controls="board" tabindex="0">SV</button>
-          <button class="tab" id="tab-mp" role="tab" data-tab="mp" aria-selected="false" aria-controls="board" tabindex="-1">Master Points</button>
-          <button class="tab" id="tab-mc" role="tab" data-tab="mc" aria-selected="false" aria-controls="board" tabindex="-1">Master Completion</button>
-          <button class="tab" id="tab-hall" role="tab" data-tab="hall" aria-selected="false" aria-controls="board" tabindex="-1">Mount Hall of Fame</button>
+        <div>
+          <h2 id="sv-board-h">SV Leaderboard</h2>
+          <p class="ms-section-sub">Highest Shadow Vault floor reached, ranked by floor and earliest achievement.</p>
         </div>
       </div>
 
-      <div class="podium" id="podium"></div>
+      <div class="podium" id="podium-sv"></div>
 
-      <div class="controls" id="controls">
-        <input class="search" id="search" type="search" placeholder="Search character name…" aria-label="Search character name">
-        <button class="chip" id="f-active" aria-pressed="false">Active</button>
-        <button class="chip ember" id="f-outdated" aria-pressed="false">Outdated</button>
-        <button class="chip gold" id="f-mount" aria-pressed="false">Mount earned</button>
-        <button class="chip" id="f-svdone" aria-pressed="false">SV complete</button>
+      <div class="controls">
+        <input class="search" id="search-sv" type="search" placeholder="Search character name…" aria-label="Search SV Leaderboard by character name">
+          <button class="chip" id="f-active-sv" aria-pressed="false"> Active</button>
+          <button class="chip ember" id="f-outdated-sv" aria-pressed="false">Outdated</button>
+          <button class="chip" id="f-svdone-sv" aria-pressed="false">SV complete</button>
       </div>
 
-      <div class="tablewrap" id="board" role="tabpanel" aria-labelledby="tab-sv"></div>
+      <div class="tablewrap" id="board-sv"></div>
+    </section>
+
+    <!-- Masters Leaderboard -->
+    <section class="ms-panel ms-section" id="masters-board" aria-labelledby="masters-board-h">
+      <div class="ms-section-head">
+        <div>
+          <h2 id="masters-board-h">Masters Leaderboard</h2>
+          <p class="ms-section-sub">Master points earned toward the mount, ranked by total and earliest achievement.</p>
+        </div>
+      </div>
+
+      <div class="podium" id="podium-mp"></div>
+
+      <div class="controls">
+        <input class="search" id="search-mp" type="search" placeholder="Search character name…" aria-label="Search Masters Leaderboard by character name">
+          <button class="chip" id="f-active-mp" aria-pressed="false">Active</button>
+          <button class="chip ember" id="f-outdated-mp" aria-pressed="false">Outdated</button>
+          <button class="chip gold" id="f-mount-mp" aria-pressed="false">Mount earned</button>
+      </div>
+
+      <div class="tablewrap" id="board-mp"></div>
     </section>
 
     <!-- Achievements -->

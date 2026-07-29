@@ -165,6 +165,20 @@
     node.textContent = message;
   }
 
+  /** A deployed-but-outdated Apps Script backend answers UNKNOWN_ACTION for
+   * every passwordless action. Say what is actually wrong instead of
+   * surfacing the raw API string. */
+  function friendlyFailure(failure) {
+    var raw = (failure && failure.message) || 'Request could not be completed.';
+    var stale = failure && (failure.code === 'UNKNOWN_ACTION' || /unknown action/i.test(raw));
+    if (stale) {
+      return 'Accounts are not live on the backend yet. The Apps Script project still needs the ' +
+        'updated Code.gs, AuthApi.gs and MasterSeal.gs, plus a new web-app deployment version.';
+    }
+    if (failure && failure.code === 'CONFIGURATION') return raw;
+    return raw;
+  }
+
   function syncAdminVisibility(show) {
     var section = document.getElementById('administration');
     var nav = document.querySelector('[data-admin-nav]');
@@ -184,7 +198,7 @@
       }
       return;
     }
-    notice(kind, failure && failure.message || 'Request could not be completed.', true);
+    notice(kind, friendlyFailure(failure), true);
   }
 
   function actionButton(text, kind, action) {
@@ -338,7 +352,7 @@
           codeField.input.focus();
         }
         message.className = 'notice error';
-        message.textContent = failure && failure.message || 'Request could not be completed.';
+        message.textContent = friendlyFailure(failure);
       }).finally(function () {
         createButton.disabled = false;
       });
@@ -352,7 +366,7 @@
         adoptSession(result, { showCode: false });
       }).catch(function (failure) {
         message.className = 'notice error';
-        message.textContent = failure && failure.message || 'Request could not be completed.';
+        message.textContent = friendlyFailure(failure);
       }).finally(function () {
         restoreButton.disabled = false;
       });
