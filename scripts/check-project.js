@@ -10,7 +10,7 @@ const required = [
   'AuthApi.gs',
   'MasterSeal.gs',
   'AppFrontend.js',
-  'MasterSeal.js',
+  'Boards.js',
   'MasterSeal.html',
   'MasterSealPage.js',
   'master-seal.css',
@@ -66,9 +66,13 @@ function requireText(relative, patterns) {
 requireText('Leaderboard.html', [
   { label: 'must load repository-relative config.js with a cache version token', regex: /<script src="config\.js\?v=[\w.-]+"><\/script>/ },
   { label: 'must load repository-relative styles.css with a cache version token', regex: /<link rel="stylesheet" href="styles\.css\?v=[\w.-]+">/ },
+  { label: 'must load the dashboard stylesheet with a cache version token', regex: /<link rel="stylesheet" href="master-seal\.css\?v=[\w.-]+">/ },
   { label: 'must load repository-relative AppFrontend.js with a cache version token', regex: /<script src="AppFrontend\.js\?v=[\w.-]+"><\/script>/ },
-  { label: 'must load repository-relative MasterSeal.js with a cache version token', regex: /<script src="MasterSeal\.js\?v=[\w.-]+"><\/script>/ },
+  { label: 'must load the shared board script with a cache version token', regex: /<script src="Boards\.js\?v=[\w.-]+"><\/script>/ },
+  { label: 'must load MasterSealPage.js with a cache version token', regex: /<script src="MasterSealPage\.js\?v=[\w.-]+"><\/script>/ },
+  { label: 'must host both the Master Seal and the SV/Masters boards on one page', regex: /id="master-seal"[\s\S]*id="leaderboards"/ },
   { label: 'must reference repository-relative supplied logo', regex: /(?:src|href)="assets\/guild-logo\.png"/ },
+  { label: 'must show the OnlyPaws logo in the sidebar brand', regex: /class="ms-brand-logo" src="assets\/guild-logo\.png"/ },
   { label: 'must provide a visible logo fallback', regex: /onerror="[^"]*nextElementSibling[^"]*"/ }
 ]);
 requireText('config.js', [
@@ -79,9 +83,7 @@ requireText('config.js', [
   { label: 'must expose the authoritative BPSR_CONFIG object', regex: /root\.BPSR_CONFIG\s*=/ }
 ]);
 requireText('MasterSeal.html', [
-  { label: 'must load repository-relative config.js with a cache version token', regex: /<script src="config\.js\?v=[\w.-]+"><\/script>/ },
-  { label: 'must load the dashboard stylesheet with a cache version token', regex: /<link rel="stylesheet" href="master-seal\.css\?v=[\w.-]+">/ },
-  { label: 'must load MasterSealPage.js with a cache version token', regex: /<script src="MasterSealPage\.js\?v=[\w.-]+"><\/script>/ }
+  { label: 'must redirect to the single guild dashboard', regex: /Leaderboard\.html/ }
 ]);
 requireText('.github/workflows/pages.yml', [
   { label: 'must deploy on main pushes', regex: /branches:\s*\[main\]/ },
@@ -93,7 +95,7 @@ requireText('.github/workflows/pages.yml', [
   { label: 'must use deploy-pages', regex: /actions\/deploy-pages@v\d+/ }
 ]);
 
-for (const relative of ['Code.gs', 'AuthApi.gs', 'MasterSeal.gs', 'config.js', 'AppFrontend.js', 'MasterSeal.js', 'MasterSealPage.js']) {
+for (const relative of ['Code.gs', 'AuthApi.gs', 'MasterSeal.gs', 'config.js', 'AppFrontend.js', 'MasterSeal.js', 'MasterSealPage.js', 'Boards.js']) {
   const absolute = path.join(root, relative);
   if (!fs.existsSync(absolute)) continue;
   try {

@@ -252,8 +252,12 @@
     if (!host) return;
 
     if (state.status === 'error') {
-      host.innerHTML = '<div class="ms-empty"><strong>The guild data could not be loaded</strong>' +
-        '<p>' + esc(state.errorMessage || 'The API is unavailable.') + '</p></div>';
+      host.innerHTML = '<div class="ms-empty">' + (state.staleBackend
+        ? '<strong>Master Seal is not live on the backend yet</strong>' +
+          '<p>The interface is deployed, but the Apps Script project still needs MasterSeal.gs ' +
+          'and a new web-app version before Season 3 data can load.</p>'
+        : '<strong>The guild data could not be loaded</strong><p>' + esc(state.errorMessage || 'The API is unavailable.') + '</p>') +
+        '</div>';
       showing.textContent = '';
       pages.replaceChildren();
       return;
@@ -410,7 +414,12 @@
     var host = byId('ms-detail');
     if (!host) return;
     if (state.status === 'error') {
-      host.innerHTML = '<section><div class="ms-alert">The member details are unavailable while the API cannot be reached.</div></section>';
+      // Keep the shell intact and explain the real cause rather than alarming.
+      host.innerHTML = '<section><div class="ms-empty"><strong>Member details will appear here</strong>' +
+        '<p>' + (state.staleBackend
+          ? 'Season 3 data loads once MasterSeal.gs is added to the Apps Script project and a new web-app version is deployed.'
+          : 'They are unavailable while the guild API cannot be reached.') +
+        '</p></div></section>';
       return;
     }
     var member = null;
@@ -579,15 +588,17 @@
     }
   }
 
+  var countdownTick = function () {};
+
   function startCountdown() {
     var value = byId('ms-countdown-value');
     if (!value) return;
-    function tick() {
+    countdownTick = function () {
       var endsAt = state.season && state.season.endsAt;
       value.textContent = endsAt ? formatCountdown(countdownParts(endsAt)) : 'Season end date not configured';
-    }
-    tick();
-    root.setInterval(tick, 30000);
+    };
+    countdownTick();
+    root.setInterval(countdownTick, 30000);
   }
 
   function load() {
@@ -602,10 +613,13 @@
       if (tag) tag.textContent = data.season.displayName;
       document.title = data.season.displayName + ' Master Seal · BPSR Guild Tracker';
       setConnection('ok', 'Connected');
+      countdownTick();   // show the real countdown as soon as the season arrives
       refreshView();
     }).catch(function (failure) {
       state.status = 'error';
       state.errorMessage = failure && failure.message;
+      state.staleBackend = Boolean(failure && (failure.code === 'UNKNOWN_ACTION' ||
+        /unknown action/i.test(failure.message || '')));
       setConnection('bad', failure && failure.code === 'CONFIGURATION' ? 'Not configured' : 'API error');
       renderTable();
       renderDetail();

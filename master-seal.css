@@ -85,8 +85,9 @@ button { cursor: pointer; }
   padding: 14px 12px; background: var(--sidebar-bg);
   max-height: calc(100vh - 24px); overflow: auto;
 }
-.ms-brand { display: flex; align-items: center; gap: 10px; padding: 4px 6px 10px; color: var(--text-primary); text-decoration: none; border-bottom: 1px solid var(--border); }
+.ms-brand { display: flex; align-items: center; gap: 10px; padding: 6px 4px 12px; color: var(--text-primary); text-decoration: none; border-bottom: 1px solid var(--border); }
 .ms-brand-crest { filter: drop-shadow(0 0 8px rgba(207, 130, 239, .45)); flex: 0 0 auto; }
+.ms-brand-logo { width: 100%; max-width: 170px; height: auto; max-height: 48px; object-fit: contain; object-position: left center; filter: drop-shadow(0 0 10px rgba(207, 130, 239, .28)); }
 .ms-brand-text { display: grid; gap: 0; min-width: 0; }
 .ms-brand-text strong { font-family: var(--display); font-size: 21px; line-height: 1.05; letter-spacing: .06em; }
 .ms-brand-text small { color: var(--text-muted); font-size: 9px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
@@ -145,6 +146,12 @@ button { cursor: pointer; }
 /* Toolbar                                                             */
 /* ------------------------------------------------------------------ */
 .ms-board-panel { padding: 12px; display: grid; gap: 10px; align-content: start; }
+.ms-section { padding: 14px 16px; }
+.ms-section > h2 { font-size: 16px; letter-spacing: .05em; text-transform: uppercase; margin-bottom: 10px; }
+.ms-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.ms-section-head h2 { font-size: 16px; letter-spacing: .05em; text-transform: uppercase; }
+.ms-section-head .tabs { margin: 0; }
+.ms-section .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .ms-toolbar { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
 .ms-toolbar h2 { font-size: 16px; letter-spacing: .05em; text-transform: uppercase; }
 .ms-count-badge { padding: 3px 9px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel-bg-raised); color: var(--text-secondary); font-size: 11px; font-weight: 700; white-space: nowrap; }
