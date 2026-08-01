@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BPSR Guild Tracker — Master Seal & SV</title>
 <link rel="icon" type="image/png" href="assets/guild-logo.png">
-<script src="config.js?v=6"></script>
-<link rel="stylesheet" href="styles.css?v=6">
-<link rel="stylesheet" href="master-seal.css?v=6">
+<script src="config.js?v=7"></script>
+<link rel="stylesheet" href="styles.css?v=7">
+<link rel="stylesheet" href="master-seal.css?v=7">
 </head>
 <body class="ms-body">
 <a class="ms-skip" href="#ms-main">Skip to content</a>
@@ -30,31 +30,15 @@
       <a class="ms-nav-item selected" href="#sv-board"><span class="ms-ico" aria-hidden="true">⛰</span>SV Leaderboard</a>
       <a class="ms-nav-item" href="#masters-board"><span class="ms-ico" aria-hidden="true">⚔</span>Masters</a>
 
-      <p class="ms-nav-group">Analytics</p>
-      <a class="ms-nav-item" href="#achievements"><span class="ms-ico" aria-hidden="true">▤</span>Achievements</a>
-      <a class="ms-nav-item" href="#feed-panel"><span class="ms-ico" aria-hidden="true">≋</span>Activity Feed</a>
-
       <p class="ms-nav-group">Manage</p>
       <a class="ms-nav-item" href="#my-progress"><span class="ms-ico" aria-hidden="true">◉</span>My Progress</a>
       <a class="ms-nav-item" href="#administration" data-admin-nav hidden><span class="ms-ico" aria-hidden="true">⚙</span>Administration</a>
     </nav>
 
-    <div class="ms-guild-card">
-      <span class="ms-guild-crest" aria-hidden="true">
-        <img src="assets/guild-logo.png" alt="" onerror="this.replaceWith(document.createTextNode('◈'))">
-      </span>
-      <div class="ms-guild-body">
-        <p class="ms-guild-label">Your Guild</p>
-        <p class="ms-guild-name">BPSR <span id="ms-guild-level">Lv. 12</span></p>
-        <div class="ms-xp" role="progressbar" id="ms-guild-xp" aria-label="Guild experience"
-             aria-valuemin="0" aria-valuemax="12000" aria-valuenow="8340"><i style="width:69.5%"></i></div>
-        <p class="ms-guild-xp-text" id="ms-guild-xp-text">8,340 / 12,000 XP</p>
-      </div>
-    </div>
-
-    <div class="ms-countdown" id="ms-countdown">
-      <p class="ms-countdown-label"><span class="ms-ico" aria-hidden="true">⏳</span> Season 3 ends in</p>
-      <p class="ms-countdown-value" id="ms-countdown-value" aria-live="polite">—</p>
+    <div class="ms-season-note" id="ms-season-note">
+      <p class="ms-season-note-label"><span class="ms-ico" aria-hidden="true">⏳</span> Season 3 · Echoes of Ember</p>
+      <p class="ms-season-note-value" id="ms-season-note-value">End date not announced</p>
+      <p class="ms-season-note-sub" id="ms-season-note-sub">Published schedule runs through 19 August 2026.</p>
     </div>
 
     <div class="ms-sidebar-foot">
@@ -82,6 +66,9 @@
         <h1 id="master-seal">Master Seal <span class="ms-season-tag" id="ms-season-tag">Season 3</span></h1>
         <p>Compete across the six Chaotic Realm dungeons to earn points and unlock exclusive rewards.
           <span class="stamp" id="stamp">Loading…</span></p>
+        <p class="ms-season-statement" id="ms-season-statement">The exact end date for Season 3, “Echoes of Ember,”
+          has not been formally announced. The currently published event and reward schedule extends through
+          19 August 2026.</p>
       </div>
       <div class="ms-maxscore">
         <span>Max season score</span>
@@ -153,58 +140,52 @@
       <div class="fg-card" id="fg-card"></div>
     </section>
 
-    <!-- SV Leaderboard -->
-    <section class="ms-panel ms-section" id="sv-board" aria-labelledby="sv-board-h">
+    <!-- SV Leaderboard — structurally identical to the Masters section below -->
+    <section class="ms-panel ms-section ms-board-section" id="sv-board" aria-labelledby="sv-board-h">
       <div class="ms-section-head">
-        <div>
+        <div class="ms-section-title">
           <h2 id="sv-board-h">SV Leaderboard</h2>
           <p class="ms-section-sub">Highest Shadow Vault floor reached, ranked by floor and earliest achievement.</p>
         </div>
+        <span class="ms-count-badge" id="count-sv">—</span>
       </div>
 
       <div class="podium" id="podium-sv"></div>
 
       <div class="controls">
         <input class="search" id="search-sv" type="search" placeholder="Search character name…" aria-label="Search SV Leaderboard by character name">
-          <button class="chip" id="f-active-sv" aria-pressed="false"> Active</button>
-          <button class="chip ember" id="f-outdated-sv" aria-pressed="false">Outdated</button>
-          <button class="chip" id="f-svdone-sv" aria-pressed="false">SV complete</button>
+        <div class="chips">
+          <button class="chip" id="f-active-sv" type="button" aria-pressed="false">Active</button>
+          <button class="chip ember" id="f-outdated-sv" type="button" aria-pressed="false">Outdated</button>
+          <button class="chip" id="f-svdone-sv" type="button" aria-pressed="false">SV complete</button>
+        </div>
       </div>
 
       <div class="tablewrap" id="board-sv"></div>
     </section>
 
     <!-- Masters Leaderboard -->
-    <section class="ms-panel ms-section" id="masters-board" aria-labelledby="masters-board-h">
+    <section class="ms-panel ms-section ms-board-section" id="masters-board" aria-labelledby="masters-board-h">
       <div class="ms-section-head">
-        <div>
+        <div class="ms-section-title">
           <h2 id="masters-board-h">Masters Leaderboard</h2>
           <p class="ms-section-sub">Master points earned toward the mount, ranked by total and earliest achievement.</p>
         </div>
+        <span class="ms-count-badge" id="count-mp">—</span>
       </div>
 
       <div class="podium" id="podium-mp"></div>
 
       <div class="controls">
         <input class="search" id="search-mp" type="search" placeholder="Search character name…" aria-label="Search Masters Leaderboard by character name">
-          <button class="chip" id="f-active-mp" aria-pressed="false">Active</button>
-          <button class="chip ember" id="f-outdated-mp" aria-pressed="false">Outdated</button>
-          <button class="chip gold" id="f-mount-mp" aria-pressed="false">Mount earned</button>
+        <div class="chips">
+          <button class="chip" id="f-active-mp" type="button" aria-pressed="false">Active</button>
+          <button class="chip ember" id="f-outdated-mp" type="button" aria-pressed="false">Outdated</button>
+          <button class="chip gold" id="f-mount-mp" type="button" aria-pressed="false">Mount earned</button>
+        </div>
       </div>
 
       <div class="tablewrap" id="board-mp"></div>
-    </section>
-
-    <!-- Achievements -->
-    <section class="ms-panel ms-section" id="achievements" aria-labelledby="firsts-h">
-      <h2 id="firsts-h">First-to-Achieve Records</h2>
-      <div class="firsts" id="firsts"><div class="empty">No records yet — the race is on.</div></div>
-    </section>
-
-    <!-- Activity feed -->
-    <section class="ms-panel ms-section" id="feed-panel" hidden aria-labelledby="feed-h">
-      <h2 id="feed-h">Recent Guild Progress</h2>
-      <ul class="feed" id="feed"></ul>
     </section>
 
     <!-- Member area -->
@@ -239,8 +220,8 @@
 <div class="gate" id="gate" hidden></div>
 <div class="ms-tooltip" id="ms-tooltip" role="tooltip" hidden></div>
 
-<script src="Boards.js?v=6"></script>
-<script src="MasterSealPage.js?v=6"></script>
-<script src="AppFrontend.js?v=6"></script>
+<script src="Boards.js?v=7"></script>
+<script src="MasterSealPage.js?v=7"></script>
+<script src="AppFrontend.js?v=7"></script>
 </body>
 </html>

@@ -165,18 +165,19 @@
     node.textContent = message;
   }
 
-  /** A deployed-but-outdated Apps Script backend answers UNKNOWN_ACTION for
-   * every passwordless action. Say what is actually wrong instead of
-   * surfacing the raw API string. */
+  /** Never show a bare "API error", "Unknown action" or "Server error".
+   * Deliberate validation messages are already written for people and pass
+   * through; everything else is classified and the raw detail is logged. */
+  var ACCOUNTS_UNAVAILABLE = 'Accounts are unavailable because the deployed Apps Script backend does not yet ' +
+    'include the required account and Master Seal actions. Deploy the updated Apps Script version to enable ' +
+    'sign-in and character accounts.';
+
   function friendlyFailure(failure) {
-    var raw = (failure && failure.message) || 'Request could not be completed.';
-    var stale = failure && (failure.code === 'UNKNOWN_ACTION' || /unknown action/i.test(raw));
-    if (stale) {
-      return 'Accounts are not live on the backend yet. The Apps Script project still needs the ' +
-        'updated Code.gs, AuthApi.gs and MasterSeal.gs, plus a new web-app deployment version.';
-    }
-    if (failure && failure.code === 'CONFIGURATION') return raw;
-    return raw;
+    if (!root.BPSR_ERRORS) return (failure && failure.message) || 'That request could not be completed.';
+    var classified = root.BPSR_ERRORS.classify(failure, 'account');
+    if (classified.kind === 'expected') return classified.title;
+    if (classified.kind === 'not-deployed') return ACCOUNTS_UNAVAILABLE;
+    return classified.detail ? classified.title + ' — ' + classified.detail : classified.title;
   }
 
   function syncAdminVisibility(show) {
@@ -1191,12 +1192,15 @@
     return Boolean(failure && (failure.code === 'SESSION_EXPIRED' || failure.code === 'IDENTITY_MISMATCH'));
   }
 
-  function retryLater() {
+  function retryLater(failure) {
     hideGate();
     renderMember();
     renderAdmin();
-    notice('member', 'The tracker could not reach the API to restore your remembered session. ' +
-      'Your saved access is kept — reload the page to try again.', true);
+    var classified = root.BPSR_ERRORS ? root.BPSR_ERRORS.classify(failure, 'session restore') : null;
+    var reason = classified && classified.kind === 'not-deployed'
+      ? ACCOUNTS_UNAVAILABLE
+      : 'The tracker could not reach the API to restore your remembered session.';
+    notice('member', reason + ' Your saved access is kept — reload the page to try again.', true);
     return null;
   }
 
@@ -1217,7 +1221,7 @@
         renderAdmin();
         return result;
       }).catch(function (failure) {
-        if (!definitiveSessionFailure(failure)) return retryLater();
+        if (!definitiveSessionFailure(failure)) return retryLater(failure);
         clearCookie();
         return migrateLegacy();
       });
@@ -1232,7 +1236,7 @@
         adoptSession(result, { showCode: true });
         return result;
       }).catch(function (failure) {
-        if (!definitiveSessionFailure(failure)) return retryLater();
+        if (!definitiveSessionFailure(failure)) return retryLater(failure);
         removeLegacy();
         renderMember();
         renderAdmin();
@@ -1255,24 +1259,15 @@
         mountTarget: 3650,
         svMax: 60,
         outdatedDays: 14,
-        overallEnabled: false,
-        feedEnabled: false,
         firstGuildieEnabled: true,
         timezone: 'Europe/London'
       },
-      activities: [],
       svBoard: [],
       mpBoard: [],
-      mcBoard: [],
-      hallOfFame: [],
-      firsts: [],
       firstGuildie: { enabled: true, current: null, previous: [] },
-      feed: [],
       viewer: null,
       viewerCharacter: ''
     };
-    var firsts = document.getElementById('firsts');
-    if (firsts) firsts.replaceChildren();
     root.render();
     var stamp = document.getElementById('stamp');
     if (stamp) stamp.textContent = 'Waiting for live guild data — backend not connected.';

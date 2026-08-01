@@ -35,6 +35,7 @@
 
 ## Master Seal — Season 3
 
+- The interface states that the exact end date for Season 3, “Echoes of Ember,” has not been formally announced, and that the currently published event and reward schedule extends through 19 August 2026. No confirmed end date and no countdown to one is shown, and visible dates use UK formatting.
 - One authoritative season configuration: six exact dungeons, 3,650 maximum, seven reward milestones ending in Mount: Neon Sonic.
 - Members record best Master level (0–20 or Not cleared) and points per dungeon; no level-to-points formula is invented.
 - Total is the server-side sum of the six point values; remaining never goes below zero; progress never exceeds 100%; the mount unlocks at exactly 3,650.
@@ -44,9 +45,11 @@
 
 ## Leaderboards
 
-- SV, Master Points, Master Completion, and Mount Hall of Fame boards render.
+- SV and Masters render as two independent sections, each with its own heading, podium, search field, filter chips, table and filter state.
+- The two sections match in outer width, padding, heading placement, podium height, control row and loading/empty/failure presentation.
+- Filtering or searching one board never changes the other.
 - Ranking and tie-breaking are deterministic.
-- Top-three podium and full rankings agree.
+- Top-three podium and full rankings agree; unclaimed podium places render as placeholders so both boards keep the same height.
 - Search and all filters work.
 - Outdated status uses configured threshold without deleting or penalising users.
 - Public payloads contain no private authentication or identity fields.
@@ -63,6 +66,7 @@
 
 ## Achievements
 
+- Server-side only: the Achievements and Activity Feed sections were removed from the interface, so these records are no longer surfaced in the tracker UI. The backend behaviour below is unchanged.
 - First-to-achieve and mount records are generated server-side.
 - Each achievement is recorded once.
 - Original earned timestamps and positions remain immutable.
@@ -89,7 +93,7 @@
 - Keyboard operable controls and visible focus states.
 - Accessible labels for forms and buttons.
 - Safe rendering of HTML-like names.
-- Useful loading, empty, validation, network, and API error states.
+- Useful loading, empty and validation states, and honestly classified failure states — "Tracker backend not deployed", "Local API unavailable", "Backend request failed" — never a bare "API error", "Unknown action", "Server error" or raw backend text.
 - Buttons prevent accidental repeated submissions.
 - Missing API configuration is detected and explained.
 - Expired sessions are cleared automatically.

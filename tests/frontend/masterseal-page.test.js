@@ -134,16 +134,19 @@ test('pagination slices correctly and clamps out-of-range pages', () => {
   assert.equal(empty.rows.length, 0);
 });
 
-test('season countdown derives from the configured end date', () => {
-  const now = Date.parse('2026-07-19T00:00:00Z');
-  const parts = H.countdownParts('2026-08-22T12:48:00Z', now);
-  assert.equal(parts.ended, false);
-  assert.equal(parts.days, 34);
-  assert.equal(parts.hours, 12);
-  assert.equal(parts.minutes, 48);
-  assert.equal(H.formatCountdown(parts), '34d 12h 48m');
-  assert.equal(H.formatCountdown(H.countdownParts('2026-01-01T00:00:00Z', now)).includes('ended'), true);
-  assert.match(H.formatCountdown(H.countdownParts('not-a-date', now)), /not configured/);
+test('the season note reports the published schedule, not an unannounced end date', () => {
+  const season = { endDateAnnounced: false, endsAt: null, scheduleThrough: '19 August 2026' };
+  const note = H.seasonSchedule(season);
+  assert.equal(note.announced, false);
+  assert.match(note.headline, /not announced/i);
+  assert.match(note.detail, /19 August 2026/);
+  assert.equal(/\d+d \d+h/.test(note.headline), false, 'no countdown is invented');
+  // Nothing is claimed when the season is missing entirely.
+  assert.match(H.seasonSchedule(null).headline, /not announced/i);
+  // If an end date is ever formally announced, the note reports it.
+  const announced = H.seasonSchedule({ endDateAnnounced: true, endsAt: '2026-08-19T03:00:00Z', scheduleThrough: '19 August 2026' });
+  assert.equal(announced.announced, true);
+  assert.match(announced.headline, /^Ends /);
 });
 
 test('an empty board yields no rows and no selection candidates', () => {

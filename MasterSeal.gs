@@ -10,7 +10,12 @@ var MASTER_SEAL_SEASON = {
   displayName: 'Season 3',
   maxScore: 3650,
   maxMasterLevel: 20,
-  endsAt: '2026-08-22T03:00:00Z',
+  subtitle: 'Echoes of Ember',
+  // The exact Season 3 end date has not been formally announced. Only the
+  // published event and reward schedule is known, so no end date is asserted.
+  endDateAnnounced: false,
+  endsAt: null,
+  scheduleThrough: '19 August 2026',
   dungeons: [
     { id: 'towering-ruin', number: 1, name: 'Void - Towering Ruin', shortName: 'Towering Ruin' },
     { id: 'tinas-mindrealm', number: 2, name: "Void - Tina's Mindrealm", shortName: "Tina's Mindrealm" },

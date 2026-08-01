@@ -7,7 +7,7 @@ A build-free guild progression tracker backed by Google Sheets and Google Apps S
 - `Code.gs` owns the Sheets schema, server-calculated totals, rankings, progression events, achievements, reset periods, caching, audit utilities and the safe `GET /exec` health response.
 - `AuthApi.gs` exposes the JSON `POST /exec` API, passwordless remembered-device accounts, backup-code restore, opaque hashed sessions and protected member/administrator actions.
 - `MasterSeal.gs` holds the one authoritative Master Seal Season 3 configuration and the per-dungeon progress, validation, scoring and public-board logic.
-- `Leaderboard.html`, `styles.css`, `config.js`, `AppFrontend.js` and `MasterSeal.js` are the static HTML/CSS/vanilla-JavaScript application. No React, bundler or production Node server is used.
+- `Leaderboard.html`, `styles.css`, `master-seal.css`, `config.js`, `Boards.js`, `MasterSealPage.js` and `AppFrontend.js` are the static HTML/CSS/vanilla-JavaScript application. No React, bundler or production Node server is used. Every asset is loaded with a `?v=` cache token; **bump that token whenever one of these files changes**, or browsers and the Pages CDN keep serving the previous version.
 - `index.html` opens `Leaderboard.html` with repository-relative paths suitable for the GitHub Pages project path.
 
 ```text
@@ -18,8 +18,10 @@ index.html                      GitHub Pages entry point
 Leaderboard.html               Dashboard and public leaderboard
 styles.css                      OnlyPaws application-shell design
 config.js                       One authoritative Apps Script URL
+master-seal.css                 Dashboard theme and board components
+Boards.js                       SV and Masters leaderboards, hash routing
+MasterSealPage.js               Master Seal board and detail panel
 AppFrontend.js                  Account gate, member and administrator controller
-MasterSeal.js                   Public Master Seal board and detail panel
 assets/guild-logo.png           Supplied transparent OnlyPaws logo
 assets/master-seal/             Dungeon and reward artwork (webp)
 scripts/dev-server.js           Local mock backend for development/smoke tests
@@ -46,6 +48,8 @@ The initial administrator is Dax (`Players.IsAdmin=TRUE` on the row whose `UserI
 Existing member IDs, progression, roles and achievements are preserved. On the first visit after the upgrade, a browser holding a still-valid legacy localStorage session exchanges it (`migrate` action) for a remembered-device cookie; the member’s backup code is generated if missing and shown once with “Please save this somewhere”, and the legacy storage is removed. A browser without a valid legacy session uses **Returning user** with the backup code — members without one contact an administrator, who generates or reveals it from the admin tools or the private sheet. PIN registration and login actions are removed from the API and UI; the dormant `PinSalt`/`PinHash` columns remain untouched for one release as rollback safety and may be cleared after live acceptance.
 
 ## Master Seal — Season 3
+
+The exact end date for Season 3, “Echoes of Ember,” has not been formally announced. The currently published event and reward schedule extends through 19 August 2026, and the tracker states exactly that rather than presenting a confirmed end date or counting down to one. `MASTER_SEAL_SEASON.endsAt` is therefore `null` with `endDateAnnounced: false`; set both only if an end date is officially announced.
 
 `MasterSeal.gs` defines the single authoritative season: six Chaotic Realm dungeons (Void - Towering Ruin, Void - Tina's Mindrealm, Cursed Radiant Tomb, Mech Facility, Mistveil Hunting Ground, Sea-Ringed Reef), a 3,650 maximum score and seven reward milestones (4 × 50 Rose Orbs, Avatar Frame, Namecard, and Mount: Neon Sonic at 3,650). Members record a best Master level (0–20 or Not cleared) and points per dungeon; no level-to-points formula is invented. The server derives every total: sum of the six point values, remaining (never below zero), progress (never above 100%), cleared count and mount unlock at exactly 3,650. Unknown dungeons, negative points, out-of-range levels and points on uncleared dungeons are rejected; identical updates write nothing.
 
@@ -87,7 +91,7 @@ A fresh fork may instead carry the documented `PASTE_APPS_SCRIPT_EXEC_URL_HERE` 
 
 For one-browser setup, `?api=https%3A%2F%2Fscript.google.com%2Fmacros%2Fs%2F...%2Fexec` is also accepted. Only an explicitly supplied, valid Apps Script `/exec` URL — or, for development only, a `localhost`/`127.0.0.1` `/exec` URL such as the one `scripts/dev-server.js` prints — is stored under `bpsrApiUrl`; invalid or unrelated URLs fail closed. A persisted explicit override outranks the committed constant on later visits, so clear the site’s `bpsrApiUrl` local storage to return to the production deployment. Editing the constant is the recommended shared Pages configuration.
 
-The sidebar reports **Not configured**, **Connecting**, **Connected**, or **API error**. The preview notice appears only while no valid API URL is configured. The public leaderboard interface remains viewable, but registration and saving are unavailable until the backend is connected.
+The sidebar reports one of **Not configured**, **Connecting**, **Connected**, **Backend not deployed** (the deployment answers `UNKNOWN_ACTION` for the tracker actions), **Local API unavailable** / **API unreachable** (the `/exec` endpoint could not be reached), or **Backend request failed** (an unexpected server failure). Each state is also explained in full inside the boards; the raw backend response is written to the browser console only, never shown as the interface message. The preview notice appears only while no valid API URL is configured. The public leaderboard interface remains viewable, but registration and saving are unavailable until the backend is connected.
 
 ## GitHub Pages
 

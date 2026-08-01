@@ -106,23 +106,21 @@
     return { rows: list.slice(start, start + size), page: current, pages: total, start: start };
   }
 
-  function countdownParts(endsAt, now) {
-    var end = new Date(endsAt).getTime();
-    if (!isFinite(end)) return null;
-    var ms = end - (now || Date.now());
-    if (ms <= 0) return { ended: true, days: 0, hours: 0, minutes: 0 };
+  /** Season timing: the end date has not been announced, so the tracker
+   * reports the published schedule rather than counting down to a guess. */
+  function seasonSchedule(season) {
+    var note = (root.BPSR_SEASON || {});
+    var through = (season && season.scheduleThrough) || note.scheduleThrough || '';
+    var announced = Boolean(season && season.endDateAnnounced);
     return {
-      ended: false,
-      days: Math.floor(ms / 86400000),
-      hours: Math.floor(ms / 3600000) % 24,
-      minutes: Math.floor(ms / 60000) % 60
+      announced: announced,
+      headline: announced && season.endsAt
+        ? 'Ends ' + fmtDate(season.endsAt)
+        : (note.shortNote || 'End date not announced'),
+      detail: through
+        ? 'Published schedule runs through ' + through + '.'
+        : 'No published schedule is configured.'
     };
-  }
-
-  function formatCountdown(parts) {
-    if (!parts) return 'Season end date not configured';
-    if (parts.ended) return 'Season has ended';
-    return parts.days + 'd ' + parts.hours + 'h ' + parts.minutes + 'm';
   }
 
   root.MS_HELPERS = {
@@ -135,8 +133,7 @@
     isStale: isStale,
     selectMembers: selectMembers,
     pageSlice: pageSlice,
-    countdownParts: countdownParts,
-    formatCountdown: formatCountdown
+    seasonSchedule: seasonSchedule
   };
 
   if (typeof document === 'undefined') return;   // helper-only import (tests)
@@ -252,12 +249,9 @@
     if (!host) return;
 
     if (state.status === 'error') {
-      host.innerHTML = '<div class="ms-empty">' + (state.staleBackend
-        ? '<strong>Master Seal is not live on the backend yet</strong>' +
-          '<p>The interface is deployed, but the Apps Script project still needs MasterSeal.gs ' +
-          'and a new web-app version before Season 3 data can load.</p>'
-        : '<strong>The guild data could not be loaded</strong><p>' + esc(state.errorMessage || 'The API is unavailable.') + '</p>') +
-        '</div>';
+      var failure = state.failure || {};
+      host.innerHTML = '<div class="ms-empty is-error"><strong>' + esc(failure.title || 'Guild data could not be loaded') +
+        '</strong><p>' + esc(failure.detail || '') + '</p></div>';
       showing.textContent = '';
       pages.replaceChildren();
       return;
@@ -416,9 +410,8 @@
     if (state.status === 'error') {
       // Keep the shell intact and explain the real cause rather than alarming.
       host.innerHTML = '<section><div class="ms-empty"><strong>Member details will appear here</strong>' +
-        '<p>' + (state.staleBackend
-          ? 'Season 3 data loads once MasterSeal.gs is added to the Apps Script project and a new web-app version is deployed.'
-          : 'They are unavailable while the guild API cannot be reached.') +
+        '<p>' + esc((state.failure && state.failure.detail) ||
+          'They are unavailable while the guild data cannot be loaded.') +
         '</p></div></section>';
       return;
     }
@@ -588,17 +581,17 @@
     }
   }
 
-  var countdownTick = function () {};
-
-  function startCountdown() {
-    var value = byId('ms-countdown-value');
-    if (!value) return;
-    countdownTick = function () {
-      var endsAt = state.season && state.season.endsAt;
-      value.textContent = endsAt ? formatCountdown(countdownParts(endsAt)) : 'Season end date not configured';
-    };
-    countdownTick();
-    root.setInterval(countdownTick, 30000);
+  function renderSeasonNote() {
+    var value = byId('ms-season-note-value');
+    var sub = byId('ms-season-note-sub');
+    if (!value && !sub) return;
+    var schedule = seasonSchedule(state.season);
+    if (value) value.textContent = schedule.headline;
+    if (sub) sub.textContent = schedule.detail;
+    var statement = byId('ms-season-statement');
+    if (statement && root.BPSR_SEASON && root.BPSR_SEASON.statement) {
+      statement.textContent = root.BPSR_SEASON.statement;
+    }
   }
 
   function load() {
@@ -613,14 +606,17 @@
       if (tag) tag.textContent = data.season.displayName;
       document.title = data.season.displayName + ' Master Seal · BPSR Guild Tracker';
       setConnection('ok', 'Connected');
-      countdownTick();   // show the real countdown as soon as the season arrives
+      renderSeasonNote();   // show the real season schedule as soon as it arrives
       refreshView();
     }).catch(function (failure) {
       state.status = 'error';
-      state.errorMessage = failure && failure.message;
-      state.staleBackend = Boolean(failure && (failure.code === 'UNKNOWN_ACTION' ||
-        /unknown action/i.test(failure.message || '')));
-      setConnection('bad', failure && failure.code === 'CONFIGURATION' ? 'Not configured' : 'API error');
+      // Never surface the raw backend string; classify the failure honestly
+      // and keep the technical detail in the console.
+      var classified = root.BPSR_ERRORS
+        ? root.BPSR_ERRORS.classify(failure, 'masterSeal')
+        : { status: 'Backend request failed', title: 'Backend request failed', detail: '', kind: 'server' };
+      state.failure = classified;
+      setConnection('bad', classified.status);
       renderTable();
       renderDetail();
     });
@@ -630,7 +626,7 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     wireControls();
-    startCountdown();
+    renderSeasonNote();
     load();
   });
 }(typeof window === 'undefined' ? globalThis : window));

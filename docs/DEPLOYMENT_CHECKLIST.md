@@ -70,7 +70,8 @@
 - [ ] If a stale deployment was previously supplied, clear the site’s `bpsrApiUrl` local-storage value/site data.
 - [ ] With no URL, confirm **Not configured** and the preview notice; member/admin writes must explain that saving is unavailable.
 - [ ] With the real URL, confirm **Connecting**, then **Connected**, and confirm the preview notice stays hidden.
-- [ ] Simulate a bad/network-failing deployment and confirm **API error** plus readable member/admin scoped errors.
+- [ ] Simulate a network-failing deployment and confirm the honest classified state (**Local API unavailable** / **API unreachable**, or **Backend request failed**) plus readable member/admin scoped errors, with the raw detail only in the browser console.
+- [ ] Before the new web-app version exists, confirm the interface reports **Tracker backend not deployed** and that accounts report "Accounts are unavailable because the deployed Apps Script backend does not yet include the required account and Master Seal actions."
 
 ## GitHub Pages and visual checks
 

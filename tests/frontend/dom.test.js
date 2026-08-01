@@ -241,7 +241,6 @@ function createHarness(handler, options) {
   preview.hidden = true;
   const gate = base('div', 'gate');
   gate.hidden = true;
-  base('div', 'firsts');
   base('p', 'stamp');
 
   const store = { ...(opts.store || {}) };
@@ -278,7 +277,7 @@ function createHarness(handler, options) {
   const ctx = {
     window: null,
     document,
-    location: { protocol: 'https:', pathname: '/BPSR-Guild-Tracker/' },
+    location: { protocol: 'https:', pathname: '/BPSR-Guild-Tracker/', search: '' },
     navigator: {},
     localStorage: {
       getItem: key => store[key] || null,
@@ -303,7 +302,8 @@ function createHarness(handler, options) {
     encodeURIComponent,
     decodeURIComponent,
     confirm: opts.confirm || (() => true),
-    console,
+    // Technical failure detail is logged, not shown; keep test output quiet.
+    console: { log() {}, warn() {}, error() {} },
     BPSR_CONFIG: {
       apiUrl: opts.configured === false ? '' : 'https://script.google.com/macros/' + 's/test/exec',
       timeoutMs: 500,
@@ -312,6 +312,11 @@ function createHarness(handler, options) {
   };
   ctx.window = ctx;
   vm.createContext(ctx);
+  // config.js owns the real failure classifier; load it, then keep the
+  // harness's API stub so requests still run against the fake fetch.
+  const configured = ctx.BPSR_CONFIG;
+  vm.runInContext(fs.readFileSync('config.js', 'utf8'), ctx);
+  ctx.BPSR_CONFIG = configured;
   vm.runInContext(fs.readFileSync('AppFrontend.js', 'utf8'), ctx);
   return {
     ctx,
@@ -652,6 +657,38 @@ test('ordinary members never see admin controls and hostile names render as text
   await plain.ready();
   await signIn(plain);
   assert.equal(plain.administration.hidden, true);
+});
+
+test('an Apps Script backend without the account actions says so plainly', async () => {
+  const app = createHarness((action) => {
+    if (action === 'createAccount') throw new ApiFailure('UNKNOWN_ACTION', 'Unknown action.');
+  });
+  await app.ready();
+  const form = formByButton(app.gate, 'Create my account');
+  form.querySelector('input[name="characterName"]').value = 'New Guildie';
+  form.dispatch('submit');
+  await settle();
+  const shown = app.gate.textContent;
+  assert.match(shown, /Accounts are unavailable because the deployed Apps Script backend/);
+  assert.match(shown, /Deploy the updated Apps Script version/);
+  // The raw backend string never reaches the interface.
+  assert.equal(/Unknown action/.test(shown), false);
+  assert.equal(/API error/.test(shown), false);
+  assert.equal(/Server error/.test(shown), false);
+});
+
+test('an unexpected backend failure is reported honestly, never as a raw string', async () => {
+  const app = createHarness((action) => {
+    if (action === 'createAccount') throw new ApiFailure('INTERNAL', 'Server error');
+  });
+  await app.ready();
+  const form = formByButton(app.gate, 'Create my account');
+  form.querySelector('input[name="characterName"]').value = 'New Guildie';
+  form.dispatch('submit');
+  await settle();
+  assert.match(app.gate.textContent, /Backend request failed/);
+  assert.match(app.gate.textContent, /unexpected server failure/);
+  assert.equal(/^Server error$/m.test(app.gate.textContent), false, 'no bare "Server error" label');
 });
 
 test('the emergency recovery secret opens admin tools in memory only', async () => {

@@ -108,20 +108,11 @@ button { cursor: pointer; }
 .ms-nav-item.selected .ms-ico { color: var(--accent); }
 .ms-ico { width: 15px; text-align: center; color: var(--text-muted); font-size: 12px; }
 
-.ms-guild-card { display: flex; gap: 10px; margin-top: auto; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel-bg-raised); }
-.ms-guild-crest { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 auto; border: 1px solid var(--border-bright); border-radius: 9px; background: rgba(108, 47, 140, .3); color: var(--accent); overflow: hidden; }
-.ms-guild-crest img { width: 100%; height: 100%; object-fit: contain; }
-.ms-guild-body { min-width: 0; flex: 1; }
-.ms-guild-label { margin: 0; color: var(--text-muted); font-size: 9px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
-.ms-guild-name { display: flex; align-items: baseline; gap: 6px; margin: 1px 0 5px; font-family: var(--display); font-size: 15px; }
-.ms-guild-name span { color: var(--accent-soft); font-family: var(--ui); font-size: 10px; font-weight: 700; }
-.ms-xp { height: 5px; border-radius: 3px; background: #0a0810; overflow: hidden; }
-.ms-xp i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent-deep), var(--accent)); }
-.ms-guild-xp-text { margin: 4px 0 0; color: var(--text-muted); font-size: 9.5px; }
-
-.ms-countdown { padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel-bg-raised); }
-.ms-countdown-label { margin: 0; color: var(--text-muted); font-size: 9px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
-.ms-countdown-value { margin: 3px 0 0; font-family: var(--display); font-size: 17px; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+/* Season status: the schedule, not a countdown to an unannounced end date. */
+.ms-season-note { margin-top: auto; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel-bg-raised); }
+.ms-season-note-label { margin: 0; color: var(--text-muted); font-size: 9px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.ms-season-note-value { margin: 3px 0 0; font-family: var(--display); font-size: 15px; color: var(--text-primary); }
+.ms-season-note-sub { margin: 3px 0 0; color: var(--text-muted); font-size: 10px; line-height: 1.35; }
 
 .ms-sidebar-foot { display: flex; align-items: center; gap: 7px; color: var(--text-muted); font-size: 10.5px; }
 .ms-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warning); box-shadow: 0 0 0 3px rgba(233, 190, 105, .12); }
@@ -138,6 +129,7 @@ button { cursor: pointer; }
 .ms-header-text h1 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 28px; letter-spacing: .04em; text-transform: uppercase; }
 .ms-season-tag { padding: 3px 10px; border: 1px solid var(--border-bright); border-radius: 999px; background: rgba(108, 47, 140, .3); color: var(--accent); font-family: var(--ui); font-size: 11px; font-weight: 800; letter-spacing: .12em; }
 .ms-header-text p { margin: 4px 0 0; color: var(--text-secondary); font-size: 12.5px; }
+.ms-season-statement { color: var(--text-muted) !important; font-size: 11.5px !important; max-width: 68ch; }
 .ms-maxscore { display: grid; gap: 1px; justify-items: end; padding: 9px 14px; border: 1px solid var(--border-bright); border-radius: var(--radius-sm); background: rgba(20, 12, 30, .8); }
 .ms-maxscore span { color: var(--text-muted); font-size: 9px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
 .ms-maxscore strong { font-family: var(--display); font-size: 24px; color: var(--accent); text-shadow: 0 0 18px rgba(207, 130, 239, .45); }
@@ -373,15 +365,28 @@ button { cursor: pointer; }
    dashboard shell hosts every section.
    ========================================================================= */
 .ms-section-sub { margin: 3px 0 0; color: var(--text-muted); font-size: 12px; }
+.ms-section-title { min-width: 0; }
+
+/* The SV and Masters sections are laid out identically so the two panels read
+   as one pair: same outer width, padding, heading block, podium height,
+   control row and table frame. */
+.ms-board-section { display: grid; gap: 12px; align-content: start; }
+.ms-board-section .ms-section-head { margin-bottom: 0; align-items: flex-start; }
+.ms-board-section .podium,
+.ms-board-section .controls { margin: 0; }
+.ms-board-section .tablewrap { min-height: 132px; }
 
 /* Podium */
-.podium { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0 0 12px; }
+.podium { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0 0 12px; align-items: stretch; }
 .banner {
-  display: grid; gap: 2px; justify-items: center; text-align: center;
-  padding: 14px 10px; min-height: 0;
+  display: grid; gap: 2px; justify-items: center; align-content: start; text-align: center;
+  padding: 14px 10px; min-height: 132px;
   border: 1px solid var(--border); border-top: 2px solid var(--border-bright); border-radius: var(--radius-sm);
   background: linear-gradient(180deg, rgba(76, 34, 110, .45), rgba(16, 16, 26, .92));
 }
+/* Unclaimed podium slots keep both boards the same height. */
+.banner.placeholder { background: rgba(16, 16, 26, .55); border-top-color: var(--border); }
+.banner.placeholder .medal, .banner.placeholder .b-name, .banner.placeholder .b-stat { color: var(--text-muted); }
 .banner.gold { border-top-color: var(--gold); }
 .banner .medal { font-family: var(--display); font-size: 17px; font-weight: 700; color: var(--accent); }
 .banner.gold .medal { color: var(--gold); }
@@ -391,9 +396,10 @@ button { cursor: pointer; }
 .banner .b-badges { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
 .pod-1 { order: 2; } .pod-2 { order: 1; } .pod-3 { order: 3; }
 
-/* Filter bar */
-.controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel-bg-raised); }
+/* Filter bar — identical geometry on both boards */
+.controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel-bg-raised); min-height: 56px; }
 .controls .search { flex: 1 1 200px; min-width: 160px; min-height: 34px; padding: 6px 11px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: #0c0a14; color: var(--text-primary); font-size: 12.5px; }
+.chips { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .controls .search::placeholder { color: var(--text-muted); }
 .chip { min-height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--text-secondary); font-size: 12px; font-weight: 700; }
 .chip:hover { border-color: var(--border-bright); color: var(--text-primary); }
@@ -405,7 +411,9 @@ button { cursor: pointer; }
 .tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); background: rgba(9, 8, 16, .55); }
 .tablewrap table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
 .tablewrap th { padding: 8px 10px; text-align: left; white-space: nowrap; background: #17101f; color: var(--text-muted); font-family: var(--ui); font-size: 9px; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; border-bottom: 1px solid var(--border); }
-.tablewrap td { padding: 8px 10px; border-bottom: 1px solid rgba(53, 32, 55, .55); color: var(--text-primary); vertical-align: middle; }
+/* One row rhythm on both boards, whether or not a row carries a badge. */
+.tablewrap td { height: 45px; padding: 8px 10px; border-bottom: 1px solid rgba(53, 32, 55, .55); color: var(--text-primary); vertical-align: middle; }
+.tablewrap .badge { line-height: 1.35; }
 .tablewrap tbody tr:hover td { background: rgba(207, 130, 239, .06); }
 .tablewrap .rank { width: 46px; color: var(--text-secondary); font-weight: 800; }
 .tablewrap .rank.top { color: var(--gold); }
@@ -422,6 +430,13 @@ button { cursor: pointer; }
 .badge.ember { border-color: var(--warning); color: var(--warning); }
 .empty { padding: 22px 16px; text-align: center; color: var(--text-muted); font-size: 12.5px; }
 
+/* Shared loading / empty / failure presentation for both boards */
+.board-state { display: grid; align-content: center; justify-items: center; gap: 8px; min-height: 132px; padding: 18px 16px; }
+.board-state.ms-empty { padding: 22px 16px; }
+.board-state-note { margin: 0; color: var(--text-muted); font-size: 12px; }
+.board-skeleton { width: 100%; height: 76px; }
+.ms-empty.is-error strong { color: var(--danger); }
+
 /* First Guildie ribbon */
 .fg-card { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .fg-badge { display: grid; place-items: center; width: 52px; height: 52px; flex: 0 0 auto; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #e9b8ff, var(--accent) 55%, #4c1d63); color: #1a0725; font-family: var(--display); font-size: 17px; font-weight: 700; }
@@ -435,17 +450,6 @@ button { cursor: pointer; }
 .fg-prev-list { display: grid; gap: 5px; margin-top: 7px; color: var(--text-muted); font-size: 11.5px; }
 .fg-prev-list b { color: var(--text-secondary); font-weight: 700; }
 
-/* Achievement records and activity feed */
-.firsts { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 9px; }
-.first-card { display: grid; gap: 3px; padding: 11px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel-bg-raised); }
-.first-type { color: var(--accent-soft); font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
-.first-name { font-family: var(--display); font-size: 15px; color: var(--text-primary); }
-.first-date { color: var(--text-muted); font-size: 10.5px; }
-.feed { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.feed li { display: flex; align-items: baseline; gap: 10px; padding: 8px 11px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel-bg-raised); font-size: 12.5px; }
-.feed time { flex: 0 0 auto; min-width: 74px; color: var(--text-muted); font-size: 10.5px; }
-.feed .empty { padding: 14px; border: 0; }
-
 /* Toast */
 .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 65; display: none; padding: 11px 16px; border: 1px solid var(--border-bright); border-radius: var(--radius-sm); background: #150e1e; color: var(--text-primary); font-size: 12.5px; box-shadow: 0 12px 30px rgba(0, 0, 0, .6); }
 
@@ -455,7 +459,10 @@ button { cursor: pointer; }
   .tablewrap, .tablewrap table, .tablewrap tbody, .tablewrap tr, .tablewrap td { display: block; }
   .tablewrap thead { display: none; }
   .tablewrap tr { margin: 9px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel-bg-raised); }
-  .tablewrap td { padding: 3px 0; border: 0; }
+  .tablewrap td { height: auto; padding: 3px 0; border: 0; }
   .tablewrap td[data-l]::before { content: attr(data-l) " "; display: inline-block; min-width: 10ch; color: var(--accent-soft); font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
-  .firsts { grid-template-columns: 1fr; }
+  /* Mobile cards: the two boards keep the same card rhythm. */
+  .ms-board-section .controls { flex-direction: column; align-items: stretch; }
+  .ms-board-section .controls .search { flex: 1 1 auto; }
+  .chips { justify-content: flex-start; }
 }

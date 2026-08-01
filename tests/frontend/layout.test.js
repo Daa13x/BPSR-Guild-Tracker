@@ -29,12 +29,12 @@ test('one dashboard page hosts Master Seal and two separate leaderboards in the 
   assert.match(html, /id="master-seal"/);
   assert.match(html, /id="ms-table-host"/);
   assert.match(html, /id="ms-pages"/);
-  assert.match(html, /id="ms-countdown-value"/);
+  assert.match(html, /id="ms-season-note-value"/);
   // SV and Masters are two independent sections, each with its own podium,
   // search, filter chips and table — not one tabbed board.
   assert.match(html, /id="sv-board"/);
   assert.match(html, /id="masters-board"/);
-  ['podium-sv', 'podium-mp', 'board-sv', 'board-mp', 'search-sv', 'search-mp']
+  ['podium-sv', 'podium-mp', 'board-sv', 'board-mp', 'search-sv', 'search-mp', 'count-sv', 'count-mp']
     .forEach(id => assert.match(html, new RegExp(`id="${id}"`), `missing #${id}`));
   assert.ok(html.indexOf('id="sv-board"') < html.indexOf('id="masters-board"'), 'SV leads, Masters follows');
   assert.equal(/data-tab="mc"/.test(html), false, 'Master Completion tab removed');
@@ -43,8 +43,8 @@ test('one dashboard page hosts Master Seal and two separate leaderboards in the 
   // Sidebar: no Overview group, no redundant Master Seal entry.
   assert.equal(/>Overview</.test(html), false, 'Overview nav group removed');
   assert.equal(/ms-nav-item[^>]*>[\s\S]{0,80}Master Seal</.test(html), false, 'Master Seal nav entry removed');
-  // Member area, admin, achievements, feed and the account gate all live here too.
-  ['my-progress', 'administration', 'achievements', 'feed-panel', 'member-ui', 'admin-ui', 'firsts', 'feed']
+  // Member area, admin and the account gate all live here too.
+  ['my-progress', 'administration', 'member-ui', 'admin-ui']
     .forEach(id => assert.match(html, new RegExp(`id="${id}"`), `missing #${id}`));
   assert.match(html, /<div class="gate" id="gate" hidden><\/div>/);
   assert.match(html, /data-admin-nav hidden/);
@@ -54,6 +54,108 @@ test('one dashboard page hosts Master Seal and two separate leaderboards in the 
   assert.match(html, /<script src="AppFrontend\.js\?v=[\w.-]+"><\/script>/);
   assert.equal(/<script>[\s\S]*?<\/script>/.test(html.replace(/<script src=[^>]*><\/script>/g, '')), false,
     'board logic lives in Boards.js, not inline');
+});
+
+test('Analytics and the guild settings card are gone from markup, script and stylesheet', () => {
+  const html = fs.readFileSync('Leaderboard.html', 'utf8');
+  const boards = fs.readFileSync('Boards.js', 'utf8');
+  const frontend = fs.readFileSync('AppFrontend.js', 'utf8');
+  const css = fs.readFileSync('master-seal.css', 'utf8');
+  // No Analytics group, no Achievements or Activity Feed section anywhere.
+  [/>Analytics</, /id="achievements"/, /id="feed-panel"/, /id="firsts"/, /id="feed"/, /Activity Feed/]
+    .forEach(pattern => assert.equal(pattern.test(html), false, `${pattern} still in the page`));
+  // No guild information/settings card.
+  [/Your Guild/, /ms-guild-card/, /ms-guild-name/, /ms-guild-xp/]
+    .forEach(pattern => assert.equal(pattern.test(html), false, `${pattern} still in the page`));
+  // The render functions and state behind them are deleted, not hidden.
+  [/renderFirsts/, /renderFeed/, /firstLabel/, /fmtRelative/, /hallOfFame/, /mcBoard/]
+    .forEach(pattern => assert.equal(pattern.test(boards), false, `${pattern} still in Boards.js`));
+  assert.equal(/getElementById\('firsts'\)/.test(frontend), false, 'no reference to the deleted #firsts');
+  // Dead CSS for those sections is removed too.
+  [/\.firsts \{/, /\.first-card \{/, /\.feed \{/, /\.ms-guild-card \{/, /\.ms-xp \{/]
+    .forEach(pattern => assert.equal(pattern.test(css), false, `${pattern} still in master-seal.css`));
+});
+
+test('SV and Masters are laid out as one even pair', () => {
+  const html = fs.readFileSync('Leaderboard.html', 'utf8');
+  const css = fs.readFileSync('master-seal.css', 'utf8');
+  const section = id => {
+    const at = html.indexOf(`id="${id}"`);
+    return html.slice(html.lastIndexOf('<section', at), html.indexOf('</section>', at));
+  };
+  const sv = section('sv-board');
+  const mp = section('masters-board');
+  // Same wrapper classes, same building blocks, same order.
+  [sv, mp].forEach(part => {
+    ['ms-panel ms-section ms-board-section', 'ms-section-head', 'ms-section-title', 'ms-section-sub',
+      'ms-count-badge', 'class="podium"', 'class="controls"', 'class="search"', 'class="chips"', 'class="tablewrap"']
+      .forEach(token => assert.ok(part.includes(token), `board section missing ${token}`));
+  });
+  assert.equal((sv.match(/class="chip/g) || []).length, (mp.match(/class="chip/g) || []).length,
+    'both boards expose the same number of filter chips');
+  // Shared geometry rather than per-board overrides.
+  assert.match(css, /\.ms-board-section \{ display: grid;/);
+  assert.match(css, /\.banner \{[\s\S]*?min-height: 132px;/);
+  assert.match(css, /\.board-state \{[\s\S]*?min-height: 132px;/);
+});
+
+test('Season 3 is presented as scheduled-through, never as a confirmed end date', () => {
+  const html = fs.readFileSync('Leaderboard.html', 'utf8');
+  const config = fs.readFileSync('config.js', 'utf8');
+  const seal = fs.readFileSync('MasterSeal.gs', 'utf8');
+  assert.match(html, /has not been formally announced/);
+  assert.match(html, /extends through\s+19 August 2026/);
+  assert.match(html, /Echoes of Ember/);
+  assert.equal(/ends in/i.test(html), false, 'no countdown to an unannounced end date');
+  assert.match(config, /scheduleThrough: '19 August 2026'/);
+  assert.match(config, /endDateAnnounced: false/);
+  // The backend no longer asserts an end date either.
+  assert.match(seal, /endsAt: null/);
+  assert.match(seal, /scheduleThrough: '19 August 2026'/);
+  assert.equal(/2026-08-22/.test(seal), false, 'the stale 22 August date is gone');
+});
+
+test('navigation lists only working destinations and obsolete hashes fall back to SV', () => {
+  const html = fs.readFileSync('Leaderboard.html', 'utf8');
+  const boards = fs.readFileSync('Boards.js', 'utf8');
+  const navHrefs = [...html.matchAll(/class="ms-nav-item[^"]*" href="([^"]+)"/g)].map(m => m[1]);
+  assert.deepEqual(navHrefs, ['#sv-board', '#masters-board', '#my-progress', '#administration']);
+  // Every navigable target is a section that actually exists on the page.
+  navHrefs.forEach(href => assert.match(html, new RegExp(`id="${href.slice(1)}"`), `${href} has no section`));
+  assert.match(boards, /SUPPORTED_HASHES/);
+  assert.match(boards, /FALLBACK_HASH = '#sv-board'/);
+  assert.equal(/#achievements|#feed-panel/.test(boards), false, 'no routing case for deleted sections');
+});
+
+test('no shipped frontend file can render a vague or stale backend message', () => {
+  const shipped = ['Leaderboard.html', 'config.js', 'Boards.js', 'MasterSealPage.js', 'AppFrontend.js'];
+  const banned = [
+    /'API error'/, /"API error"/, />API error</,
+    /not live on the backend/,
+    /still needs the updated/,
+    /AuthApi\.gs and MasterSeal\.gs/
+  ];
+  // Comments may name these labels to explain why they are forbidden; only
+  // what the page can actually render is checked.
+  const withoutComments = source => source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+    .replace(/<!--[\s\S]*?-->/g, '');
+  shipped.forEach(file => {
+    const source = withoutComments(fs.readFileSync(file, 'utf8'));
+    banned.forEach(pattern =>
+      assert.equal(pattern.test(source), false, `${file} still contains ${pattern}`));
+  });
+  // The dead pre-dashboard board script is gone, not left behind to resurface.
+  assert.equal(fs.existsSync('MasterSeal.js'), false, 'superseded MasterSeal.js must not return');
+});
+
+test('static assets share one cache token so a change cannot be served stale', () => {
+  const html = fs.readFileSync('Leaderboard.html', 'utf8');
+  const tokens = [...html.matchAll(/(?:src|href)="[\w.-]+\.(?:js|css)\?v=([\w.-]+)"/g)].map(m => m[1]);
+  assert.equal(tokens.length, 6, 'every script and stylesheet carries a cache token');
+  assert.equal(new Set(tokens).size, 1, 'all assets share one token');
+  assert.ok(Number(tokens[0]) >= 7, 'token was bumped past the previously published build');
 });
 
 test('the old Master Seal URL redirects into the single dashboard', () => {
