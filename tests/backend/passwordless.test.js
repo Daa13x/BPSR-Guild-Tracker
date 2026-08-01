@@ -215,3 +215,66 @@ test('the BackupCodes sheet mirrors every code change without becoming authorita
   c.rebuildBackupCodes();
   assert.equal(codes().length, 2);
 });
+
+test('owner-only diagnostics name the real reason restore refuses a login', () => {
+  const c = runtime();
+  const dax = call(c, 'createAccount', { characterName: 'Dax' });
+  const id = dax.member.memberId;
+  const membersRow = () => c.readTable_(c.AUTH_SHEETS.MEMBERS).rows.filter(r => String(r.MemberId) === String(id))[0];
+  const writeCell = (header, value) => {
+    const t = c.readTable_(c.AUTH_SHEETS.MEMBERS);
+    t.sheet.getRange(membersRow()._row, t.headers.indexOf(header) + 1).setValue(value);
+  };
+
+  // Healthy account: the only thing that can be wrong is the typed code.
+  let d = c.diagnoseRestore('Dax');
+  assert.equal(d.memberRowFound, true);
+  assert.equal(d.backupCodeSet, true);
+  assert.match(d.verdict, /does not match the stored one/);
+
+  // Unknown character name.
+  assert.match(c.diagnoseRestore('Nobody').verdict, /No Members row/);
+
+  // A migrated row with no code yet — the most common real cause.
+  writeCell('BackupCode', '');
+  d = c.diagnoseRestore('Dax');
+  assert.equal(d.backupCodeSet, false);
+  assert.match(d.verdict, /no backup code yet/);
+  assert.equal('backupCode' in d, false, 'diagnostics never return the code itself');
+
+  // issueBackupCode mints one and restore then succeeds with it.
+  const issued = c.issueBackupCode('Dax');
+  assert.match(issued, /^BPSR-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+  assert.equal(membersRow().BackupCode, issued);
+  assert.equal(call(c, 'restore', { characterName: 'Dax', backupCode: issued }).member.characterName, 'Dax');
+
+  // A disabled row is reported as such rather than as a bad code.
+  writeCell('DisabledAt', new Date());
+  assert.match(c.diagnoseRestore('Dax').verdict, /disabled/);
+  writeCell('DisabledAt', '');
+
+  // Five failures block further attempts; the diagnostic says so, and
+  // clearLoginThrottle lifts it.
+  for (let i = 0; i < 5; i++) {
+    assert.throws(() => call(c, 'restore', { characterName: 'Dax', backupCode: 'BPSR-WRNG-WRNG-WRNG' }));
+  }
+  d = c.diagnoseRestore('Dax');
+  assert.equal(d.throttled, true);
+  assert.match(d.verdict, /blocked until/);
+  assert.throws(() => call(c, 'restore', { characterName: 'Dax', backupCode: issued }),
+    /incorrect/, 'a correct code is still refused while blocked');
+  assert.equal(c.clearLoginThrottle('Dax'), 1);
+  assert.equal(c.diagnoseRestore('Dax').throttled, false);
+  assert.equal(call(c, 'restore', { characterName: 'Dax', backupCode: issued }).member.characterName, 'Dax');
+});
+
+test('maintenance helpers are unreachable through the web API', () => {
+  const c = runtime();
+  ['diagnoseRestore', 'issueBackupCode', 'clearLoginThrottle', 'rebuildBackupCodes'].forEach(name => {
+    assert.equal(typeof c[name], 'function', name + ' exists for the editor');
+    const result = c.doPost({ postData: { contents: JSON.stringify({ action: name, data: { characterName: 'Dax' } }) } });
+    const envelope = JSON.parse(result.text);
+    assert.equal(envelope.ok, false, name + ' must not be dispatchable');
+    assert.equal(envelope.error.code, 'UNKNOWN_ACTION');
+  });
+});

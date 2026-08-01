@@ -51,6 +51,22 @@ Three ways to read a code:
 2. **Your own code** — sign in, then **My Progress → Backup access → Reveal / Copy**.
 3. **Any member's code** — **Administration → Backup access**, select the member, then **Reveal backup code**. Every reveal writes a `VIEW_BACKUP_CODE` audit entry naming the administrator and the target.
 
+### "Character name or backup code is incorrect."
+
+`restore` returns that one message for every failure so the API cannot be used to work out which character names exist. To find the real reason, run **`diagnoseRestore("Dax")`** from the Apps Script editor — it reports whether a `Members` row was found, whether `NormalizedName` matches, whether the row is disabled, whether a code is set, and whether the throttle is blocking, and never returns the code itself. The usual causes:
+
+| Cause | Fix |
+|---|---|
+| No code stored yet (lazy generation — most common for pre-existing accounts) | `issueBackupCode("Dax")`, or **Regenerate backup code** in the admin panel |
+| `NormalizedName` does not match the lower-cased name | correct that cell in `Members` |
+| `DisabledAt` is set | clear it, or enable the member |
+| Five failures in 15 minutes | blocked for 15 minutes — `clearLoginThrottle("Dax")`, or clear the row in `LoginAttempts` |
+| The code typed genuinely differs | reissue it |
+
+Character names and codes are both matched case-insensitively, and codes ignore dashes and spaces, so `bpsr-abcd-efgh-jkmn` and `BPSR ABCD EFGH JKMN` are equivalent.
+
+`diagnoseRestore`, `issueBackupCode`, `clearLoginThrottle` and `rebuildBackupCodes` are editor-only maintenance functions. They are deliberately not wired into the API dispatcher, so the web app cannot reach them — a test asserts each one returns `UNKNOWN_ACTION` if requested over HTTP.
+
 Codes are stored readable so administrators can recover members. That is a deliberate trade for a trusted guild: protecting or hiding a tab does not stop anyone who can open the spreadsheet from reading it, so **file-level sharing is the only real access boundary** — keep the spreadsheet restricted to administrators you trust. If you would rather nobody could read a code at all, store hashes instead and recover by regenerating; that removes the Reveal button by design.
 
 The initial administrator is Dax (`Players.IsAdmin=TRUE` on the row whose `UserId` equals Dax’s `Members.MemberId`). `BPSR_ADMIN_SECRET` remains optional, throttled, emergency-only recovery via Script Properties; the recovery session lives in browser memory only.

@@ -120,6 +120,82 @@ function rebuildBackupCodes() {
   return rows.length;
 }
 
+/* ---------------------------------------------------------------------------
+ * Owner-only maintenance. These are deliberately NOT wired into api_(), so
+ * they are unreachable from the web app — they run only from the Apps Script
+ * editor, by someone who already has full access to the spreadsheet.
+ * ------------------------------------------------------------------------ */
+
+/**
+ * Explain why `restore` rejects a character name. The public message is
+ * intentionally identical for every cause so the API cannot be used to
+ * enumerate members; this reports the real reason to the owner instead.
+ * Never returns the code itself.
+ */
+function diagnoseRestore(characterName) {
+  ensureAuthSheets_();
+  var raw = String(characterName || '');
+  var out = { input: raw, nameAccepted: false, normalized: '', memberRowFound: false, matchedByName: false, disabled: false, backupCodeSet: false, throttled: false, verdict: '' };
+  try { out.normalized = norm_(raw); out.nameAccepted = true; }
+  catch (e) { out.verdict = 'The character name itself is rejected as invalid input.'; return out; }
+
+  var rows = table_(AUTH_SHEETS.MEMBERS).rows.filter(function (r) { return String(r.NormalizedName) === out.normalized; });
+  out.memberRowFound = rows.length > 0;
+  if (!out.memberRowFound) {
+    var loose = table_(AUTH_SHEETS.MEMBERS).rows.filter(function (r) {
+      return String(r.CharacterName || '').trim().toLowerCase() === out.normalized;
+    });
+    out.verdict = loose.length
+      ? 'A row exists for this character, but its NormalizedName cell does not match "' + out.normalized + '". Correct that cell.'
+      : 'No Members row has NormalizedName "' + out.normalized + '".';
+    return out;
+  }
+  var m = rows[0];
+  out.disabled = Boolean(m.DisabledAt);
+  out.backupCodeSet = Boolean(m.BackupCode);
+  out.matchedByName = !out.disabled;
+
+  var attempt = table_(AUTH_SHEETS.ATTEMPTS).rows.filter(function (r) { return String(r.Key) === hash_('restore:' + raw.toLowerCase()); })[0];
+  out.throttled = Boolean(attempt && attempt.BlockedUntil && new Date(attempt.BlockedUntil) > new Date());
+
+  out.verdict = out.disabled ? 'The member row is disabled, so restore refuses it. Clear DisabledAt or enable the member.'
+    : !out.backupCodeSet ? 'The member has no backup code yet. Run issueBackupCode("' + raw + '") to mint one.'
+      : out.throttled ? 'Too many recent failures: restore is blocked until ' + new Date(attempt.BlockedUntil) +
+        '. Run clearLoginThrottle("' + raw + '") to clear it.'
+        : 'Name and code are both usable — the code being typed does not match the stored one.';
+  return out;
+}
+
+/** Mint and store a fresh code for a character name. Returns the new code. */
+function issueBackupCode(characterName) {
+  ensureAuthSheets_();
+  var n = norm_(characterName);
+  var m = table_(AUTH_SHEETS.MEMBERS).rows.filter(function (r) { return String(r.NormalizedName) === n; })[0];
+  if (!m) throw new Error('No Members row with NormalizedName "' + n + '".');
+  var code = newBackupCode_(), now = new Date();
+  writeMemberCell_(m, 'BackupCode', code);
+  if (!m.BackupCodeCreatedAt) writeMemberCell_(m, 'BackupCodeCreatedAt', now);
+  writeMemberCell_(m, 'BackupCodeUpdatedAt', now);
+  m.BackupCode = code;
+  m.BackupCodeCreatedAt = m.BackupCodeCreatedAt || now;
+  m.BackupCodeUpdatedAt = now;
+  syncBackupCodeRow_(m);
+  return code;
+}
+
+/** Clear the restore throttle for one character name. */
+function clearLoginThrottle(characterName) {
+  ensureAuthSheets_();
+  var key = hash_('restore:' + String(characterName || '').toLowerCase());
+  var t = table_(AUTH_SHEETS.ATTEMPTS), cleared = 0;
+  t.rows.forEach(function (r) {
+    if (String(r.Key) !== key) return;
+    t.sheet.getRange(r._row, 2, 1, 3).setValues([[0, new Date(), '']]);
+    cleared++;
+  });
+  return cleared;
+}
+
 /** Return the member's readable code, generating and storing one if missing. */
 function ensureBackupCode_(m) {
   if (m.BackupCode) return String(m.BackupCode);
