@@ -11,7 +11,8 @@
 - [ ] Confirm no default backup code is created or documented anywhere; codes are generated per member.
 - [ ] Configure real Master activities, active states and maximum ranks.
 - [ ] Review `Config`, including Europe/London timezone, reset settings and `MEMBER_SESSION_DAYS`.
-- [ ] Protect the `Members` (now holding readable backup codes), `Sessions`, `LoginAttempts`, `MasterSeal`, event, achievement, reset and audit sheets; restrict spreadsheet editors to trusted administrators and record that editors can read codes and impersonate members.
+- [ ] Protect the `Members` and `BackupCodes` sheets (both hold readable backup codes), plus `Sessions`, `LoginAttempts`, `MasterSeal`, event, achievement, reset and audit sheets; restrict spreadsheet editors to trusted administrators and record that editors can read codes and impersonate members. Sheet protection is organisational only — file-level sharing is the real boundary.
+- [ ] Run `rebuildBackupCodes()` once from the Apps Script editor after deploying, to populate `BackupCodes` for members created before the sheet existed. It is idempotent and safe to re-run.
 
 ## Script Properties and recovery
 

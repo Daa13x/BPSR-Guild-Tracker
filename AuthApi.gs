@@ -9,9 +9,10 @@
  * explicit product decision for a trusted guild; the sheet must stay private.
  * Legacy PinSalt/PinHash columns are deprecated and no longer used.
  */
-var AUTH_SHEETS = { MEMBERS: 'Members', SESSIONS: 'Sessions', ATTEMPTS: 'LoginAttempts' };
+var AUTH_SHEETS = { MEMBERS: 'Members', SESSIONS: 'Sessions', ATTEMPTS: 'LoginAttempts', CODES: 'BackupCodes' };
 var MEMBER_HEADERS = ['MemberId', 'CharacterName', 'NormalizedName', 'PinSalt', 'PinHash', 'CreatedAt', 'DisabledAt',
   'BackupCode', 'BackupCodeCreatedAt', 'BackupCodeUpdatedAt', 'LastAccessAt'];
+var BACKUP_CODE_HEADERS = ['MemberId', 'CharacterName', 'BackupCode', 'CreatedAt', 'UpdatedAt', 'Status'];
 var SESSION_HEADERS = ['TokenHash', 'MemberId', 'Kind', 'ExpiresAt', 'RevokedAt', 'CreatedAt', 'LastUsedAt'];
 var ADMIN_SESSION_TTL_MS = 12 * 60 * 60 * 1000, MAX_BODY = 20000;
 var TOUCH_INTERVAL_MS = 60 * 60 * 1000;
@@ -23,8 +24,10 @@ function ensureAuthSheets_() {
   ensureSheet_(ss, AUTH_SHEETS.MEMBERS, MEMBER_HEADERS);
   ensureSheet_(ss, AUTH_SHEETS.SESSIONS, SESSION_HEADERS);
   ensureSheet_(ss, AUTH_SHEETS.ATTEMPTS, ['Key', 'Count', 'WindowStarted', 'BlockedUntil']);
+  ensureSheet_(ss, AUTH_SHEETS.CODES, BACKUP_CODE_HEADERS);
   ensureColumns_(ss.getSheetByName(AUTH_SHEETS.MEMBERS), MEMBER_HEADERS);
   ensureColumns_(ss.getSheetByName(AUTH_SHEETS.SESSIONS), SESSION_HEADERS);
+  ensureColumns_(ss.getSheetByName(AUTH_SHEETS.CODES), BACKUP_CODE_HEADERS);
 }
 
 /** Append any missing header columns; never reorders or deletes existing data. */
@@ -76,6 +79,47 @@ function writeMemberCell_(memberRow, header, value) {
   if (col > 0) t.sheet.getRange(memberRow._row, col).setValue(value);
 }
 
+/**
+ * `BackupCodes` is an administrator lookup sheet: one row per member, holding
+ * the same readable code as `Members`. `Members` stays the single source of
+ * truth for restore, so a stale, edited or deleted row here can never lock a
+ * member out — rebuild it any time with `rebuildBackupCodes()`.
+ */
+function syncBackupCodeRow_(m) {
+  if (!m || !m.MemberId) return;
+  var sheet = ensureSheet_(SpreadsheetApp.getActiveSpreadsheet(), AUTH_SHEETS.CODES, BACKUP_CODE_HEADERS);
+  ensureColumns_(sheet, BACKUP_CODE_HEADERS);
+  var t = readTable_(AUTH_SHEETS.CODES);
+  var headers = t.headers.length ? t.headers : BACKUP_CODE_HEADERS;
+  var value = {
+    MemberId: String(m.MemberId),
+    CharacterName: String(m.CharacterName || ''),
+    BackupCode: String(m.BackupCode || ''),
+    CreatedAt: m.BackupCodeCreatedAt || '',
+    UpdatedAt: m.BackupCodeUpdatedAt || '',
+    Status: m.DisabledAt ? 'Disabled' : 'Active'
+  };
+  var row = headers.map(function (h) { return value[h] === undefined ? '' : value[h]; });
+  var existing = t.rows.filter(function (r) { return String(r.MemberId) === String(m.MemberId); })[0];
+  if (existing) sheet.getRange(existing._row, 1, 1, row.length).setValues([row]);
+  else sheet.appendRow(row);
+}
+
+/** Mirror one member by id, reading their current row from `Members`. */
+function syncBackupCodeFor_(id) { syncBackupCodeRow_(member_(id)); }
+
+/**
+ * Maintenance: rebuild `BackupCodes` from `Members`. Safe to run repeatedly.
+ * Run once from the Apps Script editor after deploying to populate the sheet
+ * for members who existed before it did.
+ */
+function rebuildBackupCodes() {
+  ensureAuthSheets_();
+  var rows = table_(AUTH_SHEETS.MEMBERS).rows;
+  rows.forEach(function (m) { syncBackupCodeRow_(m); });
+  return rows.length;
+}
+
 /** Return the member's readable code, generating and storing one if missing. */
 function ensureBackupCode_(m) {
   if (m.BackupCode) return String(m.BackupCode);
@@ -83,6 +127,10 @@ function ensureBackupCode_(m) {
   writeMemberCell_(m, 'BackupCode', code);
   writeMemberCell_(m, 'BackupCodeCreatedAt', now);
   writeMemberCell_(m, 'BackupCodeUpdatedAt', now);
+  m.BackupCode = code;
+  m.BackupCodeCreatedAt = now;
+  m.BackupCodeUpdatedAt = now;
+  syncBackupCodeRow_(m);
   return code;
 }
 
@@ -150,6 +198,7 @@ function createAccount_(d) {
     SpreadsheetApp.getActiveSpreadsheet().getSheetByName(AUTH_SHEETS.MEMBERS)
       .appendRow([id, name, n, '', '', now, '', code, now, now, now]);
     writePlayerRow_({ UserId: id, CharacterName: name, SVFloor: 0, SVFloorDate: '', EasyComplete: false, EasyDate: '', HardComplete: false, HardDate: '', MasterPoints: 0, MasterPointsDate: '', MountEarned: false, MountEarnedAt: '', MountPosition: '', MountPointsWhenEarned: '', LastUpdated: now, RegisteredAt: now, IsAdmin: false, Notes: '' });
+    syncBackupCodeRow_({ MemberId: id, CharacterName: name, BackupCode: code, BackupCodeCreatedAt: now, BackupCodeUpdatedAt: now, DisabledAt: '' });
     return { member: profile_(id), session: newSession_(id, 'member'), backupCode: code };
   } finally {
     lock.releaseLock();
@@ -312,6 +361,10 @@ function adminRegenerateBackupCode_(token, d) {
     writeMemberCell_(m, 'BackupCode', code);
     if (!m.BackupCodeCreatedAt) writeMemberCell_(m, 'BackupCodeCreatedAt', now);
     writeMemberCell_(m, 'BackupCodeUpdatedAt', now);
+    m.BackupCode = code;
+    m.BackupCodeCreatedAt = m.BackupCodeCreatedAt || now;
+    m.BackupCodeUpdatedAt = now;
+    syncBackupCodeRow_(m);
     var revoked = d.revokeSessions === true;
     if (revoked) revokeMember_(d.memberId, 'member');
     audit_(String(actor.MemberId), 'REGENERATE_BACKUP_CODE', String(d.memberId),
@@ -330,11 +383,11 @@ function adminRevokeSessions_(token, d) {
   });
 }
 
-function setDisabledUnlocked_(actor, id, disabled) { var m = member_(id), p = linkedPlayer_(id); if (disabled && truthy_(p.IsAdmin)) { var admins = activeAdminIds_(); if (admins.length <= 1 && admins.indexOf(String(id)) !== -1) throw apiError_('LAST_ADMIN', 'The last active administrator cannot be disabled.'); } writeMemberCell_(m, 'DisabledAt', disabled ? new Date() : ''); if (disabled) revokeMember_(id); audit_(String(actor.MemberId), disabled ? 'DISABLE_MEMBER' : 'ENABLE_MEMBER', String(id), disabled ? 'Disabled and sessions revoked' : 'Member enabled'); bustCache_(); return adminRead_(id); }
+function setDisabledUnlocked_(actor, id, disabled) { var m = member_(id), p = linkedPlayer_(id); if (disabled && truthy_(p.IsAdmin)) { var admins = activeAdminIds_(); if (admins.length <= 1 && admins.indexOf(String(id)) !== -1) throw apiError_('LAST_ADMIN', 'The last active administrator cannot be disabled.'); } writeMemberCell_(m, 'DisabledAt', disabled ? new Date() : ''); if (disabled) revokeMember_(id); syncBackupCodeFor_(id); audit_(String(actor.MemberId), disabled ? 'DISABLE_MEMBER' : 'ENABLE_MEMBER', String(id), disabled ? 'Disabled and sessions revoked' : 'Member enabled'); bustCache_(); return adminRead_(id); }
 function adminSetDisabled_(token, id, disabled) { if (typeof disabled !== 'boolean') throw apiError_('VALIDATION', 'Disabled state must be true or false.'); return withAdminLock_(token, function (actor) { return setDisabledUnlocked_(actor, id, disabled); }); }
 function activeAdminIds_() { var members = {}, admins = {}; table_(AUTH_SHEETS.MEMBERS).rows.forEach(function (m) { if (!m.DisabledAt) members[String(m.MemberId)] = true; }); table_(SHEETS.PLAYERS).rows.forEach(function (p) { var id = String(p.UserId); if (members[id] && truthy_(p.IsAdmin)) admins[id] = true; }); return Object.keys(admins); }
 function adminSetRole_(token, d) { if (typeof d.isAdmin !== 'boolean') throw apiError_('VALIDATION', 'Administrator state must be true or false.'); return withAdminLock_(token, function (actor) { var target = linkedPlayer_(d.memberId), desired = d.isAdmin, current = truthy_(target.IsAdmin); if (current === desired) return adminRead_(d.memberId); if (!desired) { var admins = activeAdminIds_(); if (admins.length <= 1 && admins.indexOf(String(d.memberId)) !== -1) throw apiError_('LAST_ADMIN', 'The last active administrator cannot be demoted.'); if (String(actor.MemberId) === String(d.memberId) && d.confirmSelf !== true) throw apiError_('CONFIRM_SELF', 'Self-demotion requires explicit confirmation.'); } target.IsAdmin = desired; writePlayerRow_(target); if (!desired) revokeMember_(d.memberId, 'admin'); audit_(String(actor.MemberId), 'SET_ADMIN_ROLE', String(d.memberId), desired ? 'Promoted to administrator' : 'Demoted from administrator'); bustCache_(); return adminRead_(d.memberId); }); }
-function adminEdit_(token, id, d) { return withAdminLock_(token, function (actor) { var p = linkedPlayer_(id); if (d.characterName !== undefined) { var n = cleanName_(d.characterName), other = memberName_(n); if (other && String(other.MemberId) !== String(id)) throw apiError_('DUPLICATE', 'Character name is unavailable.'); var m = member_(id), t = table_(AUTH_SHEETS.MEMBERS); t.sheet.getRange(m._row, 2, 1, 2).setValues([[n, norm_(n)]]); p.CharacterName = n; } if (d.svFloor !== undefined) p.SVFloor = integer_(d.svFloor, 1, 60); writePlayerRow_(p); audit_(String(actor.MemberId), 'EDIT_MEMBER', String(id), 'Administrative correction'); bustCache_(); return adminRead_(id); }); }
+function adminEdit_(token, id, d) { return withAdminLock_(token, function (actor) { var p = linkedPlayer_(id); if (d.characterName !== undefined) { var n = cleanName_(d.characterName), other = memberName_(n); if (other && String(other.MemberId) !== String(id)) throw apiError_('DUPLICATE', 'Character name is unavailable.'); var m = member_(id), t = table_(AUTH_SHEETS.MEMBERS); t.sheet.getRange(m._row, 2, 1, 2).setValues([[n, norm_(n)]]); p.CharacterName = n; syncBackupCodeFor_(id); } if (d.svFloor !== undefined) p.SVFloor = integer_(d.svFloor, 1, 60); writePlayerRow_(p); audit_(String(actor.MemberId), 'EDIT_MEMBER', String(id), 'Administrative correction'); bustCache_(); return adminRead_(id); }); }
 function adminDuplicates_() { var by = {}, out = []; table_(AUTH_SHEETS.MEMBERS).rows.forEach(function (m) { if (m.DisabledAt) return; var n = String(m.NormalizedName); (by[n] = by[n] || []).push(String(m.MemberId)); }); Object.keys(by).forEach(function (n) { if (by[n].length > 1) { var members = by[n].map(function (id) { return adminRead_(id); }); out.push({ normalizedName: n, memberIds: by[n], members: members }); } }); return out; }
 function adminMerge_(token, keep, remove) { return withAdminLock_(token, function (actor) { if (String(keep) === String(remove)) throw apiError_('VALIDATION', 'Choose two different members.'); var keepMember = member_(keep), removeMember = member_(remove), keepPlayer = linkedPlayer_(keep), removePlayer = linkedPlayer_(remove), admins = activeAdminIds_(); if (!keepMember || !removeMember) throw apiError_('NOT_FOUND', 'Member not found.'); if (truthy_(removePlayer.IsAdmin) && admins.length <= 1 && (!truthy_(keepPlayer.IsAdmin) || keepMember.DisabledAt)) throw apiError_('LAST_ADMIN', 'Merge would remove the last active administrator.'); var mp = table_(SHEETS.MASTER_PROGRESS), ev = table_(SHEETS.EVENTS), ah = table_(SHEETS.ACHIEVEMENTS), seal = table_(MASTER_SEAL_SHEET); [mp, ev, ah].forEach(function (t) { t.rows.forEach(function (r) { if (String(r.UserId || r.PlayerUserId) === String(remove)) { var col = t.headers.indexOf(r.UserId !== undefined ? 'UserId' : 'PlayerUserId') + 1; t.sheet.getRange(r._row, col).setValue(keep); } }); }); seal.rows.forEach(function (r) { if (String(r.MemberId) === String(remove)) seal.sheet.getRange(r._row, 1).setValue(keep); }); setDisabledUnlocked_(actor, remove, true); audit_(String(actor.MemberId), 'MERGE_MEMBER', String(remove), 'Merged into ' + keep); return adminRead_(keep); }); }
 function adminReset_(token) { return withAdminLock_(token, function (actor) { var t = table_(SHEETS.RESETS); t.rows.forEach(function (r) { if (String(r.Status) === 'Active') closePeriod_(r, String(actor.MemberId)); }); openPeriod_(String(actor.MemberId)); audit_(String(actor.MemberId), 'MANUAL_RESET', '', 'New update period'); bustCache_(); return { ok: true }; }); }

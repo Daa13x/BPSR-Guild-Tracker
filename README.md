@@ -41,6 +41,18 @@ An explicit product decision: the readable backup code is stored in the private 
 
 `Players.IsAdmin` is the authoritative role flag. `Members.MemberId` and `Players.UserId` must be the same stable identifier and each member must map to exactly one player row. Administrator access requires a valid member session **and** a live `IsAdmin` check on every protected action — no admin flag is ever trusted from a cookie, and demotion or disabling takes effect immediately. Administrators can view, copy and regenerate a member’s backup code (regeneration kills the old code instantly and can optionally revoke every remembered device), revoke devices, rename, disable and merge members. Disabling revokes all of that member’s sessions; the last active administrator cannot be demoted, disabled or removed.
 
+### Finding a backup code
+
+Codes are `BPSR-XXXX-XXXX-XXXX` and are generated lazily: on account creation, on the first successful restore, or when an administrator regenerates one. A member migrated from the PIN system has an empty `BackupCode` until one of those happens — regenerate to mint one.
+
+Three ways to read a code:
+
+1. **`BackupCodes` sheet** — one row per member (`MemberId`, `CharacterName`, `BackupCode`, `CreatedAt`, `UpdatedAt`, `Status`), kept in step automatically when a code is created or regenerated, when a member is renamed, and when one is disabled or enabled. This is a lookup mirror for administrators; **`Members` remains the single source of truth for restore**, so a stale, edited or deleted row here cannot lock anyone out. Run `rebuildBackupCodes()` once from the Apps Script editor to populate it for members who existed before the sheet did, and any time you want it rebuilt — it is idempotent.
+2. **Your own code** — sign in, then **My Progress → Backup access → Reveal / Copy**.
+3. **Any member's code** — **Administration → Backup access**, select the member, then **Reveal backup code**. Every reveal writes a `VIEW_BACKUP_CODE` audit entry naming the administrator and the target.
+
+Codes are stored readable so administrators can recover members. That is a deliberate trade for a trusted guild: protecting or hiding a tab does not stop anyone who can open the spreadsheet from reading it, so **file-level sharing is the only real access boundary** — keep the spreadsheet restricted to administrators you trust. If you would rather nobody could read a code at all, store hashes instead and recover by regenerating; that removes the Reveal button by design.
+
 The initial administrator is Dax (`Players.IsAdmin=TRUE` on the row whose `UserId` equals Dax’s `Members.MemberId`). `BPSR_ADMIN_SECRET` remains optional, throttled, emergency-only recovery via Script Properties; the recovery session lives in browser memory only.
 
 ### Migration from the PIN system

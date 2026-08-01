@@ -167,3 +167,51 @@ test('session and account metadata reach administrators for practical recovery',
   assert.equal(read.activeSessions, 1);
   assert.equal(read.disabled, false);
 });
+
+test('the BackupCodes sheet mirrors every code change without becoming authoritative', () => {
+  const c = runtime();
+  const codes = () => c.readTable_(c.AUTH_SHEETS.CODES).rows;
+  const rowFor = id => codes().filter(r => String(r.MemberId) === String(id))[0];
+
+  // Creating an account writes exactly one mirror row.
+  const dax = call(c, 'createAccount', { characterName: 'Dax' });
+  const id = dax.member.memberId;
+  assert.equal(codes().length, 1);
+  assert.equal(rowFor(id).BackupCode, dax.backupCode);
+  assert.equal(rowFor(id).CharacterName, 'Dax');
+  assert.equal(rowFor(id).Status, 'Active');
+  assert.ok(rowFor(id).CreatedAt);
+
+  const recovery = call(c, 'adminLogin', { secret: 'secret' }).session;
+  call(c, 'adminSetRole', { token: recovery.token, memberId: id, isAdmin: true });
+  const token = dax.session.token;
+
+  // Regeneration updates the same row rather than appending a second one.
+  const regenerated = call(c, 'adminRegenerateBackupCode', { token: token, memberId: id });
+  assert.equal(codes().length, 1);
+  assert.equal(rowFor(id).BackupCode, regenerated.backupCode);
+  assert.notEqual(regenerated.backupCode, dax.backupCode);
+
+  // A rename keeps the sheet searchable by the current character name.
+  call(c, 'adminEdit', { token: token, memberId: id, characterName: 'Daxx' });
+  assert.equal(rowFor(id).CharacterName, 'Daxx');
+
+  // A second member appears alongside, and disabling is reflected as status.
+  const other = call(c, 'createAccount', { characterName: 'Aria' });
+  call(c, 'adminSetDisabled', { token: token, memberId: other.member.memberId, disabled: true });
+  assert.equal(codes().length, 2);
+  assert.equal(rowFor(other.member.memberId).Status, 'Disabled');
+
+  // The mirror is a convenience index: wiping it cannot lock anyone out, and
+  // rebuilding restores it from Members.
+  c.__sheets.BackupCodes.rows = [c.BACKUP_CODE_HEADERS.slice()];
+  assert.equal(codes().length, 0);
+  const restored = call(c, 'restore', { characterName: 'Daxx', backupCode: regenerated.backupCode });
+  assert.equal(restored.member.characterName, 'Daxx');
+  assert.equal(c.rebuildBackupCodes(), 2);
+  assert.equal(codes().length, 2);
+  assert.equal(rowFor(id).BackupCode, regenerated.backupCode);
+  // Rebuilding twice must not duplicate rows.
+  c.rebuildBackupCodes();
+  assert.equal(codes().length, 2);
+});
