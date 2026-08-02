@@ -35,7 +35,9 @@ function load(){
   setConnectionStatus(API_URL ? 'connecting' : 'not configured');
   BOARDS.forEach(function(key){ renderBoardState(key, 'loading', 'Loading ' + BOARD_LABELS[key] + '…', ''); });
   if (API_URL) {
-    api('leaderboard',{}).then(function(d){DATA=d;setConnectionStatus('connected');render();}).catch(function(err){
+    // Send the session token so a hidden viewer still receives their own row.
+    var token = window.BPSR_SESSION ? window.BPSR_SESSION.token() : '';
+    api('leaderboard', token ? { token: token } : {}).then(function(d){DATA=d;setConnectionStatus('connected');render();}).catch(function(err){
       var failure = classify(err, 'leaderboard');
       setConnectionStatus(failure.status);
       if (stampEl) stampEl.textContent = failure.title;
@@ -95,7 +97,7 @@ function renderPodium(key, full){
     else { stat=num(p.points)+' pts'; sub=num(p.pointsRemaining)+' to the mount'; }
     html += '<div class="' + classes + '">' +
       '<div class="medal">'+['I','II','III'][i]+'</div>' +
-      '<div class="b-name">'+esc(p.name)+'</div>' +
+      '<div class="b-name">'+esc(p.name)+(p.verified?verifiedMark():'')+'</div>' +
       '<div class="b-stat">'+stat+'</div>' +
       '<div class="b-sub">'+sub+'</div>' +
       '<div class="b-badges">'+badges(p)+'</div></div>';
@@ -146,7 +148,7 @@ function renderBoard(key){
     body = rows.map(function(p){
       var r = DATA.svBoard.indexOf(p)+1;
       return tr(r, [
-        td('Character','<span class="pname">'+esc(p.name)+'</span>'),
+        td('Character', nameCell(p)),
         td('SV floor','<span class="num">'+p.sv+'</span> <span class="dim">/ '+DATA.config.svMax+'</span>'),
         td('Progress', p.svPct+'%<div class="bar blue"><i style="width:'+p.svPct+'%"></i></div>'),
         td('Badges', badges(p, 'sv')),
@@ -158,7 +160,7 @@ function renderBoard(key){
     body = rows.map(function(p){
       var r = DATA.mpBoard.indexOf(p)+1;
       return tr(r, [
-        td('Character','<span class="pname">'+esc(p.name)+'</span>'),
+        td('Character', nameCell(p)),
         td('Points','<span class="num">'+num(p.points)+'</span>'),
         td('Progress', p.pointsPct+'%<div class="bar"><i style="width:'+p.pointsPct+'%"></i></div>'),
         td('Remaining','<span class="dim">'+num(p.pointsRemaining)+'</span>'),
@@ -194,6 +196,21 @@ function renderFirstGuildie(){
       '</div></details>';
   }
   el.innerHTML = html;
+}
+
+/** Character name with an optional verified mark and, for the viewer's own
+ * hidden row, a note that only they can see it. */
+function nameCell(p){
+  var html = '<span class="pname">'+esc(p.name)+'</span>';
+  if (p.verified) html += verifiedMark();
+  if (p.hidden && DATA && p.name === DATA.viewerCharacter) html += ' <span class="badge hidden-badge" title="Hidden from other viewers — only you can see this row">Hidden — only you</span>';
+  return html;
+}
+function verifiedMark(){
+  return ' <span class="verified" title="Verified by a guild administrator" aria-label="Verified">' +
+    '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" focusable="false">' +
+    '<path fill="currentColor" d="M12 1.6l2.5 2.1 3.3-.3.9 3.2 2.9 1.7-1.1 3.1 1.1 3.1-2.9 1.7-.9 3.2-3.3-.3L12 22.4l-2.5-2.1-3.3.3-.9-3.2L2.4 15.7 3.5 12.6 2.4 9.5l2.9-1.7.9-3.2 3.3.3L12 1.6z"/>' +
+    '<path fill="#0b0712" d="M10.6 15.2l-2.8-2.8 1.2-1.2 1.6 1.6 3.6-3.6 1.2 1.2z"/></svg></span>';
 }
 
 function badges(p, ctx){
@@ -310,7 +327,8 @@ function demoData(){
     return { name:n, sv:sv, svPct:Math.round(sv/60*100), svDate:ago(3+i*4), svComplete:sv>=60,
       easy:i<6, hard:i<4, points:pts, pointsPct:Math.min(100,Math.round(pts/3650*100)),
       pointsRemaining:Math.max(0,3650-pts), pointsDate:ago(1+i*3), mount:mount,
-      lastUpdated:ago([1,2,0,9,22,4,31,3][i]), outdated:[false,false,false,false,true,false,true,false][i] };
+      lastUpdated:ago([1,2,0,9,22,4,31,3][i]), outdated:[false,false,false,false,true,false,true,false][i],
+      verified:i<2, hidden:false };
   });
   var bySv = players.slice().sort(function(a,b){ return b.sv-a.sv || new Date(a.svDate)-new Date(b.svDate) || a.name.localeCompare(b.name); });
   var byMp = players.slice().sort(function(a,b){ return b.points-a.points || new Date(a.pointsDate)-new Date(b.pointsDate) || a.name.localeCompare(b.name); });

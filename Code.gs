@@ -54,7 +54,13 @@ var DEFAULT_CONFIG = {
   ADMIN_EMAILS: '',                 // comma-separated admin emails
   CUSTOM_MILESTONES: '[]',          // JSON: [{"id":"MP1000","label":"1,000 Master points","type":"points","value":1000}]
   CACHE_SECONDS: '90',              // public leaderboard cache TTL
-  MEMBER_SESSION_DAYS: '180'        // remembered-device session lifetime
+  MEMBER_SESSION_DAYS: '180',       // remembered-device session lifetime
+  // Stim Vault biweekly reset — Blue Protocol: Star Resonance resets every two
+  // weeks on Mondays at 05:00 in UTC-2 (i.e. 07:00 UTC). STIM_RESET_ANCHOR is a
+  // known reset instant in UTC that fixes which fortnight is which; move it to
+  // align with the live game schedule. STIM_RESET_ENABLED gates the feature.
+  STIM_RESET_ANCHOR: '2026-08-03T07:00:00Z',
+  STIM_RESET_ENABLED: 'true'
 };
 
 var ACH = {
@@ -66,6 +72,19 @@ var ACH = {
   MOUNT_EARNED: 'MOUNT_EARNED'      // one per player, hall-of-fame source
 };
 
+/**
+ * `Hidden` keeps a member off the public boards while leaving their account and
+ * progression untouched; they still see their own row when signed in.
+ * `Verified` shows a public verified mark beside the character name.
+ */
+var PLAYER_HEADERS = [
+  'UserId', 'CharacterName', 'SVFloor', 'SVFloorDate',
+  'EasyComplete', 'EasyDate', 'HardComplete', 'HardDate',
+  'MasterPoints', 'MasterPointsDate',
+  'MountEarned', 'MountEarnedAt', 'MountPosition', 'MountPointsWhenEarned',
+  'LastUpdated', 'RegisteredAt', 'IsAdmin', 'Notes', 'Hidden', 'Verified'
+];
+
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
@@ -73,13 +92,8 @@ var ACH = {
 function setupSpreadsheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   ensureSheet_(ss, SHEETS.CONFIG, ['Key', 'Value']);
-  ensureSheet_(ss, SHEETS.PLAYERS, [
-    'UserId', 'CharacterName', 'SVFloor', 'SVFloorDate',
-    'EasyComplete', 'EasyDate', 'HardComplete', 'HardDate',
-    'MasterPoints', 'MasterPointsDate',
-    'MountEarned', 'MountEarnedAt', 'MountPosition', 'MountPointsWhenEarned',
-    'LastUpdated', 'RegisteredAt', 'IsAdmin', 'Notes'
-  ]);
+  ensureSheet_(ss, SHEETS.PLAYERS, PLAYER_HEADERS);
+  ensureColumns_(ss.getSheetByName(SHEETS.PLAYERS), PLAYER_HEADERS);
   ensureSheet_(ss, SHEETS.ACTIVITIES, ['ActivityId', 'Name', 'MaxRank', 'Active']);
   ensureSheet_(ss, SHEETS.MASTER_PROGRESS, ['UserId', 'ActivityId', 'Rank', 'CompletedDate']);
   ensureSheet_(ss, SHEETS.ACHIEVEMENTS, [
@@ -508,6 +522,40 @@ function clampInt_(v, min, max, fallback) {
   return Math.max(min, Math.min(max, n));
 }
 
+// ---------------------------------------------------------------------------
+// Stim Vault biweekly reset
+// ---------------------------------------------------------------------------
+var STIM_RESET_PERIOD_MS = 14 * 24 * 60 * 60 * 1000;
+
+/**
+ * The most recent Stim Vault reset instant at or before `now`. Resets fall on
+ * every second Monday at 05:00 UTC-2 (07:00 UTC); `anchorIso` is any known
+ * reset instant, which fixes the fortnight phase. Pure and timezone-safe: it
+ * works in absolute UTC milliseconds, so the host timezone never matters.
+ */
+function lastStimReset_(now, anchorIso) {
+  var anchor = new Date(anchorIso || DEFAULT_CONFIG.STIM_RESET_ANCHOR).getTime();
+  var t = (now instanceof Date ? now.getTime() : Number(now));
+  if (!isFinite(anchor) || !isFinite(t)) return null;
+  // Number of whole 14-day periods since the anchor; floor handles times
+  // before the anchor too (elapsed goes negative, floor rounds down).
+  var periods = Math.floor((t - anchor) / STIM_RESET_PERIOD_MS);
+  return new Date(anchor + periods * STIM_RESET_PERIOD_MS);
+}
+
+/**
+ * True when a reset boundary has passed between `lastSeen` and `now` — i.e. the
+ * viewer last loaded the site before the latest reset, so their Stim Vault is
+ * stale and should be cleared. A first-ever visit (no lastSeen) is not a reset.
+ */
+function stimVaultStale_(lastSeen, now, anchorIso) {
+  if (!lastSeen) return false;
+  var seen = (lastSeen instanceof Date ? lastSeen.getTime() : new Date(lastSeen).getTime());
+  if (!isFinite(seen)) return false;
+  var boundary = lastStimReset_(now, anchorIso);
+  return Boolean(boundary && seen < boundary.getTime());
+}
+
 function customMilestones_() {
   try { return JSON.parse(cfg_('CUSTOM_MILESTONES')) || []; }
   catch (e) { return []; }
@@ -566,7 +614,25 @@ function bustCache_() {
   CacheService.getScriptCache().remove('leaderboards_v1');
 }
 
-function getLeaderboardBundle() {
+/**
+ * The cached bundle carries every member, hidden ones included, so the cache
+ * stays viewer-independent. Hidden rows are stripped per request, keeping only
+ * the viewer's own — a hidden member sees their true position on the board and
+ * nobody else sees them at all. Ranks are the position within the projected
+ * arrays, so removing rows leaves no gaps to infer a hidden member from.
+ */
+function projectBundleForViewer_(bundle, viewerName) {
+  var mine = String(viewerName || '');
+  function visible(rows) {
+    return (rows || []).filter(function (r) { return !r.hidden || (mine && r.name === mine); });
+  }
+  bundle.svBoard = visible(bundle.svBoard);
+  bundle.mpBoard = visible(bundle.mpBoard);
+  bundle.mcBoard = visible(bundle.mcBoard);
+  return bundle;
+}
+
+function getLeaderboardBundle(viewerMemberId) {
   var cache = CacheService.getScriptCache();
   var cached = cache.get('leaderboards_v1');
   var bundle;
@@ -578,10 +644,11 @@ function getLeaderboardBundle() {
     try { cache.put('leaderboards_v1', JSON.stringify(bundle), ttl); } catch (e) { /* too large: skip cache */ }
   }
   // Per-viewer extras are never cached.
-  var email = Session.getActiveUser().getEmail() || '';
-  bundle.viewer = { isAdmin: isAdmin_(email), signedIn: !!email };
-  var me = email ? findPlayer_(email) : null;
-  bundle.viewerCharacter = me ? String(me.CharacterName) : '';
+  var viewer = viewerMemberId ? findPlayer_(viewerMemberId) : null;
+  bundle = projectBundleForViewer_(bundle, viewer ? String(viewer.CharacterName) : '');
+  bundle.viewer = { isAdmin: viewer ? truthy_(viewer.IsAdmin) : false, signedIn: !!viewer };
+  bundle.viewerCharacter = viewer ? String(viewer.CharacterName) : '';
+  bundle.viewerHidden = viewer ? truthy_(viewer.Hidden) : false;
   return JSON.stringify(bundle);
 }
 
@@ -643,7 +710,9 @@ function buildBundle_() {
       totalRanks: totalRanks,
       mastersDate: bestRankDate ? bestRankDate.toISOString() : null,
       lastUpdated: iso_(p.LastUpdated),
-      outdated: last ? ((now - last) / 86400000 > outdatedDays) : true
+      outdated: last ? ((now - last) / 86400000 > outdatedDays) : true,
+      verified: truthy_(p.Verified),
+      hidden: truthy_(p.Hidden)
     };
   });
 

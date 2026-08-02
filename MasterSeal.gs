@@ -191,15 +191,25 @@ function adminMasterSealEdit_(token, d) {
  * Public Master Seal board. No member IDs, no codes — names only, same
  * privacy stance as the existing leaderboard projection.
  */
-function masterSealBoard_() {
+function masterSealBoard_(viewerMemberId) {
   var grouped = sealRowsByMember_();
+  var flags = {};
+  readTable_(SHEETS.PLAYERS).rows.forEach(function (p) {
+    flags[String(p.UserId)] = { hidden: truthy_(p.Hidden), verified: truthy_(p.Verified) };
+  });
   var rows = [];
   readTable_(AUTH_SHEETS.MEMBERS).rows.forEach(function (m) {
     if (m.DisabledAt) return;
+    // Hidden members stay off the board for everyone except themselves.
+    var flag = flags[String(m.MemberId)] || { hidden: false, verified: false };
+    var isViewer = viewerMemberId && String(m.MemberId) === String(viewerMemberId);
+    if (flag.hidden && !isViewer) return;
     var dungeons = sealProgress_(grouped[String(m.MemberId)]);
     var totals = sealTotals_(dungeons);
     rows.push({
       name: String(m.CharacterName),
+      verified: flag.verified,
+      hidden: flag.hidden,
       dungeons: dungeons.map(function (d) {
         return { dungeonId: d.dungeonId, bestMasterLevel: d.bestMasterLevel, points: d.points, cleared: d.cleared };
       }),

@@ -236,6 +236,10 @@ function session_(token, kind) {
 
 function sessionMaybe_(token, kind) { try { return session_(token, kind); } catch (e) { return null; } }
 
+/** Member id behind a board request, or '' for an anonymous viewer. Never
+ * throws: an absent or expired token simply yields the public projection. */
+function viewerMemberId_(token) { var s = token ? sessionMaybe_(token, 'member') : null; return s ? String(s.MemberId) : ''; }
+
 function newSession_(id, kind) {
   var t = token_();
   var ttl = kind === 'member' ? memberSessionMs_() : ADMIN_SESSION_TTL_MS;
@@ -327,7 +331,7 @@ function revokeAllDevices_(token) {
 // ---------------------------------------------------------------------------
 
 function linkedPlayer_(id) { var members = table_(AUTH_SHEETS.MEMBERS).rows.filter(function (m) { return String(m.MemberId) === String(id); }), players = table_(SHEETS.PLAYERS).rows.filter(function (p) { return String(p.UserId) === String(id); }); if (members.length !== 1 || players.length !== 1) throw apiError_('IDENTITY_MISMATCH', 'Member identity is not linked to exactly one progression record.'); return players[0]; }
-function profile_(id) { var p = linkedPlayer_(id); return { memberId: String(id), characterName: String(p.CharacterName || ''), svFloor: Number(p.SVFloor) || 0, masterPoints: Number(p.MasterPoints) || 0, masterRanks: myRanks_(id), isAdmin: truthy_(p.IsAdmin) }; }
+function profile_(id) { var p = linkedPlayer_(id); return { memberId: String(id), characterName: String(p.CharacterName || ''), svFloor: Number(p.SVFloor) || 0, masterPoints: Number(p.MasterPoints) || 0, masterRanks: myRanks_(id), isAdmin: truthy_(p.IsAdmin), hidden: truthy_(p.Hidden), verified: truthy_(p.Verified) }; }
 function myRanks_(id) { var o = {}; table_(SHEETS.MASTER_PROGRESS).rows.forEach(function (r) { if (String(r.UserId) === String(id)) o[String(r.ActivityId)] = Number(r.Rank) || 0; }); return o; }
 function integer_(v, min, max) { if (typeof v === 'string' && v.trim() === '') throw apiError_('VALIDATION', 'Invalid progression.'); var n = Number(v); if (!isFinite(n) || Math.floor(n) !== n || n < min || n > max) throw apiError_('VALIDATION', 'Invalid progression.'); return n; }
 function progress_(id, d) {
@@ -405,7 +409,7 @@ function adminMembers_(q) {
   return table_(AUTH_SHEETS.MEMBERS).rows.filter(function (m) { return String(m.CharacterName).toLowerCase().indexOf(s) >= 0; }).map(function (m) {
     var p = profile_(m.MemberId), meta = memberMeta_(m, counts);
     meta.memberId = String(m.MemberId); meta.characterName = p.characterName; meta.svFloor = p.svFloor;
-    meta.masterPoints = p.masterPoints; meta.isAdmin = p.isAdmin;
+    meta.masterPoints = p.masterPoints; meta.isAdmin = p.isAdmin; meta.hidden = p.hidden; meta.verified = p.verified;
     return meta;
   });
 }
@@ -460,6 +464,34 @@ function adminRevokeSessions_(token, d) {
 }
 
 function setDisabledUnlocked_(actor, id, disabled) { var m = member_(id), p = linkedPlayer_(id); if (disabled && truthy_(p.IsAdmin)) { var admins = activeAdminIds_(); if (admins.length <= 1 && admins.indexOf(String(id)) !== -1) throw apiError_('LAST_ADMIN', 'The last active administrator cannot be disabled.'); } writeMemberCell_(m, 'DisabledAt', disabled ? new Date() : ''); if (disabled) revokeMember_(id); syncBackupCodeFor_(id); audit_(String(actor.MemberId), disabled ? 'DISABLE_MEMBER' : 'ENABLE_MEMBER', String(id), disabled ? 'Disabled and sessions revoked' : 'Member enabled'); bustCache_(); return adminRead_(id); }
+/** Hide or unhide a member. Hidden members keep their account, their session
+ * and their progression, and still see their own row when signed in; they are
+ * simply absent from every board shown to anyone else. */
+function adminSetHidden_(token, d) {
+  if (typeof d.hidden !== 'boolean') throw apiError_('VALIDATION', 'Hidden state must be true or false.');
+  return withAdminLock_(token, function (actor) {
+    var p = linkedPlayer_(d.memberId);
+    p.Hidden = d.hidden;
+    writePlayerRow_(p);
+    audit_(String(actor.MemberId), 'SET_HIDDEN', String(d.memberId), d.hidden ? 'Hidden from public boards' : 'Shown on public boards');
+    bustCache_();
+    return adminRead_(d.memberId);
+  });
+}
+
+/** Grant or remove the public verified mark shown beside a character name. */
+function adminSetVerified_(token, d) {
+  if (typeof d.verified !== 'boolean') throw apiError_('VALIDATION', 'Verified state must be true or false.');
+  return withAdminLock_(token, function (actor) {
+    var p = linkedPlayer_(d.memberId);
+    p.Verified = d.verified;
+    writePlayerRow_(p);
+    audit_(String(actor.MemberId), 'SET_VERIFIED', String(d.memberId), d.verified ? 'Verified mark granted' : 'Verified mark removed');
+    bustCache_();
+    return adminRead_(d.memberId);
+  });
+}
+
 function adminSetDisabled_(token, id, disabled) { if (typeof disabled !== 'boolean') throw apiError_('VALIDATION', 'Disabled state must be true or false.'); return withAdminLock_(token, function (actor) { return setDisabledUnlocked_(actor, id, disabled); }); }
 function activeAdminIds_() { var members = {}, admins = {}; table_(AUTH_SHEETS.MEMBERS).rows.forEach(function (m) { if (!m.DisabledAt) members[String(m.MemberId)] = true; }); table_(SHEETS.PLAYERS).rows.forEach(function (p) { var id = String(p.UserId); if (members[id] && truthy_(p.IsAdmin)) admins[id] = true; }); return Object.keys(admins); }
 function adminSetRole_(token, d) { if (typeof d.isAdmin !== 'boolean') throw apiError_('VALIDATION', 'Administrator state must be true or false.'); return withAdminLock_(token, function (actor) { var target = linkedPlayer_(d.memberId), desired = d.isAdmin, current = truthy_(target.IsAdmin); if (current === desired) return adminRead_(d.memberId); if (!desired) { var admins = activeAdminIds_(); if (admins.length <= 1 && admins.indexOf(String(d.memberId)) !== -1) throw apiError_('LAST_ADMIN', 'The last active administrator cannot be demoted.'); if (String(actor.MemberId) === String(d.memberId) && d.confirmSelf !== true) throw apiError_('CONFIRM_SELF', 'Self-demotion requires explicit confirmation.'); } target.IsAdmin = desired; writePlayerRow_(target); if (!desired) revokeMember_(d.memberId, 'admin'); audit_(String(actor.MemberId), 'SET_ADMIN_ROLE', String(d.memberId), desired ? 'Promoted to administrator' : 'Demoted from administrator'); bustCache_(); return adminRead_(d.memberId); }); }
@@ -480,9 +512,9 @@ function api_(a, d) {
   if (a === 'myBackupCode') return myBackupCode_(d.token);
   if (a === 'revokeAllDevices') return revokeAllDevices_(d.token);
   if (a === 'adminLogin') return adminLogin_(d);
-  if (a === 'leaderboard') return JSON.parse(getLeaderboardBundle());
+  if (a === 'leaderboard') return JSON.parse(getLeaderboardBundle(viewerMemberId_(d.token)));
   if (a === 'activities') return activities_();
-  if (a === 'masterSeal') return masterSealBoard_();
+  if (a === 'masterSeal') return masterSealBoard_(viewerMemberId_(d.token));
   if (a === 'myMasterSeal') return myMasterSeal_(d.token);
   if (a === 'masterSealUpdate') return masterSealUpdate_(d.token, d);
   if (a === 'adminMasterSealEdit') return adminMasterSealEdit_(d.token, d);
@@ -504,6 +536,8 @@ function api_(a, d) {
   if (a === 'adminEdit') return adminEdit_(d.token, d.memberId, d);
   if (a === 'adminDisable' || a === 'adminDelete') return adminSetDisabled_(d.token, d.memberId, true);
   if (a === 'adminSetDisabled') return adminSetDisabled_(d.token, d.memberId, d.disabled);
+  if (a === 'adminSetHidden') return adminSetHidden_(d.token, d);
+  if (a === 'adminSetVerified') return adminSetVerified_(d.token, d);
   if (a === 'adminSetRole') return adminSetRole_(d.token, d);
   if (a === 'adminDuplicates') { admin_(d.token); return adminDuplicates_(); }
   if (a === 'adminMerge') return adminMerge_(d.token, d.keepMemberId, d.removeMemberId);

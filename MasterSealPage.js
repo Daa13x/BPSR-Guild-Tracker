@@ -233,8 +233,18 @@
       clearedCount: row.clearedCount === undefined ? clearedCount(dungeons) : Number(row.clearedCount),
       mountUnlocked: Boolean(row.mountUnlocked),
       lastUpdated: row.lastUpdated || null,
+      verified: Boolean(row.verified),
+      hidden: Boolean(row.hidden),
       dungeons: dungeons
     };
+  }
+
+  /** Verified mark shown beside a verified member's character name. */
+  function verifiedMark() {
+    return '<span class="verified" title="Verified by a guild administrator" aria-label="Verified">' +
+      '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" focusable="false">' +
+      '<path fill="currentColor" d="M12 1.6l2.5 2.1 3.3-.3.9 3.2 2.9 1.7-1.1 3.1 1.1 3.1-2.9 1.7-.9 3.2-3.3-.3L12 22.4l-2.5-2.1-3.3.3-.9-3.2L2.4 15.7 3.5 12.6 2.4 9.5l2.9-1.7.9-3.2 3.3.3L12 1.6z"/>' +
+      '<path fill="#0b0712" d="M10.6 15.2l-2.8-2.8 1.2-1.2 1.6 1.6 3.6-3.6 1.2 1.2z"/></svg></span>';
   }
 
   // ---------------------------------------------------------------------
@@ -308,7 +318,8 @@
         '<td data-l="Character"><span class="ms-char">' +
           '<span class="ms-avatar" aria-hidden="true">' + esc(m.name.charAt(0).toUpperCase()) +
             '<span class="ms-status' + (active ? ' on' : '') + '"></span></span>' +
-          '<span class="ms-char-name">' + esc(m.name) + '</span>' +
+          '<span class="ms-char-name">' + esc(m.name) + '</span>' + (m.verified ? verifiedMark() : '') +
+          (m.hidden ? '<span class="badge hidden-badge" title="Hidden from other viewers — only you can see this row">Hidden — only you</span>' : '') +
           '<span class="sr-only">' + (active ? 'Active in the last 24 hours' : 'Not active recently') + '</span>' +
         '</span></td>' +
         '<td data-l="Total"><span class="ms-total">' + num(m.totalScore) + '<small>/ ' + num(season.maxScore) + '</small></span></td>' +
@@ -596,7 +607,8 @@
 
   function load() {
     setConnection('', 'Connecting…');
-    return api('masterSeal', {}).then(function (data) {
+    var token = root.BPSR_SESSION ? root.BPSR_SESSION.token() : '';
+    return api('masterSeal', token ? { token: token } : {}).then(function (data) {
       state.season = data.season;
       state.members = (data.board || []).map(function (row, i) { return adaptMember(row, data.season, i); });
       state.status = 'ready';

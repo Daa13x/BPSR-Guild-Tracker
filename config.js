@@ -120,6 +120,25 @@
     };
   }
 
+  /* ---------------------------------------------------------------------
+   * Shared remembered-device session token reader. AppFrontend.js owns the
+   * cookie; the boards only need to read it so a signed-in request can be
+   * attributed to the viewer (e.g. so a hidden member still sees their own
+   * row). Returns '' when no session cookie is present.
+   * ------------------------------------------------------------------- */
+  root.BPSR_SESSION = {
+    token: function () {
+      var secure = root.location && root.location.protocol === 'https:';
+      var name = (secure ? '__Secure-bpsr-member-session' : 'bpsr-member-session') + '=';
+      var parts = String(root.document && root.document.cookie || '').split(';');
+      for (var i = 0; i < parts.length; i++) {
+        var c = parts[i].trim();
+        if (c.indexOf(name) === 0) { try { return decodeURIComponent(c.slice(name.length)); } catch (_) { return ''; } }
+      }
+      return '';
+    }
+  };
+
   root.BPSR_ERRORS = {
     classify: function (failure, context) {
       var classified = classifyFailure(failure);

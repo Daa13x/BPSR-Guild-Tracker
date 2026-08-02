@@ -774,6 +774,8 @@
         ['Master points', profile.masterPoints],
         ['Role', profile.isAdmin ? 'Administrator' : 'Member'],
         ['Status', profile.disabled ? 'Disabled' : 'Active'],
+        ['Visibility', profile.hidden ? 'Hidden from boards' : 'Visible'],
+        ['Verified', profile.verified ? 'Yes' : 'No'],
         ['Backup code', profile.backupCodeSet ? 'Set · updated ' + (profile.backupCodeUpdatedAt || '').slice(0, 10) : 'Missing'],
         ['Last access', profile.lastAccessAt ? profile.lastAccessAt.slice(0, 10) : '—'],
         ['Active devices', profile.activeSessions]
@@ -795,6 +797,10 @@
     var disabled = document.getElementById('admin-disabled-toggle');
     if (role) role.textContent = profile.isAdmin ? 'Remove administrator role' : 'Make administrator';
     if (disabled) disabled.textContent = profile.disabled ? 'Enable member' : 'Disable member';
+    var hide = document.getElementById('admin-hidden-toggle');
+    if (hide) hide.textContent = profile.hidden ? 'Show on leaderboards' : 'Hide from leaderboards';
+    var verify = document.getElementById('admin-verified-toggle');
+    if (verify) verify.textContent = profile.verified ? 'Remove verified mark' : 'Grant verified mark';
     var codeValue = document.getElementById('admin-code-value');
     if (codeValue) codeValue.textContent = 'Hidden — use Reveal';
   }
@@ -1018,6 +1024,38 @@
     });
     disableButton.id = 'admin-disabled-toggle';
     editCard.appendChild(disableButton);
+
+    var hideButton = actionButton('Hide from leaderboards', 'admin', function () {
+      if (!state.selectedProfile) throw new Error('Select a member first.');
+      var hidden = !state.selectedProfile.hidden;
+      return api('adminSetHidden', {
+        token: token,
+        memberId: state.selected,
+        hidden: hidden
+      }).then(function (profile) {
+        selectedDetails(profile);
+        return refreshAll(hidden
+          ? 'Member hidden from public boards. They still see their own row when signed in.'
+          : 'Member shown on public boards again.');
+      });
+    });
+    hideButton.id = 'admin-hidden-toggle';
+    editCard.appendChild(hideButton);
+
+    var verifyButton = actionButton('Grant verified mark', 'admin', function () {
+      if (!state.selectedProfile) throw new Error('Select a member first.');
+      var verified = !state.selectedProfile.verified;
+      return api('adminSetVerified', {
+        token: token,
+        memberId: state.selected,
+        verified: verified
+      }).then(function (profile) {
+        selectedDetails(profile);
+        return refreshAll(verified ? 'Verified mark granted.' : 'Verified mark removed.');
+      });
+    });
+    verifyButton.id = 'admin-verified-toggle';
+    editCard.appendChild(verifyButton);
     adminGrid.appendChild(editCard);
 
     var duplicateCard = adminCard(
