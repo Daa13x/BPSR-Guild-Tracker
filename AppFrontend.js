@@ -6,7 +6,7 @@
 
   var CONFIG = root.BPSR_CONFIG || {
     apiUrl: '',
-    timeoutMs: 15000,
+    timeoutMs: 45000,
     isConfigured: function () { return false; }
   };
   var LEGACY_KEYS = { member: 'bpsr.member.session', admin: 'bpsr.admin.session' };
@@ -34,7 +34,7 @@
       ));
     }
     var controller = new AbortController();
-    var timer = root.setTimeout(function () { controller.abort(); }, CONFIG.timeoutMs || 15000);
+    var timer = root.setTimeout(function () { controller.abort(); }, CONFIG.timeoutMs || 45000);
     return root.fetch(CONFIG.apiUrl, {
       method: 'POST',
       redirect: 'follow',

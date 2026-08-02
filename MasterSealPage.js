@@ -201,7 +201,7 @@
       return Promise.reject(Object.assign(new Error('The API is not configured yet.'), { code: 'CONFIGURATION' }));
     }
     var controller = new AbortController();
-    var timer = root.setTimeout(function () { controller.abort(); }, config.timeoutMs || 15000);
+    var timer = root.setTimeout(function () { controller.abort(); }, config.timeoutMs || 45000);
     return root.fetch(config.apiUrl, {
       method: 'POST', redirect: 'follow',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },

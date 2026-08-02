@@ -47,7 +47,9 @@
   }
   root.BPSR_CONFIG = {
     apiUrl: apiUrl,
-    timeoutMs: 15000,
+    // Apps Script can take longer than 15 seconds to wake after being idle.
+    // Keep the tracker connected through a normal cold start.
+    timeoutMs: 45000,
     source: validExecUrl(supplied) ? 'query' : (validExecUrl(stored) ? 'storage' : (constantIsReal ? 'constant' : 'none')),
     invalidQuery: Boolean(supplied && !validExecUrl(supplied)),
     isConfigured: function () { return validExecUrl(apiUrl); },

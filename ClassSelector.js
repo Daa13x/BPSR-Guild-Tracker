@@ -35,7 +35,7 @@
   function api(action, data) {
     if (!configured()) return Promise.reject(Object.assign(new Error('Not configured.'), { code: 'CONFIGURATION' }));
     var controller = new AbortController();
-    var timer = root.setTimeout(function () { controller.abort(); }, CONFIG.timeoutMs || 15000);
+    var timer = root.setTimeout(function () { controller.abort(); }, CONFIG.timeoutMs || 45000);
     return root.fetch(CONFIG.apiUrl, {
       method: 'POST', redirect: 'follow',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
