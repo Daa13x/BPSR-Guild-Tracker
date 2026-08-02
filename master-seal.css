@@ -67,12 +67,13 @@ button { cursor: pointer; }
 /* ------------------------------------------------------------------ */
 .ms-shell {
   display: grid;
-  grid-template-columns: 264px minmax(0, 1fr) minmax(400px, 520px);
+  grid-template-columns: 212px minmax(0, 1fr) minmax(400px, 520px);
   gap: 14px; padding: 12px; min-height: 100vh; align-items: start;
 }
-/* Left column holds the sidebar nav and, below it, the Master Seal editor. */
+/* Left column holds the sidebar nav and, below it, the Master Seal editor.
+   Both boxes fill the column so the editor matches the OnlyPaws box width. */
 .ms-leftcol { display: flex; flex-direction: column; gap: 14px; min-width: 0; position: sticky; top: 12px; align-self: start; }
-.ms-leftcol .ms-sidebar { position: static; max-height: none; }
+.ms-leftcol .ms-sidebar { position: static; max-height: none; align-self: stretch; }
 .ms-leftcol #seal-editor { max-height: calc(100vh - 24px); overflow: auto; }
 
 .ms-panel, .ms-sidebar, .ms-detail > section {
@@ -470,7 +471,8 @@ button { cursor: pointer; }
 .seal-edit legend { grid-column: 1 / -1; float: none; padding: 0; margin-bottom: 2px; color: var(--accent-soft); font-family: var(--ui); font-size: 12px; font-weight: 800; letter-spacing: .02em; }
 .seal-edit .field { display: grid; gap: 4px; margin: 0; }
 .seal-edit .field span { color: var(--text-muted); font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
-.seal-edit input, .seal-edit select { min-height: 36px; padding: 6px 9px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: #0c0a14; color: var(--text-primary); font-size: 13px; }
+.seal-edit .field { min-width: 0; }
+.seal-edit input, .seal-edit select { width: 100%; min-width: 0; min-height: 36px; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: #0c0a14; color: var(--text-primary); font-size: 13px; }
 .seal-reset-note { grid-column: 1 / -1; margin: 4px 0 0; color: var(--warning); font-size: 10.5px; }
 .seal-save-row { display: flex; justify-content: flex-end; }
 .seal-save-row .btn, #seal-ui .btn { min-height: 38px; padding: 0 18px; border: 1px solid var(--border-bright); border-radius: var(--radius-sm); background: rgba(108, 47, 140, .35); color: var(--accent); font-weight: 700; }

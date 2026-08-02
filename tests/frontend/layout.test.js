@@ -168,7 +168,7 @@ test('the old Master Seal URL redirects into the single dashboard', () => {
 
 test('dashboard shell uses the template display font and the reference three-column composition', () => {
   const css = fs.readFileSync('master-seal.css', 'utf8');
-  assert.match(css, /grid-template-columns:\s*264px minmax\(0, 1fr\) minmax\(400px, 520px\)/);
+  assert.match(css, /grid-template-columns:\s*212px minmax\(0, 1fr\) minmax\(400px, 520px\)/);
   assert.match(css, /font-family: 'Philosopher'/);
   assert.match(css, /assets\/fonts\/Philosopher-Bold\.woff/);
   for (const font of ['Philosopher-Bold', 'Philosopher-Regular']) {
