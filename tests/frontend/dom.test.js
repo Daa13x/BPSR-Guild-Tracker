@@ -516,7 +516,7 @@ test('a valid legacy local-storage session migrates once to the cookie and shows
   assert.equal(app.gate.hidden, true);
 });
 
-test('progression sends SV and ranks from the remembered session without browser totals', async () => {
+test('Masters progression sends ranks only; the SV floor moved to the Stim Vault editor', async () => {
   let resolveProgress;
   const progressPending = new Promise(resolve => { resolveProgress = resolve; });
   const app = createHarness((action, data) => {
@@ -525,10 +525,12 @@ test('progression sends SV and ranks from the remembered session without browser
   });
   await app.ready();
   await signIn(app);
-  assert.match(app.member.textContent, /SV floor12/);
+  assert.match(app.member.textContent, /SV floor12/, 'SV floor still shown as a read-only metric');
   assert.match(app.member.textContent, /Master points480/);
   const form = formByButton(app.member, 'Save progression');
-  form.querySelector('input[name="svFloor"]').value = '15';
+  // The SV floor input is gone from My Progress — it lives in the seal editor now.
+  assert.equal(form.querySelector('input[name="svFloor"]'), null, 'no SV floor input in My Progress');
+  assert.match(app.member.textContent, /Stim Vault in the Master Seal editor/);
   form.querySelector('input[data-activity]').value = '4';
   form.dispatch('submit');
   form.dispatch('submit');
@@ -537,7 +539,7 @@ test('progression sends SV and ranks from the remembered session without browser
   assert.equal(progressCalls.length, 1, 'disabled submit prevents repeated requests');
   assert.equal(progressCalls[0].data.token, 'member-token');
   assert.deepEqual(progressCalls[0].data.masterRanks, { ACT1: '4' });
-  assert.equal(progressCalls[0].data.svFloor, '15');
+  assert.equal('svFloor' in progressCalls[0].data, false, 'progress no longer carries svFloor');
   assert.equal('masterPoints' in progressCalls[0].data, false);
   resolveProgress({ changed: true, profile: profile({ svFloor: 15 }) });
   await settle();
@@ -568,7 +570,7 @@ test('the Master Seal editor submits the Stim Vault and six dungeons, deriving c
   dungeon.querySelector('select').value = '5';
   dungeon.querySelector('input[type="number"]').value = '316';
   // Stim Vault: points only, no level — still counts as cleared.
-  rows[0].querySelector('input[type="number"]').value = '120';
+  rows[0].querySelector('input[type="number"]').value = '40';
   form.dispatch('submit');
   await settle();
   const update = app.calls.find(call => call.action === 'masterSealUpdate');
@@ -576,7 +578,7 @@ test('the Master Seal editor submits the Stim Vault and six dungeons, deriving c
   assert.equal(Object.keys(update.data.dungeons).length, 6, 'six dungeons, Stim Vault sent separately');
   assert.deepEqual(update.data.dungeons['towering-ruin'], { cleared: true, bestMasterLevel: 5, points: 316 });
   assert.deepEqual(update.data.dungeons['sea-ringed-reef'], { cleared: false, bestMasterLevel: null, points: 0 });
-  assert.deepEqual(update.data.stimVault, { cleared: true, bestMasterLevel: null, points: 120 });
+  assert.deepEqual(update.data.stimVault, { cleared: true, bestMasterLevel: null, points: 40 });
   assert.match(app.seal.querySelector('.notice').textContent, /Master Seal progress saved/);
 });
 

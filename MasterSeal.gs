@@ -152,77 +152,67 @@ function sealWrite_(memberId, submitted) {
 }
 
 // ---------------------------------------------------------------------------
-// Stim Vault — a per-member entry that resets every two weeks (Blue Protocol:
-// Star Resonance, Monday 05:00 UTC-2). Stored in the MasterSeal sheet under a
-// reserved DungeonId, so it is never one of the six scored dungeons and never
-// affects the season totals or the public board.
+// Stim Vault — the biweekly floor climb. It IS the SV (Shadow Vault) floor
+// shown on the SV Leaderboard: the same value, edited in one place, and it
+// resets every two weeks (Blue Protocol: Star Resonance, Monday 05:00 UTC-2).
+// Backed by Players.SVFloor, so there is no separate store.
 // ---------------------------------------------------------------------------
 var STIM_VAULT_ID = 'stim-vault';
 
 function stimAnchor_() { return cfg_('STIM_RESET_ANCHOR') || DEFAULT_CONFIG.STIM_RESET_ANCHOR; }
 function stimResetEnabled_() { return truthy_(cfg_('STIM_RESET_ENABLED')); }
 
-function stimRow_(memberId) {
-  return readTable_(MASTER_SEAL_SHEET).rows.filter(function (r) {
-    return String(r.MemberId) === String(memberId) && String(r.DungeonId) === STIM_VAULT_ID;
-  })[0] || null;
-}
-
 /**
- * Lazily clear the member's Stim Vault when a biweekly reset boundary has
- * passed since it was last written. Runs on every load, so a member who
- * returns after a reset sees a fresh vault; one who was on within the current
- * fortnight sees it unchanged. Returns the current vault state.
+ * Lazily clear the member's SV floor when a biweekly reset boundary has passed
+ * since it was last set. Runs on load, so a member who returns after a reset
+ * starts the new fortnight at floor 0; one who was on within the fortnight is
+ * unchanged. The watermark is SVFloorDate, moved forward when we reset.
  */
 function applyStimReset_(memberId, now) {
-  ensureMasterSealSheet_();
-  var row = stimRow_(memberId);
-  var when = now || new Date();
-  if (!row) return { points: 0, bestMasterLevel: null, updatedAt: null, reset: false };
-  var pts = Number(row.Points) || 0;
-  var lvl = (row.BestMasterLevel !== '' && row.BestMasterLevel !== null) ? Number(row.BestMasterLevel) : null;
-  var stale = stimResetEnabled_() && stimVaultStale_(row.UpdatedAt, when, stimAnchor_());
-  if (stale && (pts > 0 || lvl !== null)) {
-    SpreadsheetApp.getActiveSpreadsheet().getSheetByName(MASTER_SEAL_SHEET)
-      .getRange(row._row, 3, 1, 4).setValues([['', 0, false, when]]);
-    return { points: 0, bestMasterLevel: null, updatedAt: when.toISOString(), reset: true };
+  if (!stimResetEnabled_()) return;
+  var p = findPlayer_(memberId);
+  if (!p) return;
+  var floor = Number(p.SVFloor) || 0;
+  if (floor > 0 && stimVaultStale_(p.SVFloorDate, now || new Date(), stimAnchor_())) {
+    var when = now || new Date();
+    p.SVFloor = 0;
+    p.SVFloorDate = when;
+    p.LastUpdated = when;
+    writePlayerRow_(p);
+    bustCache_();
   }
-  return { points: pts, bestMasterLevel: lvl, updatedAt: iso_(row.UpdatedAt), reset: false };
 }
 
-/** Public Stim Vault view: current value plus the fortnight window. */
+/** Public Stim Vault view: the current SV floor plus the fortnight window. */
 function stimVaultPublic_(memberId, now) {
-  var state = applyStimReset_(memberId, now);
+  applyStimReset_(memberId, now);
+  var p = findPlayer_(memberId);
+  var floor = p ? Number(p.SVFloor) || 0 : 0;
   var when = now || new Date();
   var boundary = lastStimReset_(when, stimAnchor_());
   return {
     id: STIM_VAULT_ID, name: 'Stim Vault',
-    points: state.points, bestMasterLevel: state.bestMasterLevel,
+    points: floor, bestMasterLevel: null, max: SV_MAX_FLOOR,
     enabled: stimResetEnabled_(),
     periodStart: boundary ? boundary.toISOString() : null,
-    nextResetAt: boundary ? new Date(boundary.getTime() + STIM_RESET_PERIOD_MS).toISOString() : null,
-    justReset: state.reset
+    nextResetAt: boundary ? new Date(boundary.getTime() + STIM_RESET_PERIOD_MS).toISOString() : null
   };
 }
 
-/** Upsert the Stim Vault entry. Cleared is derived: any points or level counts. */
+/** Set the SV floor from the Stim Vault editor (0–60). Same value the SV
+ * Leaderboard ranks; may be raised or lowered by the member directly. */
 function stimWrite_(memberId, entry) {
-  ensureMasterSealSheet_();
   if (!entry || typeof entry !== 'object') return false;
-  var level = null;
-  if (entry.bestMasterLevel !== undefined && entry.bestMasterLevel !== null && entry.bestMasterLevel !== '') {
-    level = integer_(entry.bestMasterLevel, 0, MASTER_SEAL_SEASON.maxMasterLevel);
-  }
-  var points = entry.points === undefined || entry.points === '' ? 0
-    : integer_(entry.points, 0, MASTER_SEAL_SEASON.maxScore);
-  var cleared = points > 0 || level !== null;
-  var row = stimRow_(memberId);
-  var currentLevel = row && row.BestMasterLevel !== '' && row.BestMasterLevel !== null ? Number(row.BestMasterLevel) : null;
-  if (row && currentLevel === level && (Number(row.Points) || 0) === points) return false;
-  var now = new Date(), levelCell = level === null ? '' : level;
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(MASTER_SEAL_SHEET);
-  if (row) sheet.getRange(row._row, 3, 1, 4).setValues([[levelCell, points, cleared, now]]);
-  else sheet.appendRow([memberId, STIM_VAULT_ID, levelCell, points, cleared, now]);
+  var floor = entry.points === undefined || entry.points === '' || entry.points === null
+    ? 0 : integer_(entry.points, 0, SV_MAX_FLOOR);
+  var p = linkedPlayer_(memberId);
+  if ((Number(p.SVFloor) || 0) === floor) return false;
+  var now = new Date();
+  p.SVFloor = floor;
+  p.SVFloorDate = now;
+  p.LastUpdated = now;
+  writePlayerRow_(p);
+  bustCache_();
   return true;
 }
 

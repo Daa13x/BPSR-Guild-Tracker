@@ -549,15 +549,14 @@
       });
     host.appendChild(metrics);
 
-    // -- SV and Master activity progression (unchanged model) --
+    // -- Master activity ranks. The SV floor is edited in the Master Seal
+    //    editor (Stim Vault → Floors), the single source for the SV board. --
     var form = E('form');
     form.className = 'progress-card';
-    form.appendChild(E('h3', 'SV and Masters progression'));
-    var sv = field('Highest SV floor (1–60)', 'svFloor', 'number', 'Leave blank if unchanged');
-    sv.input.min = '1';
-    sv.input.max = '60';
-    sv.input.inputMode = 'numeric';
-    form.appendChild(sv.wrap);
+    form.appendChild(E('h3', 'Masters progression'));
+    var hint = E('p', 'Your SV floor is now the Stim Vault in the Master Seal editor on the left.');
+    hint.className = 'seal-hint';
+    form.appendChild(hint);
     var ranks = E('div');
     ranks.className = 'rank-grid';
     form.appendChild(ranks);
@@ -596,7 +595,6 @@
       });
       api('progress', {
         token: memberToken(),
-        svFloor: sv.input.value || undefined,
         masterRanks: masterRanks
       }).then(function (result) {
         state.member = result.profile;
@@ -726,7 +724,7 @@
       // Stim Vault first — a floors value with no Master level, resets biweekly.
       var stim = mine.stimVault || { points: 0, bestMasterLevel: null };
       var stimRow = sealRow('stim-vault', 'Stim Vault', stim, mine.season.maxMasterLevel, mine.season.maxScore,
-        { withLevel: false, valueLabel: 'Floors', valueMax: mine.season.maxScore });
+        { withLevel: false, valueLabel: 'Floors', valueMax: stim.max || 60 });
       if (mine.stimVault && mine.stimVault.nextResetAt) {
         var note = E('p', 'Resets ' + fmtSealDate(mine.stimVault.nextResetAt) + (mine.stimVault.justReset ? ' · just reset for the new fortnight' : ''));
         note.className = 'seal-reset-note';
@@ -763,9 +761,13 @@
           state.mySeal.totals = result.totals;
           state.mySeal.stimVault = result.stimVault;
         }
+        // The Stim Vault floor is the SV floor, so keep the member profile and
+        // the SV/Masters boards in step after saving.
+        if (state.member && result.stimVault) state.member.svFloor = result.stimVault.points;
         message.className = 'notice';
         message.textContent = result.changed ? 'Master Seal progress saved.' : 'No Master Seal changes.';
         renderSealMetric();
+        if (root.load) root.load();
         if (root.loadMasterSeal) root.loadMasterSeal();
       }).catch(function (failure) {
         message.className = 'notice error';

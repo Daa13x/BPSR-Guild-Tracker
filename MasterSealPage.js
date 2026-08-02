@@ -479,16 +479,38 @@
     });
     html += '</div></section>';
 
+    // Rewards are spaced evenly across the full width (rather than by absolute
+    // score) so there is no empty gap before the first milestone. The fill
+    // interpolates between the evenly-spaced marks for the member's total.
+    var rewardCount = season.rewards.length;
+    var evenPos = function (i) { return rewardCount <= 1 ? 0 : (i / (rewardCount - 1)) * 100; };
+    var fillPct = 0;
+    var ts = member.totalScore;
+    if (ts >= season.rewards[rewardCount - 1].score) {
+      fillPct = 100;
+    } else {
+      for (var fi = 0; fi < rewardCount - 1; fi++) {
+        var lo = fi === 0 ? 0 : season.rewards[fi].score;
+        var hi = season.rewards[fi + 1].score;
+        if (ts < hi) {
+          var base = fi === 0 ? 0 : evenPos(fi);
+          var span = evenPos(fi + 1) - base;
+          var frac = hi > lo ? Math.max(0, (ts - lo) / (hi - lo)) : 0;
+          fillPct = base + frac * span;
+          break;
+        }
+      }
+    }
     html += '<section><div class="ms-rewards-head"><h3>' + esc(season.displayName) + ' Rewards</h3>' +
       '<span class="ms-rewards-max">Max score <b>' + num(season.maxScore) + '</b></span></div>' +
       '<div class="ms-track">' +
       '<span class="ms-track-rail" aria-hidden="true"></span>' +
-      '<span class="ms-track-fill" aria-hidden="true" style="width:' + Math.min(100, member.progressPercent) + '%"></span>' +
+      '<span class="ms-track-fill" aria-hidden="true" style="width:' + Math.min(100, fillPct) + '%"></span>' +
       '<div class="ms-track-marks">';
     season.rewards.forEach(function (reward, i) {
       var previous = i === 0 ? 0 : season.rewards[i - 1].score;
       var status = milestoneState(reward.score, member.totalScore, previous);
-      var offset = markerOffset(reward.score, season.maxScore);
+      var offset = evenPos(i);
       var isFinal = i === season.rewards.length - 1;
       html += '<div class="ms-mark ' + status + (isFinal ? ' final' : '') + '" style="left:' + offset + '%">' +
         '<span class="ms-mark-score">' + num(reward.score) + '</span>' +
