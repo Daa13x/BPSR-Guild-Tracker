@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BPSR Guild Tracker — Master Seal & SV</title>
 <link rel="icon" type="image/png" href="assets/guild-logo.png">
-<script src="config.js?v=8"></script>
-<link rel="stylesheet" href="styles.css?v=8">
-<link rel="stylesheet" href="master-seal.css?v=8">
+<script src="config.js?v=9"></script>
+<link rel="stylesheet" href="styles.css?v=9">
+<link rel="stylesheet" href="master-seal.css?v=9">
 </head>
 <body class="ms-body">
 <a class="ms-skip" href="#ms-main">Skip to content</a>
@@ -17,7 +17,8 @@
 </button>
 
 <div class="ms-shell">
-  <!-- ================= Sidebar ================= -->
+  <!-- ================= Left column: sidebar + Master Seal editor ========= -->
+  <div class="ms-leftcol">
   <aside class="ms-sidebar" id="ms-sidebar" aria-label="Guild tracker navigation">
     <a class="ms-brand" href="#overview" aria-label="OnlyPaws Guild Tracker">
       <img class="ms-brand-logo" src="assets/guild-logo.png" alt="OnlyPaws guild logo"
@@ -42,6 +43,19 @@
       <span class="sr-only" id="connection-status">Connecting</span>
     </div>
   </aside>
+
+  <!-- Master Seal customisation — sits in the left column, under the nav. The
+       member records their own Stim Vault (floors) and the six dungeons here. -->
+  <section class="ms-panel ms-section" id="seal-editor" aria-labelledby="seal-editor-h">
+    <div class="ms-section-head">
+      <div class="ms-section-title">
+        <h2 id="seal-editor-h">Master Seal — Season 3</h2>
+        <p class="ms-section-sub" id="seal-editor-sub">Record your best Stim Vault floors and each dungeon.</p>
+      </div>
+    </div>
+    <div id="seal-ui" aria-live="polite"></div>
+  </section>
+  </div>
 
   <!-- ================= Main column ================= -->
   <main class="ms-main" id="ms-main">
@@ -129,18 +143,6 @@
       </div>
     </section>
 
-    <!-- Master Seal customisation — the member records their own Stim Vault and
-         the six Chaotic Realm dungeons here. Reachable from the sidebar. -->
-    <section class="ms-panel ms-section" id="seal-editor" aria-labelledby="seal-editor-h">
-      <div class="ms-section-head">
-        <div class="ms-section-title">
-          <h2 id="seal-editor-h">Master Seal — Season 3</h2>
-          <p class="ms-section-sub" id="seal-editor-sub">Record your best points and Master level for the Stim Vault and each dungeon.</p>
-        </div>
-      </div>
-      <div id="seal-ui" aria-live="polite"></div>
-    </section>
-
     <!-- SV Leaderboard — structurally identical to the Masters section below -->
     <section class="ms-panel ms-section ms-board-section" id="sv-board" aria-labelledby="sv-board-h">
       <div class="ms-section-head">
@@ -221,8 +223,8 @@
 <div class="gate" id="gate" hidden></div>
 <div class="ms-tooltip" id="ms-tooltip" role="tooltip" hidden></div>
 
-<script src="Boards.js?v=8"></script>
-<script src="MasterSealPage.js?v=8"></script>
-<script src="AppFrontend.js?v=8"></script>
+<script src="Boards.js?v=9"></script>
+<script src="MasterSealPage.js?v=9"></script>
+<script src="AppFrontend.js?v=9"></script>
 </body>
 </html>

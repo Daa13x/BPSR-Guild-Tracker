@@ -67,9 +67,13 @@ button { cursor: pointer; }
 /* ------------------------------------------------------------------ */
 .ms-shell {
   display: grid;
-  grid-template-columns: 205px minmax(680px, 1fr) minmax(430px, 550px);
+  grid-template-columns: 264px minmax(0, 1fr) minmax(400px, 520px);
   gap: 14px; padding: 12px; min-height: 100vh; align-items: start;
 }
+/* Left column holds the sidebar nav and, below it, the Master Seal editor. */
+.ms-leftcol { display: flex; flex-direction: column; gap: 14px; min-width: 0; position: sticky; top: 12px; align-self: start; }
+.ms-leftcol .ms-sidebar { position: static; max-height: none; }
+.ms-leftcol #seal-editor { max-height: calc(100vh - 24px); overflow: auto; }
 
 .ms-panel, .ms-sidebar, .ms-detail > section {
   background: linear-gradient(180deg, rgba(30, 20, 44, .55), rgba(16, 16, 26, .92));
@@ -454,10 +458,15 @@ button { cursor: pointer; }
 .fg-prev-list { display: grid; gap: 5px; margin-top: 7px; color: var(--text-muted); font-size: 11.5px; }
 .fg-prev-list b { color: var(--text-secondary); font-weight: 700; }
 
-/* Master Seal editor — Stim Vault first, then the six dungeons */
-#seal-ui .seal-form { display: grid; gap: 12px; }
-.seal-edit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
-.seal-edit { display: grid; grid-template-columns: 1fr 1fr; align-items: end; gap: 8px 10px; margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel-bg-raised); }
+/* Master Seal editor — lives in the narrow left column: Stim Vault (floors)
+   first, then the six dungeons, one per row, with a single Save at the base. */
+#seal-editor { padding: 12px; }
+#seal-editor .ms-section-head { margin-bottom: 10px; }
+#seal-ui .seal-form { display: grid; gap: 10px; }
+.seal-edit-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.seal-edit { display: grid; grid-template-columns: 1fr 1fr; align-items: end; gap: 6px 8px; margin: 0; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel-bg-raised); }
+/* The Stim Vault is a floors value with no Master level — one field only. */
+.seal-edit-single { grid-template-columns: 1fr; }
 .seal-edit legend { grid-column: 1 / -1; float: none; padding: 0; margin-bottom: 2px; color: var(--accent-soft); font-family: var(--ui); font-size: 12px; font-weight: 800; letter-spacing: .02em; }
 .seal-edit .field { display: grid; gap: 4px; margin: 0; }
 .seal-edit .field span { color: var(--text-muted); font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }

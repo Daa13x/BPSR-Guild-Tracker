@@ -634,46 +634,51 @@
   // Master Seal — the member edits only their own six dungeons
   // -------------------------------------------------------------------------
 
-  /** One editable row: a label, a points box and a Master-level dropdown.
-   * "Cleared" is derived — any points or a chosen level counts as cleared. */
-  function sealRow(key, label, record, maxLevel, maxScore) {
+  /** One editable row: a labelled value box and, for dungeons, a Master-level
+   * dropdown. The Stim Vault is a floors value with no Master level, so it
+   * omits the dropdown. "Cleared" is derived — any value or level counts. */
+  function sealRow(key, label, record, maxLevel, maxScore, opts) {
+    var o = opts || {};
     var group = E('fieldset');
-    group.className = 'seal-edit';
+    group.className = 'seal-edit' + (o.withLevel === false ? ' seal-edit-single' : '');
     group.dataset.seal = key;
     group.appendChild(E('legend', label));
 
-    var points = field('Points', 'points-' + key, 'number', '0');
+    var points = field(o.valueLabel || 'Points', 'points-' + key, 'number', '0');
     points.input.min = '0';
-    points.input.max = String(maxScore);
+    points.input.max = String(o.valueMax || maxScore);
     points.input.inputMode = 'numeric';
     points.input.value = record && record.points ? String(record.points) : '0';
     points.wrap.className = 'field seal-points';
-
-    var levelWrap = E('label');
-    levelWrap.className = 'field seal-level';
-    levelWrap.appendChild(E('span', 'Master level'));
-    var level = document.createElement('select');
-    level.name = 'level-' + key;
-    var none = document.createElement('option');
-    none.value = ''; none.textContent = 'Not cleared';
-    level.appendChild(none);
-    for (var i = 0; i <= maxLevel; i++) {
-      var option = document.createElement('option');
-      option.value = String(i); option.textContent = 'M' + i;
-      level.appendChild(option);
-    }
-    level.value = record && record.bestMasterLevel !== null && record.bestMasterLevel !== undefined
-      ? String(record.bestMasterLevel) : '';
-    levelWrap.appendChild(level);
-
     group.appendChild(points.wrap);
-    group.appendChild(levelWrap);
+
+    if (o.withLevel !== false) {
+      var levelWrap = E('label');
+      levelWrap.className = 'field seal-level';
+      levelWrap.appendChild(E('span', 'Master level'));
+      var level = document.createElement('select');
+      level.name = 'level-' + key;
+      var none = document.createElement('option');
+      none.value = ''; none.textContent = 'Not cleared';
+      level.appendChild(none);
+      for (var i = 0; i <= maxLevel; i++) {
+        var option = document.createElement('option');
+        option.value = String(i); option.textContent = 'M' + i;
+        level.appendChild(option);
+      }
+      level.value = record && record.bestMasterLevel !== null && record.bestMasterLevel !== undefined
+        ? String(record.bestMasterLevel) : '';
+      levelWrap.appendChild(level);
+      group.appendChild(levelWrap);
+    }
     return group;
   }
 
-  /** Read one row into the {cleared, bestMasterLevel, points} entry shape. */
+  /** Read one row into the {cleared, bestMasterLevel, points} entry shape.
+   * A row with no dropdown (Stim Vault) never carries a Master level. */
   function readSealRow(group) {
-    var level = group.querySelector('select').value;
+    var select = group.querySelector('select');
+    var level = select ? select.value : '';
     var points = Number(group.querySelector('input[type="number"]').value || 0);
     var hasLevel = level !== '';
     var cleared = hasLevel || points > 0;
@@ -718,9 +723,10 @@
     api('myMasterSeal', { token: memberToken() }).then(function (mine) {
       state.mySeal = mine;
       grid.replaceChildren();
-      // Stim Vault first — the biweekly-resetting entry.
+      // Stim Vault first — a floors value with no Master level, resets biweekly.
       var stim = mine.stimVault || { points: 0, bestMasterLevel: null };
-      var stimRow = sealRow('stim-vault', 'Stim Vault', stim, mine.season.maxMasterLevel, mine.season.maxScore);
+      var stimRow = sealRow('stim-vault', 'Stim Vault', stim, mine.season.maxMasterLevel, mine.season.maxScore,
+        { withLevel: false, valueLabel: 'Floors', valueMax: mine.season.maxScore });
       if (mine.stimVault && mine.stimVault.nextResetAt) {
         var note = E('p', 'Resets ' + fmtSealDate(mine.stimVault.nextResetAt) + (mine.stimVault.justReset ? ' · just reset for the new fortnight' : ''));
         note.className = 'seal-reset-note';
