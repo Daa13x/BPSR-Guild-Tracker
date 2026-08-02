@@ -96,7 +96,11 @@
       progress: function (a, b) { return b.progressPercent - a.progressPercent || a.rank - b.rank; },
       remaining: function (a, b) { return a.remainingScore - b.remainingScore || a.rank - b.rank; },
       updated: function (a, b) { return String(b.lastUpdated || '').localeCompare(String(a.lastUpdated || '')) || a.rank - b.rank; },
-      sv: function (a, b) { return (b.svFloor || 0) - (a.svFloor || 0) || a.rank - b.rank; },
+      sv: function (a, b) {
+        var af = a.svFloor === null ? -1 : a.svFloor;
+        var bf = b.svFloor === null ? -1 : b.svFloor;
+        return (bf - af) || a.rank - b.rank;
+      },
       name: function (a, b) { return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : a.name.toLowerCase() > b.name.toLowerCase() ? 1 : 0; }
     };
     return list.sort(sorters[o.sort] || sorters.rank);
@@ -238,9 +242,15 @@
       lastUpdated: row.lastUpdated || null,
       verified: Boolean(row.verified),
       hidden: Boolean(row.hidden),
-      svFloor: Number(row.svFloor) || 0,
+      svFloor: normaliseSvFloor(row.svFloor === undefined ? row.SVFloor : row.svFloor),
       dungeons: dungeons
     };
+  }
+
+  function normaliseSvFloor(value) {
+    if (value === null || value === undefined || String(value).trim() === '') return null;
+    var floor = Number(value);
+    return isFinite(floor) && Math.floor(floor) === floor && floor >= 0 && floor <= 60 ? floor : null;
   }
 
   /** Verified mark shown beside a verified member's character name. */
@@ -336,7 +346,8 @@
           ? '<span class="ms-mount on"><img src="' + rewardImage({ rewardType: 'mount' }) + '" alt="" loading="lazy" onerror="this.remove()">Unlocked</span>'
           : '<span class="ms-mount">🔒 Locked</span>') + '</td>' +
         '<td data-l="Updated"><span class="ms-updated">' + fmtDate(m.lastUpdated) + '<small>' + fmtTime(m.lastUpdated) + '</small></span></td>' +
-        '<td data-l="SV Floor"><span class="ms-svfloor' + (m.svFloor >= 60 ? ' full' : '') + '">' + m.svFloor + '<small>/ 60</small></span></td>' +
+        '<td data-l="SV Floor"><span class="ms-svfloor' + (m.svFloor >= 60 ? ' full' : '') + '">' +
+          (m.svFloor === null ? '—<small> unavailable</small>' : m.svFloor + '<small>/ 60</small>') + '</span></td>' +
         m.dungeons.map(function (d) {
           return '<td class="ms-dcell' + (d.cleared ? '' : ' un') + '" data-l="' + esc(d.shortName || d.dungeonName) + '">' +
             '<span class="sr-only">' + esc(d.dungeonName) + ': ' + (d.cleared

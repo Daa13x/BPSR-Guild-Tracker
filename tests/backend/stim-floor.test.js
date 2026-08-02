@@ -12,6 +12,11 @@ function setCell(c, memberId, header, value) {
   const { table, row } = playerRow(c, memberId);
   table.sheet.getRange(row._row, table.headers.indexOf(header) + 1).setValue(value);
 }
+function setMemberCell(c, memberId, header, value) {
+  const t = c.readTable_(c.AUTH_SHEETS.MEMBERS);
+  const row = t.rows.filter(r => String(r.MemberId) === String(memberId))[0];
+  t.sheet.getRange(row._row, t.headers.indexOf(header) + 1).setValue(value);
+}
 
 test('the reset boundary is every second Monday at 07:00 UTC (05:00 UTC-2)', () => {
   const c = runtime();
@@ -79,4 +84,28 @@ test('the Master Seal board carries each member SV floor for display and sorting
   board.forEach(r => { floors[r.name] = r.svFloor; });
   assert.equal(floors.Dax, 40);
   assert.equal(floors.Aria, 12);
+});
+
+test('Master Seal joins SVFloor by stable member id, not display name', () => {
+  const c = runtime();
+  const dax = call(c, 'createAccount', { characterName: 'Dax' });
+  const aria = call(c, 'createAccount', { characterName: 'Aria' });
+  call(c, 'masterSealUpdate', { token: dax.session.token, dungeons: {}, stimVault: { points: 5 } });
+  call(c, 'masterSealUpdate', { token: aria.session.token, dungeons: {}, stimVault: { points: 55 } });
+  setMemberCell(c, dax.member.memberId, 'CharacterName', 'Aria');
+  setMemberCell(c, aria.member.memberId, 'CharacterName', 'Dax');
+  const floors = Object.fromEntries(call(c, 'masterSeal', {}).board.map(r => [r.name, r.svFloor]));
+  assert.equal(floors.Aria, 5);
+  assert.equal(floors.Dax, 55);
+});
+
+test('Master Seal normalises numeric strings, preserves zero and reports invalid source values', () => {
+  const c = runtime();
+  const dax = call(c, 'createAccount', { characterName: 'Dax' });
+  setCell(c, dax.member.memberId, 'SVFloor', '20');
+  assert.equal(call(c, 'masterSeal', {}).board[0].svFloor, 20);
+  setCell(c, dax.member.memberId, 'SVFloor', '0');
+  assert.equal(call(c, 'masterSeal', {}).board[0].svFloor, 0);
+  setCell(c, dax.member.memberId, 'SVFloor', 'not-a-floor');
+  assert.equal(call(c, 'masterSeal', {}).board[0].svFloor, null);
 });

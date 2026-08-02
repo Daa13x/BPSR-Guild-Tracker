@@ -267,13 +267,15 @@ function masterSealBoard_(viewerMemberId) {
   var grouped = sealRowsByMember_();
   var flags = {};
   readTable_(SHEETS.PLAYERS).rows.forEach(function (p) {
-    flags[String(p.UserId)] = { hidden: truthy_(p.Hidden), verified: truthy_(p.Verified), svFloor: Number(p.SVFloor) || 0 };
+    // Join by the immutable member id. Character names may be renamed and are
+    // presentation only, never a progression key.
+    flags[String(p.UserId)] = { hidden: truthy_(p.Hidden), verified: truthy_(p.Verified), svFloor: masterSealSvFloor_(p.SVFloor) };
   });
   var rows = [];
   readTable_(AUTH_SHEETS.MEMBERS).rows.forEach(function (m) {
     if (m.DisabledAt) return;
     // Hidden members stay off the board for everyone except themselves.
-    var flag = flags[String(m.MemberId)] || { hidden: false, verified: false, svFloor: 0 };
+    var flag = flags[String(m.MemberId)] || { hidden: false, verified: false, svFloor: null };
     var isViewer = viewerMemberId && String(m.MemberId) === String(viewerMemberId);
     if (flag.hidden && !isViewer) return;
     var dungeons = sealProgress_(grouped[String(m.MemberId)]);
@@ -301,4 +303,12 @@ function masterSealBoard_(viewerMemberId) {
   });
   rows.forEach(function (r, i) { r.rank = i + 1; });
   return { season: sealSeasonPublic_(), board: rows, generatedAt: new Date().toISOString() };
+}
+
+/** Preserve zeroes, normalise numeric Sheets strings, and expose malformed
+ * source values honestly instead of presenting them as a real zero floor. */
+function masterSealSvFloor_(value) {
+  if (value === null || value === undefined || String(value).trim() === '') return null;
+  var floor = Number(value);
+  return isFinite(floor) && Math.floor(floor) === floor && floor >= 0 && floor <= SV_MAX_FLOOR ? floor : null;
 }
