@@ -273,7 +273,11 @@ button { cursor: pointer; }
 .ms-rewards-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .ms-rewards-max { padding: 3px 9px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel-bg-raised); color: var(--text-secondary); font-size: 10px; font-weight: 700; letter-spacing: .04em; }
 .ms-rewards-max b { color: var(--accent); }
-.ms-track { position: relative; margin-top: 12px; padding-bottom: 4px; }
+/* Side padding of half a marker width so the 0%- and 100%-placed rewards
+   (500 and the 3,650 Mount) sit fully inside the panel instead of overflowing
+   and forcing a horizontal scrollbar. Absolutely-positioned rail/fill/marks
+   all inset to the padding box automatically. */
+.ms-track { position: relative; margin-top: 12px; padding: 0 40px 4px; overflow: hidden; }
 .ms-track-rail { position: absolute; left: 0; right: 0; top: 96px; height: 4px; border-radius: 3px; background: #17101f; }
 .ms-track-fill { position: absolute; left: 0; top: 96px; height: 4px; border-radius: 3px; background: linear-gradient(90deg, var(--accent-deep), var(--accent)); box-shadow: 0 0 12px rgba(207, 130, 239, .5); transition: width .35s ease; }
 .ms-track-marks { position: relative; height: 152px; }
@@ -449,6 +453,19 @@ button { cursor: pointer; }
 .fg-prev summary { cursor: pointer; color: var(--accent-soft); font-size: 12px; }
 .fg-prev-list { display: grid; gap: 5px; margin-top: 7px; color: var(--text-muted); font-size: 11.5px; }
 .fg-prev-list b { color: var(--text-secondary); font-weight: 700; }
+
+/* Master Seal editor — Stim Vault first, then the six dungeons */
+#seal-ui .seal-form { display: grid; gap: 12px; }
+.seal-edit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.seal-edit { display: grid; grid-template-columns: 1fr 1fr; align-items: end; gap: 8px 10px; margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel-bg-raised); }
+.seal-edit legend { grid-column: 1 / -1; float: none; padding: 0; margin-bottom: 2px; color: var(--accent-soft); font-family: var(--ui); font-size: 12px; font-weight: 800; letter-spacing: .02em; }
+.seal-edit .field { display: grid; gap: 4px; margin: 0; }
+.seal-edit .field span { color: var(--text-muted); font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.seal-edit input, .seal-edit select { min-height: 36px; padding: 6px 9px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: #0c0a14; color: var(--text-primary); font-size: 13px; }
+.seal-reset-note { grid-column: 1 / -1; margin: 4px 0 0; color: var(--warning); font-size: 10.5px; }
+.seal-save-row { display: flex; justify-content: flex-end; }
+.seal-save-row .btn, #seal-ui .btn { min-height: 38px; padding: 0 18px; border: 1px solid var(--border-bright); border-radius: var(--radius-sm); background: rgba(108, 47, 140, .35); color: var(--accent); font-weight: 700; }
+.seal-save-row .btn:hover { background: rgba(108, 47, 140, .5); }
 
 /* Verified mark and hidden-to-others badge */
 .verified { display: inline-flex; vertical-align: middle; margin-left: 4px; color: var(--accent); filter: drop-shadow(0 0 4px rgba(207, 130, 239, .5)); }

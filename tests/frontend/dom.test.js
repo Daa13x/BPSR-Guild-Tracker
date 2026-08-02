@@ -215,7 +215,8 @@ function emptySeal() {
   return {
     season,
     dungeons: season.dungeons.map(d => ({ dungeonId: d.id, bestMasterLevel: null, points: 0, cleared: false, updatedAt: null })),
-    totals: { totalScore: 0, remainingScore: 3650, progressPercent: 0, clearedCount: 0, mountUnlocked: false, lastUpdated: null }
+    totals: { totalScore: 0, remainingScore: 3650, progressPercent: 0, clearedCount: 0, mountUnlocked: false, lastUpdated: null },
+    stimVault: { id: 'stim-vault', name: 'Stim Vault', points: 0, bestMasterLevel: null, enabled: true, periodStart: '2026-07-20T07:00:00.000Z', nextResetAt: '2026-08-03T07:00:00.000Z', justReset: false }
   };
 }
 
@@ -230,6 +231,7 @@ function createHarness(handler, options) {
     return node;
   }
   const member = base('div', 'member-ui');
+  const seal = base('div', 'seal-ui');
   const administration = base('section', 'administration');
   administration.hidden = true;
   const admin = base('div', 'admin-ui', administration);
@@ -322,6 +324,7 @@ function createHarness(handler, options) {
     ctx,
     document,
     member,
+    seal,
     admin,
     administration,
     preview,
@@ -541,32 +544,40 @@ test('progression sends SV and ranks from the remembered session without browser
   assert.match(app.member.querySelector('.notice').textContent, /Progress updated/);
 });
 
-test('the Master Seal form submits six validated dungeons and uncleared ones stay zeroed', async () => {
+test('the Master Seal editor submits the Stim Vault and six dungeons, deriving cleared', async () => {
   const seal = emptySeal();
   const app = createHarness((action, data) => {
     if (action === 'restore') return { member: profile(), session: session('member-token') };
     if (action === 'myMasterSeal') return seal;
     if (action === 'masterSealUpdate') {
-      return { changed: true, dungeons: seal.dungeons, totals: { ...seal.totals, totalScore: 316 } };
+      return { changed: true, dungeons: seal.dungeons, totals: { ...seal.totals, totalScore: 316 }, stimVault: seal.stimVault };
     }
   });
   await app.ready();
   await signIn(app);
-  const form = formByButton(app.member, 'Save Master Seal progress');
-  assert.ok(form, 'seal form renders');
-  const first = form.querySelector('fieldset[data-dungeon="towering-ruin"]');
-  first.querySelector('input[type="checkbox"]').checked = true;
-  first.querySelector('input[type="checkbox"]').dispatch('change');
-  first.querySelector('select').value = '5';
-  first.querySelector('input[type="number"]').value = '316';
+  // The editor lives in its own #seal-ui section, not in My Progress.
+  const form = formByButton(app.seal, 'Save Master Seal progress');
+  assert.ok(form, 'seal editor renders in its own section');
+  // Stim Vault is the first row.
+  const rows = form.querySelectorAll('fieldset[data-seal]');
+  assert.equal(rows[0].dataset.seal, 'stim-vault', 'Stim Vault leads the editor');
+  assert.equal(rows.length, 7, 'Stim Vault plus six dungeons');
+
+  // A dungeon: points + level, cleared derived from having a level.
+  const dungeon = form.querySelector('fieldset[data-seal="towering-ruin"]');
+  dungeon.querySelector('select').value = '5';
+  dungeon.querySelector('input[type="number"]').value = '316';
+  // Stim Vault: points only, no level — still counts as cleared.
+  rows[0].querySelector('input[type="number"]').value = '120';
   form.dispatch('submit');
   await settle();
   const update = app.calls.find(call => call.action === 'masterSealUpdate');
   assert.equal(update.data.token, 'member-token');
-  assert.equal(Object.keys(update.data.dungeons).length, 6);
+  assert.equal(Object.keys(update.data.dungeons).length, 6, 'six dungeons, Stim Vault sent separately');
   assert.deepEqual(update.data.dungeons['towering-ruin'], { cleared: true, bestMasterLevel: 5, points: 316 });
   assert.deepEqual(update.data.dungeons['sea-ringed-reef'], { cleared: false, bestMasterLevel: null, points: 0 });
-  assert.match(app.member.querySelector('.notice').textContent, /Master Seal progress saved/);
+  assert.deepEqual(update.data.stimVault, { cleared: true, bestMasterLevel: null, points: 120 });
+  assert.match(app.seal.querySelector('.notice').textContent, /Master Seal progress saved/);
 });
 
 test('sign out clears only this device; revoke-all requires confirmation and returns to the gate', async () => {

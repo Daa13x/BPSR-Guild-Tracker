@@ -29,7 +29,8 @@ test('one dashboard page hosts Master Seal and two separate leaderboards in the 
   assert.match(html, /id="master-seal"/);
   assert.match(html, /id="ms-table-host"/);
   assert.match(html, /id="ms-pages"/);
-  assert.match(html, /id="ms-season-note-value"/);
+  assert.match(html, /id="seal-editor"/);
+  assert.match(html, /id="seal-ui"/);
   // SV and Masters are two independent sections, each with its own podium,
   // search, filter chips and table — not one tabbed board.
   assert.match(html, /id="sv-board"/);
@@ -119,7 +120,7 @@ test('navigation lists only working destinations and obsolete hashes fall back t
   const html = fs.readFileSync('Leaderboard.html', 'utf8');
   const boards = fs.readFileSync('Boards.js', 'utf8');
   const navHrefs = [...html.matchAll(/class="ms-nav-item[^"]*" href="([^"]+)"/g)].map(m => m[1]);
-  assert.deepEqual(navHrefs, ['#sv-board', '#masters-board', '#my-progress', '#administration']);
+  assert.deepEqual(navHrefs, ['#sv-board', '#seal-editor', '#masters-board', '#my-progress', '#administration']);
   // Every navigable target is a section that actually exists on the page.
   navHrefs.forEach(href => assert.match(html, new RegExp(`id="${href.slice(1)}"`), `${href} has no section`));
   assert.match(boards, /SUPPORTED_HASHES/);

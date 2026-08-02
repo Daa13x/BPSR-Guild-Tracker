@@ -151,12 +151,88 @@ function sealWrite_(memberId, submitted) {
   return changed;
 }
 
-/** Own progress for the signed-in member. */
+// ---------------------------------------------------------------------------
+// Stim Vault — a per-member entry that resets every two weeks (Blue Protocol:
+// Star Resonance, Monday 05:00 UTC-2). Stored in the MasterSeal sheet under a
+// reserved DungeonId, so it is never one of the six scored dungeons and never
+// affects the season totals or the public board.
+// ---------------------------------------------------------------------------
+var STIM_VAULT_ID = 'stim-vault';
+
+function stimAnchor_() { return cfg_('STIM_RESET_ANCHOR') || DEFAULT_CONFIG.STIM_RESET_ANCHOR; }
+function stimResetEnabled_() { return truthy_(cfg_('STIM_RESET_ENABLED')); }
+
+function stimRow_(memberId) {
+  return readTable_(MASTER_SEAL_SHEET).rows.filter(function (r) {
+    return String(r.MemberId) === String(memberId) && String(r.DungeonId) === STIM_VAULT_ID;
+  })[0] || null;
+}
+
+/**
+ * Lazily clear the member's Stim Vault when a biweekly reset boundary has
+ * passed since it was last written. Runs on every load, so a member who
+ * returns after a reset sees a fresh vault; one who was on within the current
+ * fortnight sees it unchanged. Returns the current vault state.
+ */
+function applyStimReset_(memberId, now) {
+  ensureMasterSealSheet_();
+  var row = stimRow_(memberId);
+  var when = now || new Date();
+  if (!row) return { points: 0, bestMasterLevel: null, updatedAt: null, reset: false };
+  var pts = Number(row.Points) || 0;
+  var lvl = (row.BestMasterLevel !== '' && row.BestMasterLevel !== null) ? Number(row.BestMasterLevel) : null;
+  var stale = stimResetEnabled_() && stimVaultStale_(row.UpdatedAt, when, stimAnchor_());
+  if (stale && (pts > 0 || lvl !== null)) {
+    SpreadsheetApp.getActiveSpreadsheet().getSheetByName(MASTER_SEAL_SHEET)
+      .getRange(row._row, 3, 1, 4).setValues([['', 0, false, when]]);
+    return { points: 0, bestMasterLevel: null, updatedAt: when.toISOString(), reset: true };
+  }
+  return { points: pts, bestMasterLevel: lvl, updatedAt: iso_(row.UpdatedAt), reset: false };
+}
+
+/** Public Stim Vault view: current value plus the fortnight window. */
+function stimVaultPublic_(memberId, now) {
+  var state = applyStimReset_(memberId, now);
+  var when = now || new Date();
+  var boundary = lastStimReset_(when, stimAnchor_());
+  return {
+    id: STIM_VAULT_ID, name: 'Stim Vault',
+    points: state.points, bestMasterLevel: state.bestMasterLevel,
+    enabled: stimResetEnabled_(),
+    periodStart: boundary ? boundary.toISOString() : null,
+    nextResetAt: boundary ? new Date(boundary.getTime() + STIM_RESET_PERIOD_MS).toISOString() : null,
+    justReset: state.reset
+  };
+}
+
+/** Upsert the Stim Vault entry. Cleared is derived: any points or level counts. */
+function stimWrite_(memberId, entry) {
+  ensureMasterSealSheet_();
+  if (!entry || typeof entry !== 'object') return false;
+  var level = null;
+  if (entry.bestMasterLevel !== undefined && entry.bestMasterLevel !== null && entry.bestMasterLevel !== '') {
+    level = integer_(entry.bestMasterLevel, 0, MASTER_SEAL_SEASON.maxMasterLevel);
+  }
+  var points = entry.points === undefined || entry.points === '' ? 0
+    : integer_(entry.points, 0, MASTER_SEAL_SEASON.maxScore);
+  var cleared = points > 0 || level !== null;
+  var row = stimRow_(memberId);
+  var currentLevel = row && row.BestMasterLevel !== '' && row.BestMasterLevel !== null ? Number(row.BestMasterLevel) : null;
+  if (row && currentLevel === level && (Number(row.Points) || 0) === points) return false;
+  var now = new Date(), levelCell = level === null ? '' : level;
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(MASTER_SEAL_SHEET);
+  if (row) sheet.getRange(row._row, 3, 1, 4).setValues([[levelCell, points, cleared, now]]);
+  else sheet.appendRow([memberId, STIM_VAULT_ID, levelCell, points, cleared, now]);
+  return true;
+}
+
+/** Own progress for the signed-in member, Stim Vault included and reset-checked. */
 function myMasterSeal_(token) {
   var s = session_(token, 'member');
+  var stim = stimVaultPublic_(s.MemberId);   // applies the biweekly reset on load
   var mine = sealRowsByMember_()[String(s.MemberId)];
   var dungeons = sealProgress_(mine);
-  return { season: sealSeasonPublic_(), dungeons: dungeons, totals: sealTotals_(dungeons) };
+  return { season: sealSeasonPublic_(), dungeons: dungeons, totals: sealTotals_(dungeons), stimVault: stim };
 }
 
 function masterSealUpdate_(token, d) {
@@ -165,9 +241,15 @@ function masterSealUpdate_(token, d) {
   lock.waitLock(20000);
   try {
     var changed = sealWrite_(s.MemberId, d.dungeons);
+    var stimChanged = d.stimVault ? stimWrite_(s.MemberId, d.stimVault) : false;
     var mine = sealRowsByMember_()[String(s.MemberId)];
     var dungeons = sealProgress_(mine);
-    return { changed: changed, dungeons: dungeons, totals: sealTotals_(dungeons) };
+    return {
+      changed: changed || stimChanged,
+      dungeons: dungeons,
+      totals: sealTotals_(dungeons),
+      stimVault: stimVaultPublic_(s.MemberId)
+    };
   } finally {
     lock.releaseLock();
   }

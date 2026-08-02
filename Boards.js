@@ -59,7 +59,6 @@ function render(){
   if (stampEl) stampEl.textContent =
     'Updated ' + fmtDateTime(d.generatedAt) + (API_URL ? '' : ' · preview only');
 
-  renderFirstGuildie();
   BOARDS.forEach(renderBoard);
 }
 
@@ -173,33 +172,6 @@ function renderBoard(key){
   el.innerHTML = '<table>'+head+'<tbody>'+body+'</tbody></table>';
 }
 
-function renderFirstGuildie(){
-  var fg = DATA.firstGuildie, panel = document.getElementById('fg-panel');
-  if (!panel) return;
-  panel.hidden = !fg.enabled;
-  if (!fg.enabled) return;
-  var c = fg.current, el = document.getElementById('fg-card'), html = '';
-  if (!el) return;
-  if (c && c.winner){
-    html += '<div class="fg-badge">1st</div><div class="fg-main">' +
-      '<div class="fg-name">'+esc(c.winner.name)+'</div>' +
-      '<div class="fg-what">'+esc(c.winner.what)+'</div>' +
-      '<div class="fg-meta">'+fmtDateTime(c.winner.at)+' · '+periodLabel(c)+'</div></div>';
-  } else {
-    html += '<div class="fg-main"><div class="fg-empty">No winner yet this period — the badge goes to the first genuine progress update.</div>' +
-      (c ? '<div class="fg-meta">'+periodLabel(c)+'</div>' : '') + '</div>';
-  }
-  var prev = fg.previous.filter(function(p){ return p.winner; });
-  if (prev.length){
-    html += '<details class="fg-prev"><summary>Previous winners ('+prev.length+')</summary><div class="fg-prev-list">' +
-      prev.map(function(p){ return '<div><b>'+esc(p.winner.name)+'</b> — '+esc(p.winner.what)+' · '+fmtDateTime(p.winner.at)+'</div>'; }).join('') +
-      '</div></details>';
-  }
-  el.innerHTML = html;
-}
-
-/** Character name with an optional verified mark and, for the viewer's own
- * hidden row, a note that only they can see it. */
 function nameCell(p){
   var html = '<span class="pname">'+esc(p.name)+'</span>';
   if (p.verified) html += verifiedMark();
@@ -234,16 +206,13 @@ function num(n){ return Number(n||0).toLocaleString(); }
 // UK-style visible dates throughout the tracker.
 function fmtDate(iso){ if(!iso) return '—'; return new Date(iso).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }
 function fmtDateTime(iso){ if(!iso) return '—'; return new Date(iso).toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
-function periodLabel(c){
-  var t = c.type.charAt(0).toUpperCase()+c.type.slice(1);
-  return t+' period · started '+fmtDate(c.start)+(c.end?' · resets '+fmtDate(c.end):'');
-}
+
 
 // ---------- navigation and hash routing ----------
 // Only sections that genuinely exist are addressable. Any other hash — links
 // to the removed Analytics sections above all — falls back to the SV
 // leaderboard instead of scrolling to a section that is no longer on the page.
-var SUPPORTED_HASHES = ['#overview', '#master-seal', '#sv-board', '#masters-board', '#my-progress', '#administration'];
+var SUPPORTED_HASHES = ['#overview', '#master-seal', '#seal-editor', '#sv-board', '#masters-board', '#my-progress', '#administration'];
 var FALLBACK_HASH = '#sv-board';
 
 function targetForHash(hash){

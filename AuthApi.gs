@@ -512,7 +512,7 @@ function api_(a, d) {
   if (a === 'myBackupCode') return myBackupCode_(d.token);
   if (a === 'revokeAllDevices') return revokeAllDevices_(d.token);
   if (a === 'adminLogin') return adminLogin_(d);
-  if (a === 'leaderboard') return JSON.parse(getLeaderboardBundle(viewerMemberId_(d.token)));
+  if (a === 'leaderboard') { var vid = viewerMemberId_(d.token); if (vid) applyStimReset_(vid); return JSON.parse(getLeaderboardBundle(vid)); }
   if (a === 'activities') return activities_();
   if (a === 'masterSeal') return masterSealBoard_(viewerMemberId_(d.token));
   if (a === 'myMasterSeal') return myMasterSeal_(d.token);

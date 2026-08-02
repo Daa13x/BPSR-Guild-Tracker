@@ -486,6 +486,9 @@
   // -------------------------------------------------------------------------
 
   function renderMember() {
+    // The Master Seal editor lives in its own section; keep it in sync with
+    // sign-in state on every member re-render.
+    renderSealEditor();
     var host = document.getElementById('member-ui');
     if (!host) return;
     host.replaceChildren();
@@ -608,8 +611,6 @@
     });
     host.appendChild(form);
 
-    host.appendChild(buildSealForm());
-
     var sessionRow = E('div');
     sessionRow.className = 'session-actions';
     sessionRow.appendChild(actionButton('Sign out of this device', 'member', function () {
@@ -633,121 +634,146 @@
   // Master Seal — the member edits only their own six dungeons
   // -------------------------------------------------------------------------
 
-  function buildSealForm() {
+  /** One editable row: a label, a points box and a Master-level dropdown.
+   * "Cleared" is derived — any points or a chosen level counts as cleared. */
+  function sealRow(key, label, record, maxLevel, maxScore) {
+    var group = E('fieldset');
+    group.className = 'seal-edit';
+    group.dataset.seal = key;
+    group.appendChild(E('legend', label));
+
+    var points = field('Points', 'points-' + key, 'number', '0');
+    points.input.min = '0';
+    points.input.max = String(maxScore);
+    points.input.inputMode = 'numeric';
+    points.input.value = record && record.points ? String(record.points) : '0';
+    points.wrap.className = 'field seal-points';
+
+    var levelWrap = E('label');
+    levelWrap.className = 'field seal-level';
+    levelWrap.appendChild(E('span', 'Master level'));
+    var level = document.createElement('select');
+    level.name = 'level-' + key;
+    var none = document.createElement('option');
+    none.value = ''; none.textContent = 'Not cleared';
+    level.appendChild(none);
+    for (var i = 0; i <= maxLevel; i++) {
+      var option = document.createElement('option');
+      option.value = String(i); option.textContent = 'M' + i;
+      level.appendChild(option);
+    }
+    level.value = record && record.bestMasterLevel !== null && record.bestMasterLevel !== undefined
+      ? String(record.bestMasterLevel) : '';
+    levelWrap.appendChild(level);
+
+    group.appendChild(points.wrap);
+    group.appendChild(levelWrap);
+    return group;
+  }
+
+  /** Read one row into the {cleared, bestMasterLevel, points} entry shape. */
+  function readSealRow(group) {
+    var level = group.querySelector('select').value;
+    var points = Number(group.querySelector('input[type="number"]').value || 0);
+    var hasLevel = level !== '';
+    var cleared = hasLevel || points > 0;
+    return { cleared: cleared, bestMasterLevel: hasLevel ? Number(level) : null, points: cleared ? points : 0 };
+  }
+
+  /** Render the Master Seal editor into its own section. Stim Vault leads,
+   * then the six dungeons; a single Save sits at the bottom. */
+  function renderSealEditor() {
+    var host = document.getElementById('seal-ui');
+    if (!host) return;
+    host.replaceChildren();
+    var message = E('div');
+    message.className = 'notice';
+    message.setAttribute('role', 'status');
+    host.appendChild(message);
+
+    if (!state.session || !memberToken()) {
+      message.textContent = configured()
+        ? 'Sign in from My Progress to record your Master Seal and Stim Vault progress.'
+        : 'Connect the Apps Script API to record Master Seal progress.';
+      return;
+    }
+
     var form = E('form');
     form.className = 'progress-card seal-form';
-    form.appendChild(E('h3', 'Master Seal — Season 3'));
-    var hint = E('p', 'Record your best Master level and points for each dungeon. Totals are calculated by the server.');
-    hint.className = 'seal-hint';
-    form.appendChild(hint);
     var grid = E('div');
     grid.className = 'seal-edit-grid';
     grid.textContent = 'Loading your Master Seal progress…';
     form.appendChild(grid);
+
+    var footer = E('div');
+    footer.className = 'seal-save-row';
     var submit = E('button', 'Save Master Seal progress');
     submit.type = 'submit';
+    submit.className = 'btn';
     submit.disabled = true;
-    form.appendChild(submit);
+    footer.appendChild(submit);
+    form.appendChild(footer);
+    host.appendChild(form);
 
     api('myMasterSeal', { token: memberToken() }).then(function (mine) {
       state.mySeal = mine;
       grid.replaceChildren();
+      // Stim Vault first — the biweekly-resetting entry.
+      var stim = mine.stimVault || { points: 0, bestMasterLevel: null };
+      var stimRow = sealRow('stim-vault', 'Stim Vault', stim, mine.season.maxMasterLevel, mine.season.maxScore);
+      if (mine.stimVault && mine.stimVault.nextResetAt) {
+        var note = E('p', 'Resets ' + fmtSealDate(mine.stimVault.nextResetAt) + (mine.stimVault.justReset ? ' · just reset for the new fortnight' : ''));
+        note.className = 'seal-reset-note';
+        stimRow.appendChild(note);
+      }
+      grid.appendChild(stimRow);
+      // Then the six dungeons in order.
       mine.season.dungeons.forEach(function (dungeon) {
         var record = null;
         mine.dungeons.forEach(function (d) { if (d.dungeonId === dungeon.id) record = d; });
-        var group = E('fieldset');
-        group.className = 'seal-edit';
-        group.dataset.dungeon = dungeon.id;
-        var legend = E('legend', dungeon.number + '. ' + dungeon.name);
-        group.appendChild(legend);
-
-        var clearedLabel = E('label');
-        clearedLabel.className = 'seal-cleared';
-        var cleared = E('input');
-        cleared.type = 'checkbox';
-        cleared.name = 'cleared-' + dungeon.id;
-        cleared.checked = Boolean(record && record.cleared);
-        clearedLabel.appendChild(cleared);
-        clearedLabel.appendChild(E('span', 'Cleared'));
-
-        var levelWrap = E('label');
-        levelWrap.className = 'field';
-        levelWrap.appendChild(E('span', 'Master level'));
-        var level = document.createElement('select');
-        level.name = 'level-' + dungeon.id;
-        var none = document.createElement('option');
-        none.value = '';
-        none.textContent = 'Not cleared';
-        level.appendChild(none);
-        for (var i = 0; i <= mine.season.maxMasterLevel; i++) {
-          var option = document.createElement('option');
-          option.value = String(i);
-          option.textContent = 'M' + i;
-          level.appendChild(option);
-        }
-        level.value = record && record.bestMasterLevel !== null ? String(record.bestMasterLevel) : '';
-        levelWrap.appendChild(level);
-
-        var points = field('Points', 'points-' + dungeon.id, 'number', '0');
-        points.input.min = '0';
-        points.input.max = String(mine.season.maxScore);
-        points.input.inputMode = 'numeric';
-        points.input.value = record ? String(record.points) : '0';
-
-        function syncCleared() {
-          level.disabled = !cleared.checked;
-          points.input.disabled = !cleared.checked;
-          if (!cleared.checked) {
-            level.value = '';
-            points.input.value = '0';
-          }
-        }
-        cleared.addEventListener('change', syncCleared);
-        syncCleared();
-
-        group.appendChild(clearedLabel);
-        group.appendChild(levelWrap);
-        group.appendChild(points.wrap);
-        grid.appendChild(group);
+        grid.appendChild(sealRow(dungeon.id, dungeon.name, record, mine.season.maxMasterLevel, mine.season.maxScore));
       });
       submit.disabled = false;
       renderSealMetric();
     }).catch(function (failure) {
       grid.textContent = '';
-      handleError('member', failure);
+      message.className = 'notice error';
+      message.textContent = friendlyFailure(failure);
     });
 
     form.addEventListener('submit', function (event) {
       event.preventDefault();
       if (submit.disabled) return;
       submit.disabled = true;
-      var dungeons = {};
-      grid.querySelectorAll('fieldset[data-dungeon]').forEach(function (group) {
-        var id = group.dataset.dungeon;
-        var cleared = group.querySelector('input[type="checkbox"]').checked;
-        var level = group.querySelector('select').value;
-        var points = group.querySelector('input[type="number"]').value;
-        dungeons[id] = {
-          cleared: cleared,
-          bestMasterLevel: cleared && level !== '' ? Number(level) : null,
-          points: cleared ? Number(points || 0) : 0
-        };
+      var dungeons = {}, stimVault = null;
+      grid.querySelectorAll('fieldset[data-seal]').forEach(function (group) {
+        var key = group.dataset.seal;
+        if (key === 'stim-vault') stimVault = readSealRow(group);
+        else dungeons[key] = readSealRow(group);
       });
-      api('masterSealUpdate', { token: memberToken(), dungeons: dungeons }).then(function (result) {
+      api('masterSealUpdate', { token: memberToken(), dungeons: dungeons, stimVault: stimVault }).then(function (result) {
         if (state.mySeal) {
           state.mySeal.dungeons = result.dungeons;
           state.mySeal.totals = result.totals;
+          state.mySeal.stimVault = result.stimVault;
         }
-        notice('member', result.changed ? 'Master Seal progress saved.' : 'No Master Seal changes.');
+        message.className = 'notice';
+        message.textContent = result.changed ? 'Master Seal progress saved.' : 'No Master Seal changes.';
         renderSealMetric();
         if (root.loadMasterSeal) root.loadMasterSeal();
       }).catch(function (failure) {
-        handleError('member', failure);
+        message.className = 'notice error';
+        message.textContent = friendlyFailure(failure);
       }).finally(function () {
         submit.disabled = false;
       });
     });
-    return form;
+  }
+
+  function fmtSealDate(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
   function renderSealMetric() {

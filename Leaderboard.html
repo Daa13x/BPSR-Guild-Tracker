@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BPSR Guild Tracker — Master Seal & SV</title>
 <link rel="icon" type="image/png" href="assets/guild-logo.png">
-<script src="config.js?v=7"></script>
-<link rel="stylesheet" href="styles.css?v=7">
-<link rel="stylesheet" href="master-seal.css?v=7">
+<script src="config.js?v=8"></script>
+<link rel="stylesheet" href="styles.css?v=8">
+<link rel="stylesheet" href="master-seal.css?v=8">
 </head>
 <body class="ms-body">
 <a class="ms-skip" href="#ms-main">Skip to content</a>
@@ -28,18 +28,13 @@
     <nav class="ms-nav">
       <p class="ms-nav-group">Leaderboards</p>
       <a class="ms-nav-item selected" href="#sv-board"><span class="ms-ico" aria-hidden="true">⛰</span>SV Leaderboard</a>
+      <a class="ms-nav-item" href="#seal-editor"><span class="ms-ico" aria-hidden="true">✦</span>Master Seal — Season 3</a>
       <a class="ms-nav-item" href="#masters-board"><span class="ms-ico" aria-hidden="true">⚔</span>Masters</a>
 
       <p class="ms-nav-group">Manage</p>
       <a class="ms-nav-item" href="#my-progress"><span class="ms-ico" aria-hidden="true">◉</span>My Progress</a>
       <a class="ms-nav-item" href="#administration" data-admin-nav hidden><span class="ms-ico" aria-hidden="true">⚙</span>Administration</a>
     </nav>
-
-    <div class="ms-season-note" id="ms-season-note">
-      <p class="ms-season-note-label"><span class="ms-ico" aria-hidden="true">⏳</span> Season 3 · Echoes of Ember</p>
-      <p class="ms-season-note-value" id="ms-season-note-value">End date not announced</p>
-      <p class="ms-season-note-sub" id="ms-season-note-sub">Published schedule runs through 19 August 2026.</p>
-    </div>
 
     <div class="ms-sidebar-foot">
       <span class="ms-dot" id="ms-conn-dot" aria-hidden="true"></span>
@@ -134,10 +129,16 @@
       </div>
     </section>
 
-    <!-- First Guildie ribbon -->
-    <section class="ms-panel ms-section" id="fg-panel" hidden aria-labelledby="fg-h">
-      <h2 id="fg-h">First Guildie to Update</h2>
-      <div class="fg-card" id="fg-card"></div>
+    <!-- Master Seal customisation — the member records their own Stim Vault and
+         the six Chaotic Realm dungeons here. Reachable from the sidebar. -->
+    <section class="ms-panel ms-section" id="seal-editor" aria-labelledby="seal-editor-h">
+      <div class="ms-section-head">
+        <div class="ms-section-title">
+          <h2 id="seal-editor-h">Master Seal — Season 3</h2>
+          <p class="ms-section-sub" id="seal-editor-sub">Record your best points and Master level for the Stim Vault and each dungeon.</p>
+        </div>
+      </div>
+      <div id="seal-ui" aria-live="polite"></div>
     </section>
 
     <!-- SV Leaderboard — structurally identical to the Masters section below -->
@@ -220,8 +221,8 @@
 <div class="gate" id="gate" hidden></div>
 <div class="ms-tooltip" id="ms-tooltip" role="tooltip" hidden></div>
 
-<script src="Boards.js?v=7"></script>
-<script src="MasterSealPage.js?v=7"></script>
-<script src="AppFrontend.js?v=7"></script>
+<script src="Boards.js?v=8"></script>
+<script src="MasterSealPage.js?v=8"></script>
+<script src="AppFrontend.js?v=8"></script>
 </body>
 </html>
