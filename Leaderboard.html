@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BPSR Guild Tracker — Master Seal & SV</title>
 <link rel="icon" type="image/png" href="assets/guild-logo.png">
-<script src="config.js?v=14"></script>
-<link rel="stylesheet" href="styles.css?v=14">
-<link rel="stylesheet" href="master-seal.css?v=14">
+<script src="config.js?v=15"></script>
+<link rel="stylesheet" href="styles.css?v=15">
+<link rel="stylesheet" href="master-seal.css?v=15">
 </head>
 <body class="ms-body">
 <a class="ms-skip" href="#ms-main">Skip to content</a>
@@ -34,6 +34,8 @@
 
       <p class="ms-nav-group">Manage</p>
       <a class="ms-nav-item" href="#my-progress"><span class="ms-ico" aria-hidden="true">◉</span>My Progress</a>
+      <!-- Personal class / build selector — directly below My Progress, above Administration -->
+      <div id="class-selector" class="cls-selector" hidden></div>
       <a class="ms-nav-item" href="#administration" data-admin-nav hidden><span class="ms-ico" aria-hidden="true">⚙</span>Administration</a>
     </nav>
 
@@ -196,6 +198,7 @@
     <section class="ms-panel ms-section account-panel" id="my-progress" aria-labelledby="account-h">
       <div class="ms-section-head">
         <h2 id="account-h">My Progress</h2>
+        <span class="cls-active" data-active-class hidden aria-label="Active class"></span>
         <div class="actions">
           <button class="btn" id="btn-update">Update my progress</button>
           <button class="btn ghost" id="btn-refresh">Refresh</button>
@@ -224,8 +227,10 @@
 <div class="gate" id="gate" hidden></div>
 <div class="ms-tooltip" id="ms-tooltip" role="tooltip" hidden></div>
 
-<script src="Boards.js?v=14"></script>
-<script src="MasterSealPage.js?v=14"></script>
-<script src="AppFrontend.js?v=14"></script>
+<script src="classes.js?v=15"></script>
+<script src="Boards.js?v=15"></script>
+<script src="MasterSealPage.js?v=15"></script>
+<script src="AppFrontend.js?v=15"></script>
+<script src="ClassSelector.js?v=15"></script>
 </body>
 </html>

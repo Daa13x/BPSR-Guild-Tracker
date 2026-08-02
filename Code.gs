@@ -114,6 +114,7 @@ function setupSpreadsheet() {
   // Account data is kept separately from public leaderboard rows.
   ensureAuthSheets_();
   ensureMasterSealSheet_();
+  ensureClassSheet_();   // personal class / build selections (additive, no data loss)
 
   // Seed config defaults without overwriting existing values.
   var cfgSheet = ss.getSheetByName(SHEETS.CONFIG);

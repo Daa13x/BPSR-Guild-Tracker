@@ -83,6 +83,15 @@ The exact end date for Season 3, “Echoes of Ember,” has not been formally an
 
 The public board (`masterSeal` action) lists every active member — names only, no IDs — ranked by total score with all six dungeon values visible per row, search, sorting, filters, keyboard row selection and a detail panel with dungeon artwork and the reward track. Members edit only their own six dungeons through their session; administrators can correct any member with an audited action. Merging duplicates reassigns Master Seal rows to the kept member.
 
+## Personal class & build selector
+
+A signed-in member can record a **primary** class and any number of **secondary** classes, each with one build path, from a compact selector directly beneath **My Progress** in the sidebar. The selection is personal — it drives the member's own active-class indicator and never changes, filters or touches the guild leaderboards.
+
+- **Canonical catalogue:** `classes.js` (frontend, browser global `BPSR_CLASSES`) is the single source of truth for the nine classes, their red/blue/green colour tokens, and their exact build paths. `Classes.gs` holds an identical backend copy; `tests/backend/classes-catalogue.test.js` fails if the two ever drift. "Primary/Secondary" is the entry's importance to the member; "Main/Frostbeam/…" is the build path — they are kept strictly separate, and Main is never a synonym for Primary.
+- **Icons:** the nine white-glyph PNGs live in `assets/classes/<class-id>.png` (copied from the supplied `128.rar`; the `Profession_N.png → class` mapping is recorded explicitly in `classes.js` as `CLASS_ICON_SOURCE`). They are displayed white-masked to the class colour via CSS `mask`, so the source assets are never recoloured.
+- **Storage & API:** selections live in a dedicated `Classes` sheet (`SelectionId, MemberId, EntryType, ClassId, BuildId, Active, CreatedAt, UpdatedAt`), created by `setupSpreadsheet()`/`ensureClassSheet_()` — additive, no existing data touched. The API actions `myClasses`, `saveClass`, `setActiveClass`, `promoteClass` and `deleteClass` validate the class/build pair against the catalogue, enforce exactly one primary per user inside a script lock, reject invalid or duplicate combinations, and never let one member mutate another's selections.
+- **Compatibility note:** existing Master Seal / SV progress is keyed to the member, not to a class, so it is left exactly as-is; the class selection is a personal annotation surfaced in the member's active-class indicator. No progress is re-keyed or lost.
+
 ## Backend setup and redeployment
 
 1. Back up the production spreadsheet and open **Extensions → Apps Script**.

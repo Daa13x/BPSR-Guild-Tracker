@@ -154,9 +154,9 @@ test('no shipped frontend file can render a vague or stale backend message', () 
 test('static assets share one cache token so a change cannot be served stale', () => {
   const html = fs.readFileSync('Leaderboard.html', 'utf8');
   const tokens = [...html.matchAll(/(?:src|href)="[\w.-]+\.(?:js|css)\?v=([\w.-]+)"/g)].map(m => m[1]);
-  assert.equal(tokens.length, 6, 'every script and stylesheet carries a cache token');
+  assert.equal(tokens.length, 8, 'every script and stylesheet carries a cache token');
   assert.equal(new Set(tokens).size, 1, 'all assets share one token');
-  assert.ok(Number(tokens[0]) >= 7, 'token was bumped past the previously published build');
+  assert.ok(Number(tokens[0]) >= 15, 'token was bumped past the previously published build');
 });
 
 test('the old Master Seal URL redirects into the single dashboard', () => {

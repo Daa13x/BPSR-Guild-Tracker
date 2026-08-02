@@ -9,11 +9,23 @@ const required = [
   'Code.gs',
   'AuthApi.gs',
   'MasterSeal.gs',
+  'Classes.gs',
   'AppFrontend.js',
   'Boards.js',
+  'classes.js',
+  'ClassSelector.js',
   'MasterSeal.html',
   'MasterSealPage.js',
   'master-seal.css',
+  'assets/classes/beat-performer.png',
+  'assets/classes/frost-mage.png',
+  'assets/classes/heavy-guardian.png',
+  'assets/classes/marksman.png',
+  'assets/classes/shield-knight.png',
+  'assets/classes/stormblade.png',
+  'assets/classes/twin-striker.png',
+  'assets/classes/verdant-oracle.png',
+  'assets/classes/wind-knight.png',
   'assets/fonts/Philosopher-Bold.woff',
   'assets/fonts/Philosopher-Regular.woff',
   'config.js',
@@ -96,7 +108,7 @@ requireText('.github/workflows/pages.yml', [
   { label: 'must use deploy-pages', regex: /actions\/deploy-pages@v\d+/ }
 ]);
 
-for (const relative of ['Code.gs', 'AuthApi.gs', 'MasterSeal.gs', 'config.js', 'AppFrontend.js', 'MasterSealPage.js', 'Boards.js']) {
+for (const relative of ['Code.gs', 'AuthApi.gs', 'MasterSeal.gs', 'Classes.gs', 'config.js', 'classes.js', 'AppFrontend.js', 'MasterSealPage.js', 'Boards.js', 'ClassSelector.js']) {
   const absolute = path.join(root, relative);
   if (!fs.existsSync(absolute)) continue;
   try {

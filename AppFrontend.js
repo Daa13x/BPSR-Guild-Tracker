@@ -493,6 +493,8 @@
     if (root.MS_PAGE && root.MS_PAGE.setViewer) {
       root.MS_PAGE.setViewer(state.member ? state.member.characterName : null);
     }
+    // Refresh the personal class selector for the current sign-in state.
+    if (root.CLASS_SELECTOR && root.CLASS_SELECTOR.reload) root.CLASS_SELECTOR.reload();
     var host = document.getElementById('member-ui');
     if (!host) return;
     host.replaceChildren();
@@ -552,66 +554,6 @@
         metrics.appendChild(cardNode);
       });
     host.appendChild(metrics);
-
-    // -- Master activity ranks. The SV floor is edited in the Master Seal
-    //    editor (Stim Vault → Floors), the single source for the SV board. --
-    var form = E('form');
-    form.className = 'progress-card';
-    form.appendChild(E('h3', 'Masters progression'));
-    var hint = E('p', 'Your SV floor is now the Stim Vault in the Master Seal editor on the left.');
-    hint.className = 'seal-hint';
-    form.appendChild(hint);
-    var ranks = E('div');
-    ranks.className = 'rank-grid';
-    form.appendChild(ranks);
-
-    api('activities', {}).then(function (activities) {
-      state.activities = activities;
-      ranks.replaceChildren();
-      activities.forEach(function (activity) {
-        var rank = field(
-          activity.name + ' rank (0–' + activity.maxRank + ')',
-          'rank-' + activity.id,
-          'number',
-          '0–' + activity.maxRank
-        );
-        rank.input.min = '0';
-        rank.input.max = String(activity.maxRank);
-        rank.input.inputMode = 'numeric';
-        rank.input.dataset.activity = activity.id;
-        rank.input.value = profile.masterRanks && profile.masterRanks[activity.id] || 0;
-        ranks.appendChild(rank.wrap);
-      });
-    }).catch(function (failure) {
-      handleError('member', failure);
-    });
-
-    var submit = E('button', 'Save progression');
-    submit.type = 'submit';
-    form.appendChild(submit);
-    form.addEventListener('submit', function (event) {
-      event.preventDefault();
-      if (submit.disabled) return;
-      submit.disabled = true;
-      var masterRanks = {};
-      ranks.querySelectorAll('input[data-activity]').forEach(function (rank) {
-        masterRanks[rank.dataset.activity] = rank.value;
-      });
-      api('progress', {
-        token: memberToken(),
-        masterRanks: masterRanks
-      }).then(function (result) {
-        state.member = result.profile;
-        renderMember();
-        notice('member', result.changed ? 'Progress updated.' : 'No genuine progression change.');
-        if (root.load) root.load();
-      }).catch(function (failure) {
-        handleError('member', failure);
-      }).finally(function () {
-        submit.disabled = false;
-      });
-    });
-    host.appendChild(form);
 
     var sessionRow = E('div');
     sessionRow.className = 'session-actions';

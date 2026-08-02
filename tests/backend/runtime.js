@@ -15,6 +15,7 @@ function runtime() {
     getLastRow() { return this.rows.length; }
     getLastColumn() { return this.rows[0] ? this.rows[0].length : 0; }
     appendRow(r) { this.rows.push(r); }
+    deleteRow(rowNum) { this.rows.splice(rowNum - 1, 1); }
     setFrozenRows() {}
     getRange(r, c, n = 1, m = 1) {
       const s = this;
@@ -45,6 +46,7 @@ function runtime() {
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'Code.gs'), 'utf8'), ctx);
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'AuthApi.gs'), 'utf8'), ctx);
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'MasterSeal.gs'), 'utf8'), ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'Classes.gs'), 'utf8'), ctx);
   ctx.ensureActivePeriod_ = () => ({ ResetPeriodId: 'RP1', _row: 2, FirstUpdaterUserId: '' });
   ctx.setupSpreadsheet();
   ctx.__sheets = sheets;

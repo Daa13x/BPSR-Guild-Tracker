@@ -516,34 +516,18 @@ test('a valid legacy local-storage session migrates once to the cookie and shows
   assert.equal(app.gate.hidden, true);
 });
 
-test('Masters progression sends ranks only; the SV floor moved to the Stim Vault editor', async () => {
-  let resolveProgress;
-  const progressPending = new Promise(resolve => { resolveProgress = resolve; });
-  const app = createHarness((action, data) => {
+test('My Progress no longer shows the Masters progression form', async () => {
+  const app = createHarness((action) => {
     if (action === 'restore') return { member: profile(), session: session('member-token') };
-    if (action === 'progress') return progressPending;
   });
   await app.ready();
   await signIn(app);
+  // Metrics remain; the ranks form and its Save progression button are gone.
   assert.match(app.member.textContent, /SV floor12/, 'SV floor still shown as a read-only metric');
   assert.match(app.member.textContent, /Master points480/);
-  const form = formByButton(app.member, 'Save progression');
-  // The SV floor input is gone from My Progress — it lives in the seal editor now.
-  assert.equal(form.querySelector('input[name="svFloor"]'), null, 'no SV floor input in My Progress');
-  assert.match(app.member.textContent, /Stim Vault in the Master Seal editor/);
-  form.querySelector('input[data-activity]').value = '4';
-  form.dispatch('submit');
-  form.dispatch('submit');
-  await settle(2);
-  const progressCalls = app.calls.filter(call => call.action === 'progress');
-  assert.equal(progressCalls.length, 1, 'disabled submit prevents repeated requests');
-  assert.equal(progressCalls[0].data.token, 'member-token');
-  assert.deepEqual(progressCalls[0].data.masterRanks, { ACT1: '4' });
-  assert.equal('svFloor' in progressCalls[0].data, false, 'progress no longer carries svFloor');
-  assert.equal('masterPoints' in progressCalls[0].data, false);
-  resolveProgress({ changed: true, profile: profile({ svFloor: 15 }) });
-  await settle();
-  assert.match(app.member.querySelector('.notice').textContent, /Progress updated/);
+  assert.equal(formByButton(app.member, 'Save progression'), undefined, 'Masters progression form removed');
+  assert.equal(app.member.querySelector('input[data-activity]'), null, 'no activity-rank inputs');
+  assert.equal(app.calls.some(c => c.action === 'activities'), false, 'no activities fetch for the removed form');
 });
 
 test('the Master Seal editor submits the Stim Vault and six dungeons, deriving cleared', async () => {

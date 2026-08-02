@@ -544,6 +544,12 @@ function api_(a, d) {
   if (a === 'adminReset') return adminReset_(d.token);
   if (a === 'adminCorrectAchievement') return adminCorrect_(d.token, d);
   if (a === 'adminAudit') { admin_(d.token); return table_(SHEETS.AUDIT).rows.slice(-100).map(function (r) { return { at: iso_(r.Timestamp), action: String(r.Action), target: String(r.Target), details: String(r.Details) }; }); }
+  // Personal class / build selections.
+  if (a === 'myClasses') return myClasses_(d.token);
+  if (a === 'saveClass') return saveClass_(d.token, d);
+  if (a === 'setActiveClass') return setActiveClass_(d.token, d);
+  if (a === 'promoteClass') return promoteClass_(d.token, d);
+  if (a === 'deleteClass') return deleteClass_(d.token, d);
   throw apiError_('UNKNOWN_ACTION', 'Unknown action.');
 }
 
