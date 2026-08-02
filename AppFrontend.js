@@ -489,6 +489,10 @@
     // The Master Seal editor lives in its own section; keep it in sync with
     // sign-in state on every member re-render.
     renderSealEditor();
+    // Tell the board who is signed in so the detail panel opens on their row.
+    if (root.MS_PAGE && root.MS_PAGE.setViewer) {
+      root.MS_PAGE.setViewer(state.member ? state.member.characterName : null);
+    }
     var host = document.getElementById('member-ui');
     if (!host) return;
     host.replaceChildren();

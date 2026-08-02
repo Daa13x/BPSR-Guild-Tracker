@@ -67,3 +67,16 @@ test('the floor is not cleared within the same fortnight', () => {
   call(c, 'leaderboard', { token });
   assert.equal(call(c, 'myMasterSeal', { token }).stimVault.points, 30, 'a fresh floor survives a reload');
 });
+
+test('the Master Seal board carries each member SV floor for display and sorting', () => {
+  const c = runtime();
+  const dax = call(c, 'createAccount', { characterName: 'Dax' });
+  const aria = call(c, 'createAccount', { characterName: 'Aria' });
+  call(c, 'masterSealUpdate', { token: dax.session.token, dungeons: {}, stimVault: { points: 40 } });
+  call(c, 'masterSealUpdate', { token: aria.session.token, dungeons: {}, stimVault: { points: 12 } });
+  const board = call(c, 'masterSeal', {}).board;
+  const floors = {};
+  board.forEach(r => { floors[r.name] = r.svFloor; });
+  assert.equal(floors.Dax, 40);
+  assert.equal(floors.Aria, 12);
+});

@@ -11,6 +11,8 @@
 
   var state = {
     season: null,
+    viewerName: null,
+    manualSelect: false,
     members: [],
     selected: null,
     query: '',
@@ -94,6 +96,7 @@
       progress: function (a, b) { return b.progressPercent - a.progressPercent || a.rank - b.rank; },
       remaining: function (a, b) { return a.remainingScore - b.remainingScore || a.rank - b.rank; },
       updated: function (a, b) { return String(b.lastUpdated || '').localeCompare(String(a.lastUpdated || '')) || a.rank - b.rank; },
+      sv: function (a, b) { return (b.svFloor || 0) - (a.svFloor || 0) || a.rank - b.rank; },
       name: function (a, b) { return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : a.name.toLowerCase() > b.name.toLowerCase() ? 1 : 0; }
     };
     return list.sort(sorters[o.sort] || sorters.rank);
@@ -235,6 +238,7 @@
       lastUpdated: row.lastUpdated || null,
       verified: Boolean(row.verified),
       hidden: Boolean(row.hidden),
+      svFloor: Number(row.svFloor) || 0,
       dungeons: dungeons
     };
   }
@@ -296,11 +300,11 @@
     var season = state.season;
     var now = Date.now();
     var html = '<table class="ms-table"><thead>' +
-      '<tr><th colspan="8"></th><th colspan="6" class="ms-group-head">Chaotic Realm Dungeons<small>(best Master clear)</small></th></tr>' +
+      '<tr><th colspan="9"></th><th colspan="6" class="ms-group-head">Chaotic Realm Dungeons<small>(best Master clear)</small></th></tr>' +
       '<tr>' +
       '<th scope="col">Rank</th><th scope="col">Character</th><th scope="col">Total Score</th>' +
       '<th scope="col">Progress</th><th scope="col">Remaining</th><th scope="col">Cleared</th>' +
-      '<th scope="col">Mount</th><th scope="col">Last Updated</th>' +
+      '<th scope="col">Mount</th><th scope="col">Last Updated</th><th scope="col">SV Floor</th>' +
       season.dungeons.map(function (d) {
         return '<th scope="col" class="ms-dh" title="' + esc(d.name) + '">' +
           '<span class="ms-dh-num">' + d.number + '</span>' +
@@ -332,6 +336,7 @@
           ? '<span class="ms-mount on"><img src="' + rewardImage({ rewardType: 'mount' }) + '" alt="" loading="lazy" onerror="this.remove()">Unlocked</span>'
           : '<span class="ms-mount">🔒 Locked</span>') + '</td>' +
         '<td data-l="Updated"><span class="ms-updated">' + fmtDate(m.lastUpdated) + '<small>' + fmtTime(m.lastUpdated) + '</small></span></td>' +
+        '<td data-l="SV Floor"><span class="ms-svfloor' + (m.svFloor >= 60 ? ' full' : '') + '">' + m.svFloor + '<small>/ 60</small></span></td>' +
         m.dungeons.map(function (d) {
           return '<td class="ms-dcell' + (d.cleared ? '' : ' un') + '" data-l="' + esc(d.shortName || d.dungeonName) + '">' +
             '<span class="sr-only">' + esc(d.dungeonName) + ': ' + (d.cleared
@@ -541,18 +546,30 @@
 
   function select(id) {
     state.selected = id;
+    state.manualSelect = true;   // a deliberate choice sticks over the viewer default
     renderTable();
     renderDetail();
   }
 
   function ensureSelection() {
     var visible = selectMembers(state.members, state);
+    // Until the viewer manually picks another member, keep the detail panel on
+    // their own row — even after the board reloads and their row appears late.
+    if (state.viewerName && !state.manualSelect) {
+      var own = null;
+      visible.forEach(function (m) { if (m.name === state.viewerName) own = m.id; });
+      if (own) { state.selected = own; return; }
+    }
     if (state.selected && visible.some(function (m) { return m.id === state.selected; })) return;
     var preferred = null;
-    try {
-      var stored = root.localStorage.getItem('bpsr.member.display');
-      if (stored) visible.forEach(function (m) { if (m.name === stored) preferred = m.id; });
-    } catch (_) { /* storage optional */ }
+    // Default to the signed-in member's own row when it is on the board.
+    if (state.viewerName) visible.forEach(function (m) { if (m.name === state.viewerName) preferred = m.id; });
+    if (!preferred) {
+      try {
+        var stored = root.localStorage.getItem('bpsr.member.display');
+        if (stored) visible.forEach(function (m) { if (m.name === stored) preferred = m.id; });
+      } catch (_) { /* storage optional */ }
+    }
     state.selected = preferred || (visible.length ? visible[0].id : null);
   }
 
@@ -656,7 +673,25 @@
     });
   }
 
-  root.MS_PAGE = { state: state, load: load, select: select, refreshView: refreshView, resetFilters: resetFilters };
+  /** The account controller tells the board who is signed in so the detail
+   * panel opens on the viewer's own row by default. Passing null (sign-out)
+   * lets the board fall back to the top-ranked member. */
+  function setViewer(name) {
+    var next = name || null;
+    if (next === state.viewerName) return;   // unchanged: don't fight a manual selection
+    state.viewerName = next;
+    state.manualSelect = false;   // a new sign-in re-defaults to the viewer's own row
+    try {
+      if (name) root.localStorage.setItem('bpsr.member.display', name);
+      else root.localStorage.removeItem('bpsr.member.display');
+    } catch (_) { /* storage optional */ }
+    state.selected = null;   // force ensureSelection to re-pick the viewer
+    if (state.status === 'ready') refreshView();
+  }
+
+  root.MS_PAGE = { state: state, load: load, select: select, refreshView: refreshView, resetFilters: resetFilters, setViewer: setViewer };
+  // The account controller reloads the board after sign-in / progress saves.
+  root.loadMasterSeal = load;
 
   document.addEventListener('DOMContentLoaded', function () {
     wireControls();

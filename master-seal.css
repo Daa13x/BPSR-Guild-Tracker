@@ -71,10 +71,13 @@ button { cursor: pointer; }
   gap: 14px; padding: 12px; min-height: 100vh; align-items: start;
 }
 /* Left column holds the sidebar nav and, below it, the Master Seal editor.
-   Both boxes fill the column so the editor matches the OnlyPaws box width. */
-.ms-leftcol { display: flex; flex-direction: column; gap: 14px; min-width: 0; position: sticky; top: 12px; align-self: start; }
-.ms-leftcol .ms-sidebar { position: static; max-height: none; align-self: stretch; }
-.ms-leftcol #seal-editor { max-height: calc(100vh - 24px); overflow: auto; }
+   Both boxes fill the column so the editor matches the OnlyPaws box width.
+   The column flows with the page (no inner scroll box), so the full editor —
+   every dungeon and the Save button — is reached by scrolling the page. Only
+   the sidebar nav stays pinned. */
+.ms-leftcol { display: flex; flex-direction: column; gap: 14px; min-width: 0; align-self: start; }
+.ms-leftcol .ms-sidebar { position: sticky; top: 12px; max-height: none; align-self: stretch; }
+.ms-leftcol #seal-editor { max-height: none; overflow: visible; }
 
 .ms-panel, .ms-sidebar, .ms-detail > section {
   background: linear-gradient(180deg, rgba(30, 20, 44, .55), rgba(16, 16, 26, .92));
@@ -208,6 +211,9 @@ button { cursor: pointer; }
 .ms-remaining { color: var(--accent); font-weight: 800; }
 .ms-cleared { color: var(--text-secondary); font-weight: 700; }
 .ms-cleared.full { color: var(--success); }
+.ms-svfloor { font-weight: 800; color: var(--text-primary); }
+.ms-svfloor.full { color: var(--success); }
+.ms-svfloor small { color: var(--text-muted); font-size: 9.5px; font-weight: 600; margin-left: 2px; }
 .ms-mount { display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: 10px; }
 .ms-mount img { width: 22px; height: 15px; border-radius: 4px; border: 1px solid var(--border-bright); object-fit: cover; }
 .ms-mount.on { color: var(--accent); }
@@ -476,6 +482,8 @@ button { cursor: pointer; }
 /* The dropdown (incl. "Not cleared") must fit the narrow left-rail box. */
 .seal-edit select { font-size: 11.5px; padding: 6px 4px; text-overflow: ellipsis; }
 .seal-reset-note { grid-column: 1 / -1; margin: 4px 0 0; color: var(--warning); font-size: 10.5px; }
+/* No empty status box at rest — it only appears when there is a message. */
+#seal-ui .notice:empty { display: none; }
 .seal-save-row { display: flex; justify-content: flex-end; }
 .seal-save-row .btn, #seal-ui .btn { min-height: 38px; padding: 0 18px; border: 1px solid var(--border-bright); border-radius: var(--radius-sm); background: rgba(108, 47, 140, .35); color: var(--accent); font-weight: 700; }
 .seal-save-row .btn:hover { background: rgba(108, 47, 140, .5); }
