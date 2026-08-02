@@ -210,6 +210,48 @@ function ensureBackupCode_(m) {
   return code;
 }
 
+/**
+ * Additively repair the account invariant required by profiles, administration
+ * and recovery: every Members row has exactly one Players row with the same
+ * stable id. Existing progression rows are never overwritten or merged here.
+ * Only an absent row is created; duplicate ids remain visible as a hard error.
+ */
+function ensureMemberPlayerLinks_() {
+  var members = table_(AUTH_SHEETS.MEMBERS).rows;
+  var players = table_(SHEETS.PLAYERS).rows;
+  var byId = {};
+  players.forEach(function (p) { var id = String(p.UserId); (byId[id] = byId[id] || []).push(p); });
+  var created = 0, duplicates = [];
+  members.forEach(function (m) {
+    var id = String(m.MemberId || '');
+    if (!id) return;
+    var matches = byId[id] || [];
+    if (matches.length > 1) { duplicates.push(id); return; }
+    if (matches.length === 1) return;
+    writePlayerRow_({
+      UserId: id, CharacterName: String(m.CharacterName || ''), SVFloor: 0, SVFloorDate: '',
+      EasyComplete: false, EasyDate: '', HardComplete: false, HardDate: '',
+      MasterPoints: 0, MasterPointsDate: '', MountEarned: false, MountEarnedAt: '',
+      MountPosition: '', MountPointsWhenEarned: '', LastUpdated: '',
+      RegisteredAt: m.CreatedAt || new Date(), IsAdmin: false, Notes: '', Hidden: false, Verified: false
+    });
+    created++;
+  });
+  return { created: created, duplicateMemberIds: duplicates };
+}
+
+/** Ensure every active member has a recovery code and that the admin lookup
+ * sheet mirrors the authoritative Members values. */
+function ensureRecoveryRecords_() {
+  var issued = 0, mirrored = 0;
+  table_(AUTH_SHEETS.MEMBERS).rows.forEach(function (m) {
+    if (!m.DisabledAt && !m.BackupCode) { ensureBackupCode_(m); issued++; }
+    else syncBackupCodeRow_(m);
+    mirrored++;
+  });
+  return { issued: issued, mirrored: mirrored };
+}
+
 function touchMemberAccess_(id, force) {
   var m = member_(id);
   if (!m) return;

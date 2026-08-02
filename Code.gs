@@ -113,6 +113,8 @@ function setupSpreadsheet() {
   ensureSheet_(ss, SHEETS.AUDIT, ['Timestamp', 'Actor', 'Action', 'Target', 'Details']);
   // Account data is kept separately from public leaderboard rows.
   ensureAuthSheets_();
+  ensureMemberPlayerLinks_();
+  ensureRecoveryRecords_();
   ensureMasterSealSheet_();
   ensureClassSheet_();   // personal class / build selections (additive, no data loss)
 

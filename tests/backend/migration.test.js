@@ -66,6 +66,25 @@ test('setup is idempotent: a second run changes nothing and erases no codes or s
   assert.equal(restored.member.memberId, 'MEM-legacy-dax');
 });
 
+test('setup creates missing progression links and recovery records without changing existing player data', () => {
+  const c = runtime();
+  const member = call(c, 'createAccount', { characterName: 'Dax' }).member;
+  const players = c.readTable_('Players');
+  players.sheet.deleteRow(players.rows[0]._row);
+  const memberTable = c.readTable_(c.AUTH_SHEETS.MEMBERS);
+  const memberRow = memberTable.rows.find(r => String(r.MemberId) === String(member.memberId));
+  memberTable.sheet.getRange(memberRow._row, memberTable.headers.indexOf('BackupCode') + 1).setValue('');
+  c.setupSpreadsheet();
+  const repaired = c.readTable_('Players').rows.filter(r => String(r.UserId) === String(member.memberId));
+  assert.equal(repaired.length, 1);
+  assert.equal(repaired[0].CharacterName, 'Dax');
+  const members = c.readTable_(c.AUTH_SHEETS.MEMBERS).rows.filter(r => String(r.MemberId) === String(member.memberId));
+  assert.match(String(members[0].BackupCode), /^BPSR-/);
+  const codes = c.readTable_(c.AUTH_SHEETS.CODES).rows.filter(r => String(r.MemberId) === String(member.memberId));
+  assert.equal(codes.length, 1);
+  assert.equal(codes[0].BackupCode, members[0].BackupCode);
+});
+
 test('legacy members migrate in place: same IDs, same links, same progression, roles preserved', () => {
   const c = runtime();
   seedOldSchema(c);
