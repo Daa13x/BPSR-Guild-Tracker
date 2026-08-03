@@ -361,7 +361,6 @@
       '<th scope="col">Mount</th><th scope="col">Last Updated</th><th scope="col">SV Floor</th>' +
       season.dungeons.map(function (d) {
         return '<th scope="col" class="ms-dh" title="' + esc(d.name) + '">' +
-          '<span class="ms-dh-num">' + d.number + '</span>' +
           '<span class="ms-dh-name">' + esc(d.shortName || d.name) + '</span></th>';
       }).join('') +
       '</tr></thead><tbody>';

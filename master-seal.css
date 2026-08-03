@@ -180,9 +180,10 @@ button { cursor: pointer; }
 .ms-table thead tr:last-child th { top: 24px; }
 .ms-group-head { text-align: center !important; color: var(--accent-soft) !important; letter-spacing: .14em !important; border-left: 1px solid var(--border); }
 .ms-group-head small { display: inline; margin-left: 5px; color: var(--text-muted); font-size: 8.5px; letter-spacing: .05em; text-transform: none; font-weight: 700; }
-.ms-dh { text-align: center !important; min-width: 44px; width: 46px; }
-.ms-dh-num { display: inline-grid; place-items: center; width: 15px; height: 15px; border: 1px solid var(--border-bright); border-radius: 4px; background: rgba(108, 47, 140, .28); color: var(--accent); font-size: 8.5px; }
-.ms-dh-name { display: block; margin-top: 2px; max-width: 44px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 8px; letter-spacing: .02em; }
+.ms-group-head { min-width: 330px; white-space: normal !important; text-align: center !important; line-height: 1.2; }
+.ms-group-head small { display: block; margin-top: 1px; font-size: 7px; letter-spacing: .04em; }
+.ms-dh { text-align: center !important; min-width: 54px; width: 55px; white-space: normal !important; vertical-align: middle; }
+.ms-dh-name { display: block; max-width: 54px; margin: 0 auto; overflow-wrap: anywhere; white-space: normal; font-size: 7.5px; line-height: 1.12; letter-spacing: .01em; }
 .ms-table td { padding: 5px 5px; border-bottom: 1px solid rgba(53, 32, 55, .55); white-space: nowrap; color: var(--text-primary); }
 .ms-table tbody tr { cursor: pointer; }
 .ms-table tbody tr:hover td { background: rgba(207, 130, 239, .07); }
