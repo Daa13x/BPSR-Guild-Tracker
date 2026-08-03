@@ -348,7 +348,12 @@ function outgoingAccountLinks_(id) {
 }
 function sessionGroupRoot_(s) { return String(s.GroupRootMemberId || s.MemberId); }
 function sessionActiveMemberId_(s) { return String(s.ActiveMemberId || s.MemberId); }
-function sessionCanManageLinkedAccounts_(s) { return truthy_(s.AccountGroupAccess); }
+/** Old remembered sessions predate AccountGroupAccess. Treat an account as a
+ * managing main when it has no incoming Alt link; an Alt's direct session
+ * remains restricted even if it was created before this flag existed. */
+function sessionCanManageLinkedAccounts_(s) {
+  return truthy_(s.AccountGroupAccess) || !incomingAccountLink_(String(s.MemberId));
+}
 function accessibleAccountIds_(s, links) {
   var root = sessionGroupRoot_(s);
   if (!sessionCanManageLinkedAccounts_(s)) return [String(s.MemberId)];
