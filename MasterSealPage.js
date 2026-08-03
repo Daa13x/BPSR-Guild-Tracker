@@ -286,6 +286,7 @@
       lastUpdated: row.lastUpdated || null,
       verified: Boolean(row.verified),
       hidden: Boolean(row.hidden),
+      raid: Boolean(row.raid),
       classes: Array.isArray(row.classes) ? row.classes.map(function (entry) { return { classId: String(entry.classId || ''), buildId: String(entry.buildId || entry.buildPathId || '') }; }) : [],
       svFloor: normaliseSvFloor(row.svFloor === undefined ? row.SVFloor : row.svFloor),
       dungeons: dungeons
