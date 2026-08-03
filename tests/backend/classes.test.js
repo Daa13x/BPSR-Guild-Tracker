@@ -36,6 +36,10 @@ test('saveClasses persists an ordered collection in one record and reloads it un
   ];
   const saved = call(c, 'saveClasses', { token: t, entries });
   assert.deepEqual(JSON.parse(JSON.stringify(saved.entries)), entries);
+  assert.equal(saved.selections[0].entryType, 'primary');
+  assert.deepEqual(saved.selections.slice(1).map(s => s.entryType), ['secondary', 'secondary', 'secondary']);
+  const stored = JSON.parse(c.__sheets.ClassSelections.rows[1][1]);
+  assert.deepEqual(stored.map(s => s.entryType), ['primary', 'secondary', 'secondary', 'secondary']);
   assert.equal(c.__sheets.ClassSelections.rows.length, 2, 'one header and one complete collection row');
   assert.deepEqual(JSON.parse(JSON.stringify(call(c, 'myClasses', { token: t }).entries)), entries, 'reload preserves order');
 });

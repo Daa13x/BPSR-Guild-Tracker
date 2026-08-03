@@ -127,7 +127,7 @@ function saveClasses_(token, d) {
   var entries = d.entries;
   if (!Array.isArray(entries)) throw apiError_('VALIDATION', 'Classes must be a list.');
   var seen = {};
-  var clean = entries.map(function (entry) {
+  var clean = entries.map(function (entry, index) {
     if (!entry || typeof entry !== 'object') throw apiError_('VALIDATION', 'Each class entry must be valid.');
     var classId = String(entry.classId || '');
     var buildId = String(entry.buildId || entry.buildPathId || '');
@@ -135,7 +135,9 @@ function saveClasses_(token, d) {
     var key = classId + '|' + buildId;
     if (seen[key]) throw apiError_('DUPLICATE', 'That class and build are already in your list.');
     seen[key] = true;
-    return { classId: classId, buildId: buildId };
+    // The ordered collection is authoritative: index zero is always primary.
+    // Store the role explicitly as well so the spreadsheet remains readable.
+    return { classId: classId, buildId: buildId, entryType: index === 0 ? 'primary' : 'secondary' };
   });
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
