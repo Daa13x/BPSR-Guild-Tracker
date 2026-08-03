@@ -28,6 +28,18 @@ test('a main account links an existing alt once and can switch its active profil
   assert.equal(call(c, 'refresh', { token: main.session.token, kind: 'member' }).profile.characterName, 'Alt Paw');
 });
 
+test('a main account can create and link a fresh secondary character without switching away', () => {
+  const c = runtime();
+  const main = call(c, 'createAccount', { characterName: 'Main Paw' });
+  const created = call(c, 'createAltAccount', { token: main.session.token, characterName: 'Fresh Alt' });
+  assert.equal(created.account.characterName, 'Fresh Alt');
+  assert.match(created.backupCode, /^BPSR-/);
+  assert.equal(created.accounts.activeMemberId, main.member.memberId);
+  assert.equal(created.accounts.accounts.length, 2);
+  assert.equal(c.readTable_(c.AUTH_SHEETS.LINKS).rows.filter(r => !r.UnlinkedAt).length, 1);
+  assert.throws(() => call(c, 'createAltAccount', { token: main.session.token, characterName: 'Fresh Alt' }), /already has an account/);
+});
+
 test('linked account checks reject invalid codes, self links, other mains and unrelated ids', () => {
   const c = runtime();
   const { main, alt, other } = accounts(c);

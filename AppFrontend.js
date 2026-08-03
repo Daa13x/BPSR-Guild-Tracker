@@ -632,6 +632,27 @@
         tools.appendChild(form); code.input.focus();
       });
       tools.appendChild(link);
+      var createAlt = E('button', 'Create secondary character'); createAlt.type = 'button'; createAlt.className = 'btn ghost';
+      createAlt.addEventListener('click', function () {
+        tools.replaceChildren();
+        var form = E('form'); form.className = 'account-link-form';
+        form.appendChild(E('p', 'Create a new character and link it to this main account. You will receive one recovery code for the new character.'));
+        var name = field('Secondary character name', 'alt-character-name', 'text', 'Enter character name'); name.input.autocomplete = 'off'; form.appendChild(name.wrap);
+        var submit = E('button', 'Create and link character'); submit.type = 'submit'; submit.className = 'btn'; form.appendChild(submit);
+        form.addEventListener('submit', function (event) {
+          event.preventDefault(); submit.disabled = true;
+          api('createAltAccount', { token: memberToken(), characterName: name.input.value }).then(function (result) {
+            state.accounts = result.accounts;
+            form.replaceChildren();
+            form.appendChild(E('p', result.account.characterName + ' is now linked as a secondary character. Save this recovery code before closing.'));
+            var code = E('output', result.backupCode); code.className = 'backup-code'; form.appendChild(code);
+            var copy = E('button', 'Copy recovery code'); copy.type = 'button'; copy.className = 'btn ghost'; copy.addEventListener('click', function () { copyText(result.backupCode).then(function () { copy.textContent = 'Copied'; }).catch(function () { copy.textContent = 'Copy failed'; }); }); form.appendChild(copy);
+            var switchButton = E('button', 'Switch to ' + result.account.characterName); switchButton.type = 'button'; switchButton.className = 'btn'; switchButton.addEventListener('click', function () { switchButton.disabled = true; switchActiveAccount(result.account.memberId); closeAccountChooser(); }); form.appendChild(switchButton);
+          }).catch(function (failure) { error(friendlyFailure(failure)); submit.disabled = false; });
+        });
+        tools.appendChild(form); name.input.focus();
+      });
+      tools.appendChild(createAlt);
     }
     modal.addEventListener('click', function (event) { if (event.target === modal) closeAccountChooser(); });
     modal.addEventListener('keydown', function (event) { if (event.key === 'Escape') closeAccountChooser(); });

@@ -450,6 +450,28 @@ function unlinkAltAccount_(token, memberId) {
   } finally { lock.releaseLock(); }
 }
 
+/** Create a fresh secondary character already linked to the signed-in main.
+ * Its recovery code is returned once to the caller; the main session stays
+ * active so creating an alt never unexpectedly switches account. */
+function createAltAccount_(token, d) {
+  ensureAuthSheets_();
+  var s = activeMemberSession_(token);
+  if (!sessionCanManageLinkedAccounts_(s)) throw apiError_('FORBIDDEN', 'Only the main account can create a secondary character.');
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var name = cleanName_(d.characterName), n = norm_(name);
+    if (memberName_(name)) throw apiError_('DUPLICATE', 'That character name already has an account. Link it with its recovery code instead.');
+    var id = uid_('MEM'), code = newBackupCode_(), now = new Date(), root = sessionGroupRoot_(s);
+    SpreadsheetApp.getActiveSpreadsheet().getSheetByName(AUTH_SHEETS.MEMBERS)
+      .appendRow([id, name, n, '', '', now, '', code, now, now, now]);
+    writePlayerRow_({ UserId: id, CharacterName: name, SVFloor: 0, SVFloorDate: '', EasyComplete: false, EasyDate: '', HardComplete: false, HardDate: '', RaidComplete: false, RaidDate: '', MasterComplete: false, MasterDate: '', MasterPoints: 0, MasterPointsDate: '', MountEarned: false, MountEarnedAt: '', MountPosition: '', MountPointsWhenEarned: '', LastUpdated: now, RegisteredAt: now, IsAdmin: false, Notes: '' });
+    syncBackupCodeRow_({ MemberId: id, CharacterName: name, BackupCode: code, BackupCodeCreatedAt: now, BackupCodeUpdatedAt: now, DisabledAt: '' });
+    SpreadsheetApp.getActiveSpreadsheet().getSheetByName(AUTH_SHEETS.LINKS).appendRow([root, id, now, '', String(s.MemberId)]);
+    audit_(String(s.MemberId), 'CREATE_ALT_ACCOUNT', id, 'Created and linked secondary character');
+    return { account: { memberId: id, characterName: name }, backupCode: code, accounts: listAccessibleAccounts_(token) };
+  } finally { lock.releaseLock(); }
+}
+
 function throttle_(key, success, message) {
   var msg = message || 'Invalid credentials.';
   var t = table_(AUTH_SHEETS.ATTEMPTS), r = t.rows.filter(function (x) { return String(x.Key) === key; })[0], now = Date.now();
@@ -740,6 +762,7 @@ function api_(a, d) {
   if (a === 'listAccessibleAccounts') return listAccessibleAccounts_(d.token);
   if (a === 'previewAltAccount') return previewAltAccount_(d.token, d.backupCode);
   if (a === 'linkAltAccount') return linkAltAccount_(d.token, d.backupCode);
+  if (a === 'createAltAccount') return createAltAccount_(d.token, d);
   if (a === 'unlinkAltAccount') return unlinkAltAccount_(d.token, d.memberId);
   if (a === 'switchActiveAccount') return switchActiveAccount_(d.token, d.memberId);
   if (a === 'logout') { if (d.token) { var logoutKind = d.kind === 'admin' ? 'admin' : 'member'; session_(d.token, logoutKind); revokeToken_(d.token, logoutKind); } return { ok: true }; }
