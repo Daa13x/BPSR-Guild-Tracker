@@ -282,32 +282,32 @@ function sealDifficultyWrite_(memberId, entry) {
 
 /** Own progress for the signed-in member, Stim Vault included and reset-checked. */
 function myMasterSeal_(token) {
-  var s = session_(token, 'member');
-  var stim = stimVaultPublic_(s.MemberId);   // applies the biweekly reset on load
-  var mine = sealRowsByMember_()[String(s.MemberId)];
+  var memberId = activeMemberId_(token);
+  var stim = stimVaultPublic_(memberId);   // applies the biweekly reset on load
+  var mine = sealRowsByMember_()[String(memberId)];
   var dungeons = sealProgress_(mine);
   return {
     season: sealSeasonPublic_(), dungeons: dungeons, totals: sealTotals_(dungeons), stimVault: stim,
-    difficulty: sealDifficultyPublic_(s.MemberId)
+    difficulty: sealDifficultyPublic_(memberId)
   };
 }
 
 function masterSealUpdate_(token, d) {
-  var s = session_(token, 'member');
+  var memberId = activeMemberId_(token);
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
-    var changed = sealWrite_(s.MemberId, d.dungeons);
-    var stimChanged = d.stimVault ? stimWrite_(s.MemberId, d.stimVault) : false;
-    var difficultyChanged = d.difficulty ? sealDifficultyWrite_(s.MemberId, d.difficulty) : false;
-    var mine = sealRowsByMember_()[String(s.MemberId)];
+    var changed = sealWrite_(memberId, d.dungeons);
+    var stimChanged = d.stimVault ? stimWrite_(memberId, d.stimVault) : false;
+    var difficultyChanged = d.difficulty ? sealDifficultyWrite_(memberId, d.difficulty) : false;
+    var mine = sealRowsByMember_()[String(memberId)];
     var dungeons = sealProgress_(mine);
     return {
       changed: changed || stimChanged || difficultyChanged,
       dungeons: dungeons,
       totals: sealTotals_(dungeons),
-      stimVault: stimVaultPublic_(s.MemberId),
-      difficulty: sealDifficultyPublic_(s.MemberId)
+      stimVault: stimVaultPublic_(memberId),
+      difficulty: sealDifficultyPublic_(memberId)
     };
   } finally {
     lock.releaseLock();

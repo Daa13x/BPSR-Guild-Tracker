@@ -254,6 +254,10 @@ button { cursor: pointer; }
 .ms-profile-score span { color: var(--text-muted); font-size: 9px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
 .ms-profile-score strong { font-family: var(--display); font-size: 30px; color: var(--accent); text-shadow: 0 0 20px rgba(207, 130, 239, .45); line-height: 1.05; }
 .ms-profile-score em { font-style: normal; color: var(--text-muted); font-size: 13px; font-weight: 700; }
+.ms-change-account { min-height: 34px; padding: 0 11px; border: 1px solid var(--line); border-radius: 9px; color: var(--text); background: rgba(207,130,239,.1); font-weight: 800; white-space: nowrap; }
+.ms-change-account:hover { border-color: var(--accent); background: rgba(207,130,239,.2); }
+.ms-change-account:disabled { opacity: .55; cursor: wait; }
+@media (max-width: 620px) { .ms-change-account { order: 4; flex-basis: auto; } }
 .ms-profile-bar { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
 .ms-profile-bar .track { flex: 1; height: 8px; border-radius: 5px; background: #0a0810; overflow: hidden; }
 .ms-profile-bar .track i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent-deep), var(--accent)); box-shadow: 0 0 12px rgba(207, 130, 239, .5); }

@@ -8,7 +8,7 @@
   var ACTIVE_WINDOW_MS = 24 * 60 * 60 * 1000;   // "recently active" indicator
   var STALE_DAYS = 14;
   var DEFAULT_PAGE_SIZE = 10;
-  var loadInFlight = null;
+  var loadInFlight = null, loadGeneration = 0;
 
   var state = {
     season: null,
@@ -500,6 +500,7 @@
     var season = state.season;
     var pct = Math.round(member.progressPercent);
     var active = recentlyActive(member.lastUpdated);
+    var canChangeAccount = Boolean(root.BPSR_ACCOUNTS && root.BPSR_ACCOUNTS.available && root.BPSR_ACCOUNTS.available());
 
     var html = '<section class="ms-profile">' +
       '<div class="ms-profile-top">' +
@@ -507,6 +508,7 @@
         '<div class="ms-profile-id"><h2>' + esc(member.name) + '</h2>' +
           '<p>Rank ' + member.rank + ' · ' + esc(season.displayName) + ' Master Seal · ' +
           (active ? 'active recently' : 'not active recently') + '</p></div>' +
+        (canChangeAccount ? '<button type="button" class="ms-change-account" id="ms-change-account">↔ Change Account</button>' : '') +
         '<div class="ms-profile-score"><span>Total score</span>' +
           '<strong>' + num(member.totalScore) + '<em> / ' + num(season.maxScore) + '</em></strong></div>' +
       '</div>' +
@@ -595,6 +597,8 @@
         root.setTimeout(hideTip, 6000);
       });
     }
+    var changeAccount = byId('ms-change-account');
+    if (changeAccount) changeAccount.addEventListener('click', function () { root.BPSR_ACCOUNTS.open(); });
   }
 
   // ---------------------------------------------------------------------
@@ -701,11 +705,13 @@
     }
   }
 
-  function load() {
-    if (loadInFlight) return loadInFlight;
+  function load(force) {
+    if (loadInFlight && !force) return loadInFlight;
+    var generation = ++loadGeneration;
     setConnection('', 'Connecting…');
     var token = root.BPSR_SESSION ? root.BPSR_SESSION.token() : '';
     loadInFlight = api('masterSeal', token ? { token: token } : {}).then(function (data) {
+      if (generation !== loadGeneration) return;
       state.season = data.season;
       state.members = (data.board || []).map(function (row, i) { return adaptMember(row, data.season, i); });
       state.status = 'ready';
@@ -718,6 +724,7 @@
       renderSeasonNote();   // show the real season schedule as soon as it arrives
       refreshView();
     }).catch(function (failure) {
+      if (generation !== loadGeneration) return;
       state.status = 'error';
       // Never surface the raw backend string; classify the failure honestly
       // and keep the technical detail in the console.
@@ -728,7 +735,7 @@
       setConnection('bad', classified.status);
       renderTable();
       renderDetail();
-    }).finally(function () { loadInFlight = null; });
+    }).finally(function () { if (generation === loadGeneration) loadInFlight = null; });
     return loadInFlight;
   }
 

@@ -19,7 +19,10 @@
     selected: null,
     selectedProfile: null,
     activities: [],
-    mySeal: null
+    mySeal: null,
+    accounts: null,
+    switchingAccount: false,
+    accountEpoch: 0
   };
 
   function configured() {
@@ -130,6 +133,8 @@
     state.backupCode = null;
     state.codeAcknowledged = true;
     state.mySeal = null;
+    state.accounts = null;
+    state.switchingAccount = false;
     syncAdminVisibility(Boolean(state.recoveryToken));
     renderMember();
     renderAdmin();
@@ -383,6 +388,7 @@
   }
 
   function adoptSession(result, options) {
+    state.accountEpoch++;
     state.session = { token: result.session.token, expiresAt: result.session.expiresAt };
     state.member = result.member;
     writeCookie(result.session.token, result.session.expiresAt);
@@ -397,6 +403,7 @@
     if (state.member.isAdmin) renderAdmin();
     if (root.load) root.load();
     if (root.loadMasterSeal) root.loadMasterSeal();
+    refreshAccessibleAccounts().catch(function () { /* chooser retries on open */ });
   }
 
   // -------------------------------------------------------------------------
@@ -482,6 +489,116 @@
   }
 
   // -------------------------------------------------------------------------
+  // Linked-account chooser. The token remains opaque in the cookie; selecting
+  // an account only changes the server-side active account after authorisation.
+  // -------------------------------------------------------------------------
+
+  function refreshAccessibleAccounts() {
+    if (!memberToken()) return Promise.resolve(null);
+    var epoch = state.accountEpoch;
+    return api('listAccessibleAccounts', { token: memberToken() }).then(function (accounts) {
+      if (epoch === state.accountEpoch) state.accounts = accounts;
+      return accounts;
+    });
+  }
+
+  function closeAccountChooser() {
+    var modal = document.getElementById('account-switch-modal');
+    if (modal) modal.remove();
+  }
+
+  function showAccountChooser() {
+    if (!state.session || state.switchingAccount) return;
+    closeAccountChooser();
+    var modal = E('div');
+    modal.id = 'account-switch-modal'; modal.className = 'account-switch-modal';
+    modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'account-switch-title');
+    var card = E('section'); card.className = 'account-switch-card'; modal.appendChild(card);
+    var head = E('div'); head.className = 'account-switch-head';
+    var title = E('h2', 'Choose account'); title.id = 'account-switch-title'; head.appendChild(title);
+    var close = E('button', '×'); close.type = 'button'; close.className = 'account-switch-close'; close.setAttribute('aria-label', 'Close account chooser');
+    close.addEventListener('click', closeAccountChooser); head.appendChild(close); card.appendChild(head);
+    var noticeNode = E('p', 'Loading linked accounts…'); noticeNode.className = 'account-switch-notice'; card.appendChild(noticeNode);
+    var list = E('div'); list.className = 'account-switch-list'; card.appendChild(list);
+    var tools = E('div'); tools.className = 'account-switch-tools'; card.appendChild(tools);
+    function error(message) { noticeNode.textContent = message; noticeNode.className = 'account-switch-notice error'; }
+    function render(accounts) {
+      list.replaceChildren();
+      noticeNode.textContent = accounts.canManage ? 'Your main account and linked alts.' : 'This direct alt login can access this account only.';
+      accounts.accounts.forEach(function (account) {
+        var row = E('button'); row.type = 'button'; row.className = 'account-switch-row' + (account.active ? ' active' : '');
+        row.disabled = account.active;
+        var avatar = E('span', String(account.characterName || '?').charAt(0).toUpperCase()); avatar.className = 'account-switch-avatar'; row.appendChild(avatar);
+        var copy = E('span'); copy.className = 'account-switch-copy'; copy.appendChild(E('strong', account.characterName));
+        copy.appendChild(E('small', account.isMain ? 'Main' : 'Alt account · SV floor ' + account.svFloor)); row.appendChild(copy);
+        if (account.active) row.appendChild(E('span', 'Active'));
+        if (!account.isMain && accounts.canManage) {
+          var unlink = E('button', 'Unlink'); unlink.type = 'button'; unlink.className = 'account-unlink';
+          unlink.addEventListener('click', function (event) {
+            event.preventDefault(); event.stopPropagation();
+            if (!root.confirm('Unlink ' + account.characterName + '? Their tracker data will not be deleted.')) return;
+            unlink.disabled = true;
+            api('unlinkAltAccount', { token: memberToken(), memberId: account.memberId }).then(function (updated) {
+              state.accounts = updated; if (state.member && state.member.memberId === account.memberId) switchActiveAccount(updated.mainMemberId);
+              else render(updated);
+            }).catch(function (failure) { error(friendlyFailure(failure)); unlink.disabled = false; });
+          });
+          row.appendChild(unlink);
+        }
+        row.addEventListener('click', function () { if (!account.active) switchActiveAccount(account.memberId); });
+        list.appendChild(row);
+      });
+      if (!accounts.canManage) return;
+      var link = E('button', 'Link alt account'); link.type = 'button'; link.className = 'btn';
+      link.addEventListener('click', function () {
+        tools.replaceChildren();
+        var form = E('form'); form.className = 'account-link-form';
+        form.appendChild(E('p', 'Enter the existing alt account recovery code to prove you control it.'));
+        var code = field('Alt recovery code', 'alt-code', 'text', 'BPSR-XXXX-XXXX-XXXX'); code.input.autocomplete = 'off'; form.appendChild(code.wrap);
+        var verify = E('button', 'Verify account'); verify.type = 'submit'; verify.className = 'btn'; form.appendChild(verify);
+        form.addEventListener('submit', function (event) {
+          event.preventDefault(); verify.disabled = true;
+          api('previewAltAccount', { token: memberToken(), backupCode: code.input.value }).then(function (candidate) {
+            form.replaceChildren(); form.appendChild(E('p', 'Link ' + candidate.characterName + ' as an alt account?'));
+            var confirm = E('button', 'Link ' + candidate.characterName); confirm.type = 'button'; confirm.className = 'btn'; form.appendChild(confirm);
+            confirm.addEventListener('click', function () {
+              confirm.disabled = true;
+              api('linkAltAccount', { token: memberToken(), backupCode: code.input.value }).then(function (updated) { state.accounts = updated; tools.replaceChildren(); render(updated); })
+                .catch(function (failure) { error(friendlyFailure(failure)); confirm.disabled = false; });
+            });
+          }).catch(function (failure) { error(friendlyFailure(failure)); verify.disabled = false; });
+        });
+        tools.appendChild(form); code.input.focus();
+      });
+      tools.appendChild(link);
+    }
+    modal.addEventListener('click', function (event) { if (event.target === modal) closeAccountChooser(); });
+    modal.addEventListener('keydown', function (event) { if (event.key === 'Escape') closeAccountChooser(); });
+    document.body.appendChild(modal); close.focus();
+    refreshAccessibleAccounts().then(function (accounts) { if (document.body.contains(modal) && accounts) render(accounts); })
+      .catch(function (failure) { error(friendlyFailure(failure)); });
+  }
+
+  function switchActiveAccount(memberId) {
+    var epoch = ++state.accountEpoch;
+    state.switchingAccount = true; state.mySeal = null;
+    renderMember();
+    return api('switchActiveAccount', { token: memberToken(), memberId: memberId }).then(function (result) {
+      if (epoch !== state.accountEpoch) return;
+      state.member = result.member; state.accounts = result.accounts; state.switchingAccount = false;
+      closeAccountChooser();
+      renderMember();
+      if (root.load) root.load(true);
+      if (root.MS_PAGE && root.MS_PAGE.setViewer) root.MS_PAGE.setViewer(state.member.characterName);
+      if (root.loadMasterSeal) root.loadMasterSeal(true);
+    }).catch(function (failure) {
+      if (epoch === state.accountEpoch) { state.switchingAccount = false; renderMember(); }
+      throw failure;
+    });
+  }
+
+  // -------------------------------------------------------------------------
   // Member area
   // -------------------------------------------------------------------------
 
@@ -503,6 +620,10 @@
     message.setAttribute('role', 'status');
     host.appendChild(message);
 
+    if (state.session && state.switchingAccount) {
+      message.textContent = 'Switching account…';
+      return;
+    }
     if (!state.session || !state.member) {
       syncAdminVisibility(Boolean(state.recoveryToken));
       message.textContent = configured()
@@ -557,6 +678,7 @@
 
     var sessionRow = E('div');
     sessionRow.className = 'session-actions';
+    sessionRow.appendChild(actionButton('Change Account', 'member', showAccountChooser));
     sessionRow.appendChild(actionButton('Sign out of this device', 'member', function () {
       return api('logout', { token: memberToken(), kind: 'member' }).catch(function () { /* revoke is best effort */ })
         .then(function () {
@@ -1262,6 +1384,7 @@
       return api('refresh', { token: token, kind: 'member' }).then(function (result) {
         state.session = { token: token, expiresAt: result.expiresAt };
         state.member = result.profile;
+        state.accounts = result.accounts || null;
         hideGate();
         syncAdminVisibility(Boolean(result.profile.isAdmin));
         renderMember();
@@ -1331,6 +1454,12 @@
     configured: configured,
     cookieName: cookieName,
     cookiePath: cookiePath
+  };
+  root.BPSR_ACCOUNTS = {
+    open: showAccountChooser,
+    switchTo: switchActiveAccount,
+    refresh: refreshAccessibleAccounts,
+    available: function () { return Boolean(state.session && state.member && !state.switchingAccount); }
   };
 
   document.addEventListener('DOMContentLoaded', function () {

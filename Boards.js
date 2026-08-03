@@ -5,7 +5,7 @@
  * ribbon and the hash routing for the single dashboard page. */
 'use strict';
 var DATA = null;
-var leaderboardLoadInFlight = null;
+var leaderboardLoadInFlight = null, leaderboardLoadGeneration = 0;
 // Each board owns its own search and filter state so the SV and Masters
 // sections behave as two independent leaderboards.
 var BOARDS = ['sv', 'mp'];
@@ -30,8 +30,9 @@ function classify(failure, context){
 }
 
 // ---------- data loading ----------
-function load(){
-  if (leaderboardLoadInFlight) return leaderboardLoadInFlight;
+function load(force){
+  if (leaderboardLoadInFlight && !force) return leaderboardLoadInFlight;
+  var generation = ++leaderboardLoadGeneration;
   var stampEl = document.getElementById('stamp');
   if (stampEl) stampEl.textContent = API_URL ? 'Loading…' : 'Preview data — no backend connected';
   setConnectionStatus(API_URL ? 'connecting' : 'not configured');
@@ -39,13 +40,14 @@ function load(){
   if (API_URL) {
     // Send the session token so a hidden viewer still receives their own row.
     var token = window.BPSR_SESSION ? window.BPSR_SESSION.token() : '';
-    leaderboardLoadInFlight = api('leaderboard', token ? { token: token } : {}).then(function(d){DATA=d;setConnectionStatus('connected');render();}).catch(function(err){
+    leaderboardLoadInFlight = api('leaderboard', token ? { token: token } : {}).then(function(d){if(generation!==leaderboardLoadGeneration)return;DATA=d;setConnectionStatus('connected');render();}).catch(function(err){
+      if(generation!==leaderboardLoadGeneration)return;
       var failure = classify(err, 'leaderboard');
       setConnectionStatus(failure.status);
       if (stampEl) stampEl.textContent = failure.title;
       DATA = null;
       BOARDS.forEach(function(key){ renderBoardState(key, 'error', failure.title, failure.detail); });
-    }).finally(function(){ leaderboardLoadInFlight = null; });
+    }).finally(function(){ if(generation===leaderboardLoadGeneration) leaderboardLoadInFlight = null; });
     return leaderboardLoadInFlight;
   } else {
     setConnectionStatus('not configured'); DATA = demoData(); render();

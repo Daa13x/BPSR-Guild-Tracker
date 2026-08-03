@@ -40,7 +40,8 @@ test('setup upgrades the old schema by appending columns without touching existi
     'BackupCode', 'BackupCodeCreatedAt', 'BackupCodeUpdatedAt', 'LastAccessAt'
   ]);
   assert.deepEqual(sessions.rows[0], [
-    'TokenHash', 'MemberId', 'Kind', 'ExpiresAt', 'RevokedAt', 'CreatedAt', 'LastUsedAt'
+    'TokenHash', 'MemberId', 'Kind', 'ExpiresAt', 'RevokedAt', 'CreatedAt', 'LastUsedAt',
+    'GroupRootMemberId', 'ActiveMemberId', 'AccountGroupAccess'
   ]);
   // Existing identity and PIN material stays exactly where it was (dormant).
   assert.deepEqual(members.rows[1].slice(0, 7),

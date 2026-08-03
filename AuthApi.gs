@@ -9,11 +9,13 @@
  * explicit product decision for a trusted guild; the sheet must stay private.
  * Legacy PinSalt/PinHash columns are deprecated and no longer used.
  */
-var AUTH_SHEETS = { MEMBERS: 'Members', SESSIONS: 'Sessions', ATTEMPTS: 'LoginAttempts', CODES: 'BackupCodes' };
+var AUTH_SHEETS = { MEMBERS: 'Members', SESSIONS: 'Sessions', ATTEMPTS: 'LoginAttempts', CODES: 'BackupCodes', LINKS: 'AccountLinks' };
 var MEMBER_HEADERS = ['MemberId', 'CharacterName', 'NormalizedName', 'PinSalt', 'PinHash', 'CreatedAt', 'DisabledAt',
   'BackupCode', 'BackupCodeCreatedAt', 'BackupCodeUpdatedAt', 'LastAccessAt'];
 var BACKUP_CODE_HEADERS = ['MemberId', 'CharacterName', 'BackupCode', 'CreatedAt', 'UpdatedAt', 'Status'];
-var SESSION_HEADERS = ['TokenHash', 'MemberId', 'Kind', 'ExpiresAt', 'RevokedAt', 'CreatedAt', 'LastUsedAt'];
+var SESSION_HEADERS = ['TokenHash', 'MemberId', 'Kind', 'ExpiresAt', 'RevokedAt', 'CreatedAt', 'LastUsedAt',
+  'GroupRootMemberId', 'ActiveMemberId', 'AccountGroupAccess'];
+var ACCOUNT_LINK_HEADERS = ['MainMemberId', 'AltMemberId', 'CreatedAt', 'UnlinkedAt', 'CreatedBy'];
 var ADMIN_SESSION_TTL_MS = 12 * 60 * 60 * 1000, MAX_BODY = 20000;
 var TOUCH_INTERVAL_MS = 60 * 60 * 1000;
 var RESTORE_MESSAGE = 'Character name or backup code is incorrect.';
@@ -25,9 +27,11 @@ function ensureAuthSheets_() {
   ensureSheet_(ss, AUTH_SHEETS.SESSIONS, SESSION_HEADERS);
   ensureSheet_(ss, AUTH_SHEETS.ATTEMPTS, ['Key', 'Count', 'WindowStarted', 'BlockedUntil']);
   ensureSheet_(ss, AUTH_SHEETS.CODES, BACKUP_CODE_HEADERS);
+  ensureSheet_(ss, AUTH_SHEETS.LINKS, ACCOUNT_LINK_HEADERS);
   ensureColumns_(ss.getSheetByName(AUTH_SHEETS.MEMBERS), MEMBER_HEADERS);
   ensureColumns_(ss.getSheetByName(AUTH_SHEETS.SESSIONS), SESSION_HEADERS);
   ensureColumns_(ss.getSheetByName(AUTH_SHEETS.CODES), BACKUP_CODE_HEADERS);
+  ensureColumns_(ss.getSheetByName(AUTH_SHEETS.LINKS), ACCOUNT_LINK_HEADERS);
 }
 
 /** Append any missing header columns; never reorders or deletes existing data. */
@@ -282,17 +286,138 @@ function sessionMaybe_(token, kind) { try { return session_(token, kind); } catc
  * throws: an absent or expired token simply yields the public projection. */
 function viewerMemberId_(token) { var s = token ? sessionMaybe_(token, 'member') : null; return s ? String(s.MemberId) : ''; }
 
-function newSession_(id, kind) {
+function newSession_(id, kind, groupAccess) {
   var t = token_();
   var ttl = kind === 'member' ? memberSessionMs_() : ADMIN_SESSION_TTL_MS;
   var exp = new Date(Date.now() + ttl), now = new Date();
-  SpreadsheetApp.getActiveSpreadsheet().getSheetByName(AUTH_SHEETS.SESSIONS)
-    .appendRow([hash_(t), id, kind, exp, '', now, now]);
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(AUTH_SHEETS.SESSIONS);
+  // readTable_ intentionally returns no headers for a header-only sheet, so
+  // use the canonical additive schema while the first remembered session is
+  // being created.
+  var headers = SESSION_HEADERS;
+  var values = {
+    TokenHash: hash_(t), MemberId: id, Kind: kind, ExpiresAt: exp, RevokedAt: '', CreatedAt: now, LastUsedAt: now,
+    GroupRootMemberId: id, ActiveMemberId: id,
+    AccountGroupAccess: kind === 'member' ? Boolean(groupAccess) : false
+  };
+  sheet.appendRow(headers.map(function (h) { return values[h] === undefined ? '' : values[h]; }));
   return { token: t, expiresAt: exp.toISOString() };
 }
 
 function revokeToken_(token, kind) { var t = table_(AUTH_SHEETS.SESSIONS), h = hash_(token); t.rows.forEach(function (r) { if (equal_(r.TokenHash, h) && String(r.Kind) === String(kind) && !r.RevokedAt) t.sheet.getRange(r._row, 5).setValue(new Date()); }); }
 function revokeMember_(id, kind) { var t = table_(AUTH_SHEETS.SESSIONS); t.rows.forEach(function (r) { if (String(r.MemberId) === String(id) && (!kind || String(r.Kind) === kind) && !r.RevokedAt) t.sheet.getRange(r._row, 5).setValue(new Date()); }); }
+
+// ---------------------------------------------------------------------------
+// Linked accounts. A remembered session represents either one direct account,
+// or a main account and its explicitly linked alts. Relationship rows use only
+// stable ids; display names and recovery codes are never relationship keys.
+// ---------------------------------------------------------------------------
+
+function activeLinks_() {
+  return table_(AUTH_SHEETS.LINKS).rows.filter(function (r) { return !r.UnlinkedAt; });
+}
+function incomingAccountLink_(id) {
+  return activeLinks_().filter(function (r) { return String(r.AltMemberId) === String(id); })[0] || null;
+}
+function outgoingAccountLinks_(id) {
+  return activeLinks_().filter(function (r) { return String(r.MainMemberId) === String(id); });
+}
+function sessionGroupRoot_(s) { return String(s.GroupRootMemberId || s.MemberId); }
+function sessionActiveMemberId_(s) { return String(s.ActiveMemberId || s.MemberId); }
+function sessionCanManageLinkedAccounts_(s) { return truthy_(s.AccountGroupAccess); }
+function accessibleAccountIds_(s) {
+  var root = sessionGroupRoot_(s);
+  if (!sessionCanManageLinkedAccounts_(s)) return [String(s.MemberId)];
+  var ids = [root];
+  outgoingAccountLinks_(root).forEach(function (r) { ids.push(String(r.AltMemberId)); });
+  return ids;
+}
+function assertAccessibleAccount_(s, memberId) {
+  var id = String(memberId || '');
+  if (accessibleAccountIds_(s).indexOf(id) === -1) throw apiError_('FORBIDDEN', 'That account is not available in this session.');
+  var member = member_(id);
+  if (!member || member.DisabledAt) throw apiError_('NOT_FOUND', 'Account is unavailable.');
+  return id;
+}
+function activeMemberSession_(token) {
+  var s = session_(token, 'member');
+  s.ActiveMemberId = assertAccessibleAccount_(s, sessionActiveMemberId_(s));
+  return s;
+}
+function activeMemberId_(token) { return String(activeMemberSession_(token).ActiveMemberId); }
+function writeSessionCell_(session, header, value) {
+  var t = table_(AUTH_SHEETS.SESSIONS), col = colIndex_(t, header);
+  if (col > 0) t.sheet.getRange(session._row, col).setValue(value);
+}
+function accountSummary_(member, player, mainId, activeId) {
+  return {
+    memberId: String(member.MemberId), characterName: String(member.CharacterName || player.CharacterName || ''),
+    svFloor: Number(player.SVFloor) || 0, masterPoints: Number(player.MasterPoints) || 0,
+    isMain: String(member.MemberId) === String(mainId), active: String(member.MemberId) === String(activeId)
+  };
+}
+function listAccessibleAccounts_(token) {
+  var s = activeMemberSession_(token), ids = accessibleAccountIds_(s), root = sessionGroupRoot_(s), active = sessionActiveMemberId_(s);
+  var members = {}, players = {};
+  table_(AUTH_SHEETS.MEMBERS).rows.forEach(function (m) { members[String(m.MemberId)] = m; });
+  table_(SHEETS.PLAYERS).rows.forEach(function (p) { players[String(p.UserId)] = p; });
+  return { mainMemberId: root, activeMemberId: active, canManage: sessionCanManageLinkedAccounts_(s),
+    accounts: ids.filter(function (id) { return members[id] && !members[id].DisabledAt && players[id]; })
+      .map(function (id) { return accountSummary_(members[id], players[id], root, active); }) };
+}
+function switchActiveAccount_(token, memberId) {
+  var s = activeMemberSession_(token), id = assertAccessibleAccount_(s, memberId);
+  writeSessionCell_(s, 'ActiveMemberId', id);
+  s.ActiveMemberId = id;
+  touchMemberAccess_(id, true);
+  return { member: profile_(id), accounts: listAccessibleAccounts_(token) };
+}
+function resolveAltByCode_(backupCode) {
+  if (!validCodeInput_(backupCode)) throw apiError_('INVALID_CREDENTIALS', RESTORE_MESSAGE);
+  var normalized = normalizeCode_(backupCode), match = null;
+  table_(AUTH_SHEETS.MEMBERS).rows.forEach(function (m) {
+    if (!match && !m.DisabledAt && m.BackupCode && equal_(normalizeCode_(m.BackupCode), normalized)) match = m;
+  });
+  if (!match) throw apiError_('INVALID_CREDENTIALS', RESTORE_MESSAGE);
+  return match;
+}
+function previewAltAccount_(token, backupCode) {
+  var s = activeMemberSession_(token);
+  if (!sessionCanManageLinkedAccounts_(s)) throw apiError_('FORBIDDEN', 'Only the main account can link an alt account.');
+  var m = resolveAltByCode_(backupCode);
+  return { memberId: String(m.MemberId), characterName: String(m.CharacterName || '') };
+}
+function linkAltAccount_(token, backupCode) {
+  var s = activeMemberSession_(token);
+  if (!sessionCanManageLinkedAccounts_(s)) throw apiError_('FORBIDDEN', 'Only the main account can link an alt account.');
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var root = sessionGroupRoot_(s), alt = resolveAltByCode_(backupCode), altId = String(alt.MemberId);
+    if (altId === root) throw apiError_('VALIDATION', 'You cannot link an account to itself.');
+    var owner = incomingAccountLink_(altId);
+    if (owner && String(owner.MainMemberId) !== root) throw apiError_('ALT_LINKED', 'This account is already linked to another main account.');
+    if (outgoingAccountLinks_(altId).length) throw apiError_('ALT_IS_MAIN', 'A main account cannot be linked as an alt account.');
+    if (!owner) SpreadsheetApp.getActiveSpreadsheet().getSheetByName(AUTH_SHEETS.LINKS)
+      .appendRow([root, altId, new Date(), '', String(s.MemberId)]);
+    audit_(String(s.MemberId), 'LINK_ALT_ACCOUNT', altId, 'Linked an alt account');
+    return listAccessibleAccounts_(token);
+  } finally { lock.releaseLock(); }
+}
+function unlinkAltAccount_(token, memberId) {
+  var s = activeMemberSession_(token);
+  if (!sessionCanManageLinkedAccounts_(s)) throw apiError_('FORBIDDEN', 'Only the main account can unlink an alt account.');
+  var root = sessionGroupRoot_(s), id = String(memberId || '');
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var link = outgoingAccountLinks_(root).filter(function (r) { return String(r.AltMemberId) === id; })[0];
+    if (!link) throw apiError_('NOT_FOUND', 'That linked account was not found.');
+    var t = table_(AUTH_SHEETS.LINKS), col = colIndex_(t, 'UnlinkedAt');
+    t.sheet.getRange(link._row, col).setValue(new Date());
+    if (sessionActiveMemberId_(s) === id) writeSessionCell_(s, 'ActiveMemberId', root);
+    audit_(String(s.MemberId), 'UNLINK_ALT_ACCOUNT', id, 'Unlinked an alt account');
+    return listAccessibleAccounts_(token);
+  } finally { lock.releaseLock(); }
+}
 
 function throttle_(key, success, message) {
   var msg = message || 'Invalid credentials.';
@@ -321,7 +446,7 @@ function createAccount_(d) {
       .appendRow([id, name, n, '', '', now, '', code, now, now, now]);
     writePlayerRow_({ UserId: id, CharacterName: name, SVFloor: 0, SVFloorDate: '', EasyComplete: false, EasyDate: '', HardComplete: false, HardDate: '', RaidComplete: false, RaidDate: '', MasterComplete: false, MasterDate: '', MasterPoints: 0, MasterPointsDate: '', MountEarned: false, MountEarnedAt: '', MountPosition: '', MountPointsWhenEarned: '', LastUpdated: now, RegisteredAt: now, IsAdmin: false, Notes: '' });
     syncBackupCodeRow_({ MemberId: id, CharacterName: name, BackupCode: code, BackupCodeCreatedAt: now, BackupCodeUpdatedAt: now, DisabledAt: '' });
-    return { member: profile_(id), session: newSession_(id, 'member'), backupCode: code };
+    return { member: profile_(id), session: newSession_(id, 'member', true), backupCode: code };
   } finally {
     lock.releaseLock();
   }
@@ -338,7 +463,9 @@ function restore_(d) {
   }
   throttle_(key, true, RESTORE_MESSAGE);
   touchMemberAccess_(m.MemberId, true);
-  return { member: profile_(m.MemberId), session: newSession_(m.MemberId, 'member') };
+  // A recovery-code login is a main-session only when this account is not an
+  // alt. An alt's own code intentionally provides access to that alt alone.
+  return { member: profile_(m.MemberId), session: newSession_(m.MemberId, 'member', !incomingAccountLink_(m.MemberId)) };
 }
 
 /**
@@ -353,7 +480,7 @@ function migrate_(d) {
   var code = ensureBackupCode_(m);
   revokeToken_(d.token, 'member');
   touchMemberAccess_(m.MemberId, true);
-  return { member: profile_(m.MemberId), session: newSession_(m.MemberId, 'member'), backupCode: code };
+  return { member: profile_(m.MemberId), session: newSession_(m.MemberId, 'member', false), backupCode: code };
 }
 
 function myBackupCode_(token) {
@@ -554,21 +681,26 @@ function api_(a, d) {
   if (a === 'myBackupCode') return myBackupCode_(d.token);
   if (a === 'revokeAllDevices') return revokeAllDevices_(d.token);
   if (a === 'adminLogin') return adminLogin_(d);
-  if (a === 'leaderboard') { var vid = viewerMemberId_(d.token); if (vid) applyStimReset_(vid); return JSON.parse(getLeaderboardBundle(vid)); }
+  if (a === 'leaderboard') { var vid = d.token ? activeMemberId_(d.token) : ''; if (vid) applyStimReset_(vid); return JSON.parse(getLeaderboardBundle(vid)); }
   if (a === 'activities') return activities_();
-  if (a === 'masterSeal') return masterSealBoard_(viewerMemberId_(d.token));
+  if (a === 'masterSeal') return masterSealBoard_(d.token ? activeMemberId_(d.token) : '');
   if (a === 'myMasterSeal') return myMasterSeal_(d.token);
   if (a === 'masterSealUpdate') return masterSealUpdate_(d.token, d);
   if (a === 'adminMasterSealEdit') return adminMasterSealEdit_(d.token, d);
-  if (a === 'me') { var s = session_(d.token, 'member'); touchMemberAccess_(s.MemberId); return profile_(s.MemberId); }
+  if (a === 'me') { var meId = activeMemberId_(d.token); touchMemberAccess_(meId); return profile_(meId); }
   if (a === 'refresh') {
     var kind = d.kind === 'admin' ? 'admin' : 'member';
     var x = kind === 'admin' ? admin_(d.token) : session_(d.token, 'member');
     var out = { expiresAt: iso_(x.ExpiresAt) };
-    if (kind === 'member') { touchMemberAccess_(x.MemberId); out.profile = profile_(x.MemberId); }
+    if (kind === 'member') { var activeId = activeMemberId_(d.token); touchMemberAccess_(activeId); out.profile = profile_(activeId); out.accounts = listAccessibleAccounts_(d.token); }
     return out;
   }
-  if (a === 'progress') { var me = session_(d.token, 'member'); return progress_(me.MemberId, d); }
+  if (a === 'progress') return progress_(activeMemberId_(d.token), d);
+  if (a === 'listAccessibleAccounts') return listAccessibleAccounts_(d.token);
+  if (a === 'previewAltAccount') return previewAltAccount_(d.token, d.backupCode);
+  if (a === 'linkAltAccount') return linkAltAccount_(d.token, d.backupCode);
+  if (a === 'unlinkAltAccount') return unlinkAltAccount_(d.token, d.memberId);
+  if (a === 'switchActiveAccount') return switchActiveAccount_(d.token, d.memberId);
   if (a === 'logout') { if (d.token) { var logoutKind = d.kind === 'admin' ? 'admin' : 'member'; session_(d.token, logoutKind); revokeToken_(d.token, logoutKind); } return { ok: true }; }
   if (a === 'adminMembers') { admin_(d.token); return adminMembers_(d.query); }
   if (a === 'adminRead') { admin_(d.token); return adminRead_(d.memberId); }

@@ -98,7 +98,7 @@ function myClasses_(token) {
   ensureClassSheet_();
   ensureClassSlotSheet_();
   ensureClassCollectionSheet_();
-  var s = session_(token, 'member');
+  var s = activeMemberSession_(token); s.MemberId = s.ActiveMemberId;
   var collection = readTable_(CLASS_COLLECTION_SHEET).rows.filter(function (r) { return String(r.MemberId) === String(s.MemberId); })[0];
   if (collection) {
     var entries;
@@ -123,7 +123,7 @@ function myClasses_(token) {
 /** Persist the ordered, complete class/build collection in one locked update. */
 function saveClasses_(token, d) {
   ensureClassCollectionSheet_();
-  var s = session_(token, 'member');
+  var s = activeMemberSession_(token); s.MemberId = s.ActiveMemberId;
   var entries = d.entries;
   if (!Array.isArray(entries)) throw apiError_('VALIDATION', 'Classes must be a list.');
   var seen = {};
@@ -156,7 +156,7 @@ function classCollectionSheet_() { return SpreadsheetApp.getActiveSpreadsheet().
 /** Save the complete two-slot editor state in one locked, single-row update. */
 function saveClassSlots_(token, d) {
   ensureClassSlotSheet_();
-  var s = session_(token, 'member');
+  var s = activeMemberSession_(token); s.MemberId = s.ActiveMemberId;
   var primary = d.primary || {};
   var secondary = d.secondary || null;
   classValidate_(String(primary.classId || ''), String(primary.buildId || ''));
@@ -215,7 +215,7 @@ function demotePrimary_(memberId, exceptId) {
  */
 function saveClass_(token, d) {
   ensureClassSheet_();
-  var s = session_(token, 'member');
+  var s = activeMemberSession_(token); s.MemberId = s.ActiveMemberId;
   var entryType = d.entryType === 'primary' ? 'primary' : 'secondary';
   var classId = String(d.classId || '');
   var buildId = String(d.buildId || '');
@@ -261,7 +261,7 @@ function saveClass_(token, d) {
 /** Make one saved selection the active personal-progress configuration. */
 function setActiveClass_(token, d) {
   ensureClassSheet_();
-  var s = session_(token, 'member');
+  var s = activeMemberSession_(token); s.MemberId = s.ActiveMemberId;
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     var target = classRows_(s.MemberId).filter(function (r) { return String(r.SelectionId) === String(d.selectionId); })[0];
@@ -276,7 +276,7 @@ function setActiveClass_(token, d) {
 /** Promote a secondary selection to primary (demoting the old primary). */
 function promoteClass_(token, d) {
   ensureClassSheet_();
-  var s = session_(token, 'member');
+  var s = activeMemberSession_(token); s.MemberId = s.ActiveMemberId;
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     var target = classRows_(s.MemberId).filter(function (r) { return String(r.SelectionId) === String(d.selectionId); })[0];
@@ -295,7 +295,7 @@ function promoteClass_(token, d) {
  */
 function deleteClass_(token, d) {
   ensureClassSheet_();
-  var s = session_(token, 'member');
+  var s = activeMemberSession_(token); s.MemberId = s.ActiveMemberId;
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     var mine = classRows_(s.MemberId);
