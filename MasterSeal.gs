@@ -216,13 +216,52 @@ function stimWrite_(memberId, entry) {
   return true;
 }
 
+/** Per-player Easy/Hard completion state is stored on the existing Players
+ * row, alongside the date on which each completion was recorded. */
+function sealDifficultyPublic_(memberId) {
+  var p = linkedPlayer_(memberId);
+  return {
+    easy: truthy_(p.EasyComplete),
+    easyDate: iso_(p.EasyDate),
+    hard: truthy_(p.HardComplete),
+    hardDate: iso_(p.HardDate)
+  };
+}
+
+function sealDifficultyWrite_(memberId, entry) {
+  if (!entry || typeof entry !== 'object' ||
+      typeof entry.easy !== 'boolean' || typeof entry.hard !== 'boolean') {
+    throw apiError_('VALIDATION', 'Easy and Hard completion values must be true or false.');
+  }
+  var p = linkedPlayer_(memberId);
+  var easyChanged = truthy_(p.EasyComplete) !== entry.easy;
+  var hardChanged = truthy_(p.HardComplete) !== entry.hard;
+  if (!easyChanged && !hardChanged) return false;
+  var now = new Date();
+  if (easyChanged) {
+    p.EasyComplete = entry.easy;
+    p.EasyDate = entry.easy ? now : '';
+  }
+  if (hardChanged) {
+    p.HardComplete = entry.hard;
+    p.HardDate = entry.hard ? now : '';
+  }
+  p.LastUpdated = now;
+  writePlayerRow_(p);
+  bustCache_();
+  return true;
+}
+
 /** Own progress for the signed-in member, Stim Vault included and reset-checked. */
 function myMasterSeal_(token) {
   var s = session_(token, 'member');
   var stim = stimVaultPublic_(s.MemberId);   // applies the biweekly reset on load
   var mine = sealRowsByMember_()[String(s.MemberId)];
   var dungeons = sealProgress_(mine);
-  return { season: sealSeasonPublic_(), dungeons: dungeons, totals: sealTotals_(dungeons), stimVault: stim };
+  return {
+    season: sealSeasonPublic_(), dungeons: dungeons, totals: sealTotals_(dungeons), stimVault: stim,
+    difficulty: sealDifficultyPublic_(s.MemberId)
+  };
 }
 
 function masterSealUpdate_(token, d) {
@@ -232,13 +271,15 @@ function masterSealUpdate_(token, d) {
   try {
     var changed = sealWrite_(s.MemberId, d.dungeons);
     var stimChanged = d.stimVault ? stimWrite_(s.MemberId, d.stimVault) : false;
+    var difficultyChanged = d.difficulty ? sealDifficultyWrite_(s.MemberId, d.difficulty) : false;
     var mine = sealRowsByMember_()[String(s.MemberId)];
     var dungeons = sealProgress_(mine);
     return {
-      changed: changed || stimChanged,
+      changed: changed || stimChanged || difficultyChanged,
       dungeons: dungeons,
       totals: sealTotals_(dungeons),
-      stimVault: stimVaultPublic_(s.MemberId)
+      stimVault: stimVaultPublic_(s.MemberId),
+      difficulty: sealDifficultyPublic_(s.MemberId)
     };
   } finally {
     lock.releaseLock();

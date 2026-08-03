@@ -49,6 +49,26 @@ test('editing the Stim Vault floor drives the SV Leaderboard', () => {
   assert.equal(call(c, 'myMasterSeal', { token }).totals.totalScore, 0);
 });
 
+test('Easy and Hard completion save to the linked Players row with their completion dates', () => {
+  const c = runtime();
+  const dax = call(c, 'createAccount', { characterName: 'Dax' });
+  const saved = call(c, 'masterSealUpdate', {
+    token: dax.session.token, dungeons: {}, difficulty: { easy: true, hard: true }
+  });
+  assert.equal(saved.difficulty.easy, true);
+  assert.equal(saved.difficulty.hard, true);
+  assert.ok(saved.difficulty.easyDate);
+  assert.ok(saved.difficulty.hardDate);
+  const { row } = playerRow(c, dax.member.memberId);
+  assert.equal(row.EasyComplete, true);
+  assert.equal(row.HardComplete, true);
+  assert.ok(row.EasyDate instanceof Date);
+  assert.ok(row.HardDate instanceof Date);
+  const loaded = call(c, 'myMasterSeal', { token: dax.session.token });
+  assert.equal(loaded.difficulty.easy, true);
+  assert.equal(loaded.difficulty.hard, true);
+});
+
 test('a stale load clears the floor for the new fortnight on both the editor and the board', () => {
   const c = runtime();
   const dax = call(c, 'createAccount', { characterName: 'Dax' });

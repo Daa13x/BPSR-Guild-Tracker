@@ -551,8 +551,6 @@ test('the Master Seal editor submits the Stim Vault and six dungeons, deriving c
   assert.equal(difficultyBoxes.length, 2);
   assert.deepEqual(difficultyBoxes.map(box => box.value), ['easy', 'hard']);
   difficultyBoxes[1].checked = true;
-  difficultyBoxes[1].dispatch('change');
-  assert.equal(JSON.parse(app.store['bpsr.master-seal.difficulty']).hard, true, 'difficulty choice remains in this browser');
 
   // Stim Vault is the first progress row.
   const rows = form.querySelectorAll('fieldset[data-seal]');
@@ -573,6 +571,7 @@ test('the Master Seal editor submits the Stim Vault and six dungeons, deriving c
   assert.deepEqual(update.data.dungeons['towering-ruin'], { cleared: true, bestMasterLevel: 5, points: 316 });
   assert.deepEqual(update.data.dungeons['sea-ringed-reef'], { cleared: false, bestMasterLevel: null, points: 0 });
   assert.deepEqual(update.data.stimVault, { cleared: true, bestMasterLevel: null, points: 40 });
+  assert.deepEqual(update.data.difficulty, { easy: false, hard: true });
   assert.match(app.seal.querySelector('.notice').textContent, /Master Seal progress saved/);
 });
 

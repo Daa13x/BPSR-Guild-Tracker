@@ -10,7 +10,6 @@
     isConfigured: function () { return false; }
   };
   var LEGACY_KEYS = { member: 'bpsr.member.session', admin: 'bpsr.admin.session' };
-  var SEAL_DIFFICULTY_KEY = 'bpsr.master-seal.difficulty';
   var state = {
     member: null,
     session: null,
@@ -630,18 +629,8 @@
     return { cleared: cleared, bestMasterLevel: hasLevel ? Number(level) : null, points: cleared ? points : 0 };
   }
 
-  /** The Easy/Hard boxes are a personal planning aid, not score data. */
-  function readSealDifficulty() {
-    try {
-      var value = JSON.parse(root.localStorage.getItem(SEAL_DIFFICULTY_KEY) || '{}');
-      return { easy: Boolean(value.easy), hard: Boolean(value.hard) };
-    } catch (_) {
-      return { easy: false, hard: false };
-    }
-  }
-
-  function sealDifficultyBoxes() {
-    var values = readSealDifficulty();
+  function sealDifficultyBoxes(values) {
+    values = values || { easy: false, hard: false };
     var group = E('fieldset');
     group.className = 'seal-difficulty';
     group.dataset.sealDifficulty = 'true';
@@ -654,13 +643,6 @@
       input.name = 'seal-difficulty-' + difficulty;
       input.value = difficulty;
       input.checked = values[difficulty];
-      input.addEventListener('change', function () {
-        var next = {};
-        group.querySelectorAll('input[type="checkbox"]').forEach(function (box) {
-          next[box.value] = Boolean(box.checked);
-        });
-        try { root.localStorage.setItem(SEAL_DIFFICULTY_KEY, JSON.stringify(next)); } catch (_) { /* best effort */ }
-      });
       label.appendChild(input);
       label.appendChild(E('span', difficulty.charAt(0).toUpperCase() + difficulty.slice(1)));
       group.appendChild(label);
@@ -707,7 +689,7 @@
       state.mySeal = mine;
       grid.replaceChildren();
       // Stim Vault first — a floors value with no Master level, resets biweekly.
-      grid.appendChild(sealDifficultyBoxes());
+      grid.appendChild(sealDifficultyBoxes(mine.difficulty));
       var stim = mine.stimVault || { points: 0, bestMasterLevel: null };
       var stimRow = sealRow('stim-vault', 'Stim Vault', stim, mine.season.maxMasterLevel, mine.season.maxScore,
         { withLevel: false, valueLabel: 'Floors', valueMax: stim.max || 60 });
@@ -735,17 +717,24 @@
       event.preventDefault();
       if (submit.disabled) return;
       submit.disabled = true;
-      var dungeons = {}, stimVault = null;
+      var dungeons = {}, stimVault = null, difficulty = { easy: false, hard: false };
       grid.querySelectorAll('fieldset[data-seal]').forEach(function (group) {
         var key = group.dataset.seal;
         if (key === 'stim-vault') stimVault = readSealRow(group);
         else dungeons[key] = readSealRow(group);
       });
-      api('masterSealUpdate', { token: memberToken(), dungeons: dungeons, stimVault: stimVault }).then(function (result) {
+      var difficultyGroup = grid.querySelector('fieldset[data-seal-difficulty="true"]');
+      if (difficultyGroup) {
+        difficultyGroup.querySelectorAll('input[type="checkbox"]').forEach(function (box) {
+          difficulty[box.value] = Boolean(box.checked);
+        });
+      }
+      api('masterSealUpdate', { token: memberToken(), dungeons: dungeons, stimVault: stimVault, difficulty: difficulty }).then(function (result) {
         if (state.mySeal) {
           state.mySeal.dungeons = result.dungeons;
           state.mySeal.totals = result.totals;
           state.mySeal.stimVault = result.stimVault;
+          state.mySeal.difficulty = result.difficulty;
         }
         // The Stim Vault floor is the SV floor, so keep the member profile and
         // the SV/Masters boards in step after saving.
