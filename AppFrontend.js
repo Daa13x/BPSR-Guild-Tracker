@@ -585,13 +585,13 @@
     function error(message) { noticeNode.textContent = message; noticeNode.className = 'account-switch-notice error'; }
     function render(accounts) {
       list.replaceChildren();
-      noticeNode.textContent = accounts.canManage ? 'Your main account and linked alts.' : 'This direct alt login can access this account only.';
+      noticeNode.textContent = accounts.canManage ? 'Your main account and linked alt characters.' : 'This direct alt login can access this account only.';
       accounts.accounts.forEach(function (account) {
         var row = E('button'); row.type = 'button'; row.className = 'account-switch-row' + (account.active ? ' active' : '');
         row.disabled = account.active;
         var avatar = E('span', String(account.characterName || '?').charAt(0).toUpperCase()); avatar.className = 'account-switch-avatar'; row.appendChild(avatar);
         var copy = E('span'); copy.className = 'account-switch-copy'; copy.appendChild(E('strong', account.characterName));
-        copy.appendChild(E('small', account.isMain ? 'Main' : 'Alt account · SV floor ' + account.svFloor)); row.appendChild(copy);
+        copy.appendChild(E('small', account.isMain ? 'Main' : 'Alt · SV floor ' + account.svFloor)); row.appendChild(copy);
         if (account.active) row.appendChild(E('span', 'Active'));
         if (!account.isMain && accounts.canManage) {
           var unlink = E('button', 'Unlink'); unlink.type = 'button'; unlink.className = 'account-unlink';
@@ -610,18 +610,18 @@
         list.appendChild(row);
       });
       if (!accounts.canManage) return;
-      var link = E('button', 'Link alt account'); link.type = 'button'; link.className = 'btn';
+      var link = E('button', 'Use recovery code'); link.type = 'button'; link.className = 'btn ghost';
       link.addEventListener('click', function () {
         tools.replaceChildren();
         var form = E('form'); form.className = 'account-link-form';
-        form.appendChild(E('p', 'Enter the existing alt account recovery code to prove you control it.'));
+        form.appendChild(E('p', 'Enter the existing alt character recovery code to prove you control it.'));
         var code = field('Alt recovery code', 'alt-code', 'text', 'BPSR-XXXX-XXXX-XXXX'); code.input.autocomplete = 'off'; form.appendChild(code.wrap);
         var verify = E('button', 'Verify account'); verify.type = 'submit'; verify.className = 'btn'; form.appendChild(verify);
         form.addEventListener('submit', function (event) {
           event.preventDefault(); verify.disabled = true;
           api('previewAltAccount', { token: memberToken(), backupCode: code.input.value }).then(function (candidate) {
-            form.replaceChildren(); form.appendChild(E('p', 'Link ' + candidate.characterName + ' as an alt account?'));
-            var confirm = E('button', 'Link ' + candidate.characterName); confirm.type = 'button'; confirm.className = 'btn'; form.appendChild(confirm);
+            form.replaceChildren(); form.appendChild(E('p', 'Add ' + candidate.characterName + ' as an alt character?'));
+            var confirm = E('button', 'Add ' + candidate.characterName); confirm.type = 'button'; confirm.className = 'btn'; form.appendChild(confirm);
             confirm.addEventListener('click', function () {
               confirm.disabled = true;
               api('linkAltAccount', { token: memberToken(), backupCode: code.input.value }).then(function (updated) { state.accounts = updated; tools.replaceChildren(); render(updated); })
@@ -631,12 +631,11 @@
         });
         tools.appendChild(form); code.input.focus();
       });
-      tools.appendChild(link);
-      var createAlt = E('button', 'Create secondary character'); createAlt.type = 'button'; createAlt.className = 'btn ghost';
+      var createAlt = E('button', 'Create new alt'); createAlt.type = 'button'; createAlt.className = 'btn ghost';
       createAlt.addEventListener('click', function () {
         tools.replaceChildren();
         var form = E('form'); form.className = 'account-link-form';
-        form.appendChild(E('p', 'Create a new character and link it to this main account. You will receive one recovery code for the new character.'));
+        form.appendChild(E('p', 'Create a new alt character linked to this main account. You will receive one recovery code for it.'));
         var name = field('Secondary character name', 'alt-character-name', 'text', 'Enter character name'); name.input.autocomplete = 'off'; form.appendChild(name.wrap);
         var submit = E('button', 'Create and link character'); submit.type = 'submit'; submit.className = 'btn'; form.appendChild(submit);
         form.addEventListener('submit', function (event) {
@@ -644,7 +643,7 @@
           api('createAltAccount', { token: memberToken(), characterName: name.input.value }).then(function (result) {
             state.accounts = result.accounts;
             form.replaceChildren();
-            form.appendChild(E('p', result.account.characterName + ' is now linked as a secondary character. Save this recovery code before closing.'));
+            form.appendChild(E('p', result.account.characterName + ' is now linked as an alt character. Save this recovery code before closing.'));
             var code = E('output', result.backupCode); code.className = 'backup-code'; form.appendChild(code);
             var copy = E('button', 'Copy recovery code'); copy.type = 'button'; copy.className = 'btn ghost'; copy.addEventListener('click', function () { copyText(result.backupCode).then(function () { copy.textContent = 'Copied'; }).catch(function () { copy.textContent = 'Copy failed'; }); }); form.appendChild(copy);
             var switchButton = E('button', 'Switch to ' + result.account.characterName); switchButton.type = 'button'; switchButton.className = 'btn'; switchButton.addEventListener('click', function () { switchButton.disabled = true; switchActiveAccount(result.account.memberId); closeAccountChooser(); }); form.appendChild(switchButton);
@@ -652,7 +651,13 @@
         });
         tools.appendChild(form); name.input.focus();
       });
-      tools.appendChild(createAlt);
+      var addAccount = E('button', 'Add alt account'); addAccount.type = 'button'; addAccount.className = 'btn';
+      addAccount.addEventListener('click', function () {
+        tools.replaceChildren();
+        tools.appendChild(E('p', 'Add an existing alt with its recovery code, or create a new alt character.'));
+        tools.appendChild(link); tools.appendChild(createAlt);
+      });
+      tools.appendChild(addAccount);
     }
     modal.addEventListener('click', function (event) { if (event.target === modal) closeAccountChooser(); });
     modal.addEventListener('keydown', function (event) { if (event.key === 'Escape') closeAccountChooser(); });
