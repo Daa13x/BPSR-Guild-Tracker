@@ -111,11 +111,23 @@ test('Raid completion resets weekly on Monday at the same time as Stim Vault', (
   });
   const anchor = '2026-08-03T07:00:00Z';
   assert.equal(c.lastRaidReset_(new Date('2026-08-10T07:00:00Z'), anchor).toISOString(), '2026-08-10T07:00:00.000Z');
-  setCell(c, dax.member.memberId, 'RaidDate', new Date('2026-08-03T07:00:00Z'));
+  setCell(c, dax.member.memberId, 'RaidDate', new Date('2026-07-20T07:00:00Z'));
   assert.equal(c.applyRaidReset_(dax.member.memberId, new Date('2026-08-10T07:00:00Z')), true);
   const { row } = playerRow(c, dax.member.memberId);
   assert.equal(row.RaidComplete, false);
   assert.equal(row.RaidDate, '');
+});
+
+test('Master Seal board applies a weekly Raid reset without per-member identity lookups', () => {
+  const c = runtime();
+  const dax = call(c, 'createAccount', { characterName: 'Dax' });
+  call(c, 'masterSealUpdate', { token: dax.session.token, dungeons: {}, difficulty: { easy: false, hard: false, raid: true, master: false } });
+  setCell(c, dax.member.memberId, 'RaidDate', new Date('2026-08-03T07:00:00Z'));
+  const original = c.linkedPlayer_;
+  c.linkedPlayer_ = function () { throw new Error('board must use its loaded Players rows'); };
+  const board = c.masterSealBoard_('');
+  c.linkedPlayer_ = original;
+  assert.equal(board.board[0].raid, false);
 });
 
 test('the Master Seal board carries each member SV floor for display and sorting', () => {

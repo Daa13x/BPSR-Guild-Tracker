@@ -336,15 +336,26 @@ function masterSealBoard_(viewerMemberId) {
   var grouped = sealRowsByMember_();
   var classEntries = classEntriesByMember_();
   var flags = {};
+  var now = new Date(), raidResetChanged = false;
   readTable_(SHEETS.PLAYERS).rows.forEach(function (p) {
     // Join by the immutable member id. Character names may be renamed and are
     // presentation only, never a progression key.
-    applyRaidReset_(p.UserId);
+    // This board already has every Players row in memory. Do not call
+    // linkedPlayer_ here: that would re-read Players and Members once per
+    // guild member and can make the Apps Script request time out.
+    if (truthy_(p.RaidComplete) && raidStale_(p.RaidDate, now, stimAnchor_())) {
+      p.RaidComplete = false;
+      p.RaidDate = '';
+      p.LastUpdated = now;
+      writePlayerRow_(p);
+      raidResetChanged = true;
+    }
     flags[String(p.UserId)] = {
       hidden: truthy_(p.Hidden), verified: truthy_(p.Verified),
       svFloor: masterSealSvFloor_(p.SVFloor), raid: truthy_(p.RaidComplete)
     };
   });
+  if (raidResetChanged) bustCache_();
   var rows = [];
   readTable_(AUTH_SHEETS.MEMBERS).rows.forEach(function (m) {
     if (m.DisabledAt) return;
