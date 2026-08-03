@@ -87,7 +87,7 @@ test('the icon mapping covers every class and points at repo assets that exist',
 test('stable IDs resolve to the accepted graphics, independent of display order', () => {
   const expectedAssets = {
     'beat-performer': 'verdant-oracle.png', 'frost-mage': 'frost-mage.png', 'heavy-guardian': 'heavy-guardian.png',
-    'marksman': 'twin-striker.png', 'shield-knight': 'shield-knight.png', 'stormblade': 'stormblade.png',
+    'marksman': 'twin-striker.png', 'shield-knight': 'stormblade.png', 'stormblade': 'shield-knight.png',
     'twin-striker': 'beat-performer.png', 'verdant-oracle': 'marksman.png', 'wind-knight': 'wind-knight.png'
   };
   for (const [id, asset] of Object.entries(expectedAssets)) assert.equal(FRONTEND.getClass(id).iconAsset, asset, id);

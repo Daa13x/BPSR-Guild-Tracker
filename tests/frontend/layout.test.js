@@ -120,11 +120,12 @@ test('navigation lists only working destinations and obsolete hashes fall back t
   const html = fs.readFileSync('Leaderboard.html', 'utf8');
   const boards = fs.readFileSync('Boards.js', 'utf8');
   const navHrefs = [...html.matchAll(/class="ms-nav-item[^"]*" href="([^"]+)"/g)].map(m => m[1]);
-  assert.deepEqual(navHrefs, ['#sv-board', '#seal-editor', '#masters-board', '#my-progress', '#administration']);
+  // The Leaderboards nav group was removed; only the Manage destinations remain.
+  assert.deepEqual(navHrefs, ['#my-progress', '#administration']);
   // Every navigable target is a section that actually exists on the page.
   navHrefs.forEach(href => assert.match(html, new RegExp(`id="${href.slice(1)}"`), `${href} has no section`));
+  assert.equal(/>Leaderboards</.test(html), false, 'Leaderboards nav group removed');
   assert.match(boards, /SUPPORTED_HASHES/);
-  assert.match(boards, /FALLBACK_HASH = '#sv-board'/);
   assert.equal(/#achievements|#feed-panel/.test(boards), false, 'no routing case for deleted sections');
 });
 

@@ -1,7 +1,7 @@
 /* Versioned, public definitions loaded once from the same Pages origin. */
 (function (root) {
   'use strict';
-  var VERSION = 1, MANIFEST_VERSION = '2026-08-03-static-v1', manifestPromise = null, dataPromise = null, cached = null, handlers = [];
+  var VERSION = 1, MANIFEST_VERSION = '2026-08-03-static-v2', manifestPromise = null, dataPromise = null, cached = null, handlers = [];
   var DEV = Boolean(root.location && /(?:localhost|127\.0\.0\.1)/.test(root.location.hostname));
   function diagnostic(message) { if (DEV && root.console && root.console.debug) root.console.debug('[BPSR static]', message); }
   function fail(code, message) { var error = new Error(message); error.code = code; return error; }

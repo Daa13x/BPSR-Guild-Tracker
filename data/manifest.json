@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "dataVersion": "2026-08-03-static-v1",
+  "dataVersion": "2026-08-03-static-v2",
   "updatedAt": "2026-08-03T00:00:00.000Z",
   "files": {
     "classes": "classes.json",
