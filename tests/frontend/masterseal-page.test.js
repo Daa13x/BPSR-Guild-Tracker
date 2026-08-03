@@ -130,6 +130,17 @@ test('combat-role filters use the canonical class registry', () => {
   assert.deepEqual(H.selectMembers(members, { filter: 'dps' }).map(m => m.name), ['Dps']);
 });
 
+test('Guild Members CONFIG groups saved selections by role while preserving each role order', () => {
+  const html = H.classConfig({ classes: [
+    { classId: 'marksman', buildId: 'falconry' }, { classId: 'beat-performer', buildId: 'concerto' },
+    { classId: 'shield-knight', buildId: 'recovery' }, { classId: 'marksman', buildId: 'wildpack' }
+  ] });
+  assert.match(html, /DPS/); assert.match(html, /Tank/); assert.match(html, /Healer/);
+  assert.ok(html.indexOf('Marksman · Falconry') < html.indexOf('Marksman · Wildpack'));
+  assert.ok(html.indexOf('DPS') < html.indexOf('Tank') && html.indexOf('Tank') < html.indexOf('Healer'));
+  assert.match(H.classConfig({ classes: [] }), /—/);
+});
+
 test('pagination slices correctly and clamps out-of-range pages', () => {
   const list = Array.from({ length: 28 }, (_, i) => ({ n: i + 1 }));
   const first = H.pageSlice(list, 1, 10);

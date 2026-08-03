@@ -60,6 +60,18 @@ test('colour tokens map each class to red, blue or green', () => {
   assert.equal(FRONTEND.colourHex('verdant-oracle'), '#58D68D');
 });
 
+test('every class and build inherits the canonical combat role metadata', () => {
+  const expected = {
+    'frost-mage': ['dps', 'DPS', 'red'], marksman: ['dps', 'DPS', 'red'], 'twin-striker': ['dps', 'DPS', 'red'], stormblade: ['dps', 'DPS', 'red'], 'wind-knight': ['dps', 'DPS', 'red'],
+    'shield-knight': ['tank', 'Tank', 'blue'], 'heavy-guardian': ['tank', 'Tank', 'blue'],
+    'beat-performer': ['healer', 'Healer', 'green'], 'verdant-oracle': ['healer', 'Healer', 'green']
+  };
+  FRONTEND.catalogue.forEach(c => {
+    assert.deepEqual([c.combatRole, c.roleLabel, c.roleColor], expected[c.id], c.id);
+    c.builds.forEach(build => assert.equal(FRONTEND.validate(c.id, build.id).class.combatRole, c.combatRole));
+  });
+});
+
 test('the icon mapping covers every class and points at repo assets that exist', () => {
   ORDER.forEach(id => {
     assert.ok(FRONTEND.iconSource[id], 'missing icon source for ' + id);
@@ -92,8 +104,8 @@ test('the backend Classes.gs catalogue is identical to classes.js', () => {
   const back = JSON.parse(JSON.stringify(backendCatalogue()));
   assert.deepEqual(back.colours, FRONTEND.colours, 'colours match');
   assert.deepEqual(
-    back.catalogue.map(c => ({ id: c.id, name: c.name, displayName: c.displayName, iconAsset: c.iconAsset, colour: c.colour, colourFamily: c.colourFamily, role: c.role, combatRole: c.combatRole, builds: c.builds.map(b => b.id + ':' + b.name) })),
-    FRONTEND.catalogue.map(c => ({ id: c.id, name: c.name, displayName: c.displayName, iconAsset: c.iconAsset, colour: c.colour, colourFamily: c.colourFamily, role: c.role, combatRole: c.combatRole, builds: c.builds.map(b => b.id + ':' + b.name) })),
+    back.catalogue.map(c => ({ id: c.id, name: c.name, displayName: c.displayName, iconAsset: c.iconAsset, colour: c.colour, colourFamily: c.colourFamily, role: c.role, roleLabel: c.roleLabel, roleColor: c.roleColor, combatRole: c.combatRole, builds: c.builds.map(b => b.id + ':' + b.name) })),
+    FRONTEND.catalogue.map(c => ({ id: c.id, name: c.name, displayName: c.displayName, iconAsset: c.iconAsset, colour: c.colour, colourFamily: c.colourFamily, role: c.role, roleLabel: c.roleLabel, roleColor: c.roleColor, combatRole: c.combatRole, builds: c.builds.map(b => b.id + ':' + b.name) })),
     'frontend and backend catalogues must not drift'
   );
 });

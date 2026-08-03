@@ -569,7 +569,12 @@ body.cls-open { overflow: hidden; }
 .cls-dialog .cls-foot { position: sticky; bottom: -16px; padding: 12px 0 0; background: var(--panel-bg, #17101f); }
 .cls-saved-list { display: grid; gap: 6px; margin: 10px 0; }
 .cls-saved-row { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-bg-raised); }
+.cls-saved-row[draggable="true"] { cursor: grab; }
+.cls-drag { color: var(--text-muted); font-size: 18px; line-height: 1; }
+.cls-saved-details { display: grid; gap: 3px; min-width: 0; flex: 1; }
 .cls-saved-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); font-size: 12px; font-weight: 700; }
+.cls-role { width: max-content; padding: 1px 5px; border: 1px solid currentColor; border-radius: 999px; font-size: 8px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.cls-role.red { color: var(--cls-red); }.cls-role.blue { color: var(--cls-blue); }.cls-role.green { color: var(--cls-green); }
 .cls-btn.add { display: block; width: 100%; margin-top: 10px; border-color: var(--accent); color: var(--text-primary); background: rgba(207,130,239,.12); }
 @media (max-width: 420px) { .cls-modal { padding: 6px; } .cls-dialog { max-height: calc(100vh - 12px); padding: 12px; } .cls-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .cls-slots { grid-template-columns: 1fr; } .cls-foot { flex-wrap: wrap; } .cls-foot .cls-btn { flex: 1 1 120px; } }
 
@@ -599,6 +604,13 @@ body.cls-open { overflow: hidden; }
 .cls-mbtn { min-height: 28px; padding: 0 9px; border: 1px solid var(--border); border-radius: 7px; background: #0c0a14; color: var(--text-secondary); font-size: 11px; font-weight: 700; }
 .cls-mbtn:hover { border-color: var(--border-bright); color: var(--text-primary); }
 .cls-mbtn.danger { border-color: rgba(239,104,104,.5); color: var(--danger); }
+
+.ms-config { min-width: 175px; max-width: 260px; }
+.ms-config-group { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 2px 0; }
+.ms-config-group > b { width: 100%; font-size: 8px; letter-spacing: .1em; text-transform: uppercase; }
+.ms-config-group.red > b { color: var(--cls-red); }.ms-config-group.blue > b { color: var(--cls-blue); }.ms-config-group.green > b { color: var(--cls-green); }
+.ms-config-chip { padding: 3px 5px; border: 1px solid currentColor; border-radius: 6px; color: var(--text-secondary); font-size: 10px; line-height: 1.2; white-space: normal; }
+.ms-config-group.red .ms-config-chip { border-color: color-mix(in srgb, var(--cls-red) 60%, transparent); }.ms-config-group.blue .ms-config-chip { border-color: color-mix(in srgb, var(--cls-blue) 60%, transparent); }.ms-config-group.green .ms-config-chip { border-color: color-mix(in srgb, var(--cls-green) 60%, transparent); }
 
 @media (max-width: 900px) {
   .cls-selector { display: block; }

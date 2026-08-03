@@ -85,12 +85,13 @@ The public board (`masterSeal` action) lists every active member — names only,
 
 ## Personal class & build selector
 
-A signed-in member can record a **primary** class and any number of **secondary** classes, each with one build path, from a compact selector directly beneath **My Progress** in the sidebar. The selection is personal — it drives the member's own active-class indicator and never changes, filters or touches the guild leaderboards.
+A signed-in member can record any number of unique class/build combinations from the selector beneath **My Progress**. They can add, remove, and reorder entries; selections are personal and do not alter progress data or guild rankings.
 
-- **Canonical catalogue:** `classes.js` (frontend, browser global `BPSR_CLASSES`) is the single source of truth for the nine classes, their red/blue/green colour tokens, and their exact build paths. `Classes.gs` holds an identical backend copy; `tests/backend/classes-catalogue.test.js` fails if the two ever drift. "Primary/Secondary" is the entry's importance to the member; "Main/Frostbeam/…" is the build path — they are kept strictly separate, and Main is never a synonym for Primary.
+- **Canonical catalogue:** `classes.js` (frontend, browser global `BPSR_CLASSES`) is the single source of truth for the nine classes, their role metadata, colour tokens, and exact build paths. `Classes.gs` holds an identical backend copy; `tests/backend/classes-catalogue.test.js` fails if the two ever drift. Canonical roles are DPS (red), Tank (blue), and Healer (green).
 - **Icons:** the nine white-glyph PNGs live in `assets/classes/<class-id>.png` (copied from the supplied `128.rar`; the `Profession_N.png → class` mapping is recorded explicitly in `classes.js` as `CLASS_ICON_SOURCE`). They are displayed white-masked to the class colour via CSS `mask`, so the source assets are never recoloured.
-- **Storage & API:** selections live in a dedicated `Classes` sheet (`SelectionId, MemberId, EntryType, ClassId, BuildId, Active, CreatedAt, UpdatedAt`), created by `setupSpreadsheet()`/`ensureClassSheet_()` — additive, no existing data touched. The API actions `myClasses`, `saveClass`, `setActiveClass`, `promoteClass` and `deleteClass` validate the class/build pair against the catalogue, enforce exactly one primary per user inside a script lock, reject invalid or duplicate combinations, and never let one member mutate another's selections.
-- **Compatibility note:** existing Master Seal / SV progress is keyed to the member, not to a class, so it is left exactly as-is; the class selection is a personal annotation surfaced in the member's active-class indicator. No progress is re-keyed or lost.
+- **Storage & API:** selections live in the additive `ClassSelections` sheet and are saved atomically through `saveClasses`. The API validates every class/build pair, rejects exact duplicates, and scopes every write to the signed-in member.
+- **Guild Member CONFIG:** the Master Seal guild table projects the same saved selections in role order (DPS, Tank, Healer), while preserving the member's chosen order within each role.
+- **Compatibility note:** legacy class rows remain readable; existing Master Seal / SV progress remains keyed to the member and is not re-keyed or lost.
 
 ## Backend setup and redeployment
 

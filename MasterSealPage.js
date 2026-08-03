@@ -124,6 +124,23 @@
     }).join('');
   }
 
+  function classConfig(member) {
+    var order = ['dps', 'tank', 'healer'], groups = { dps: [], tank: [], healer: [] };
+    (member.classes || []).forEach(function (entry) {
+      var c = root.BPSR_CLASSES && root.BPSR_CLASSES.getClass(entry.classId);
+      var valid = c && root.BPSR_CLASSES.validate(entry.classId, entry.buildId);
+      if (c && valid.ok && groups[c.combatRole]) groups[c.combatRole].push({ c: c, build: valid.build });
+    });
+    var html = order.map(function (role) {
+      if (!groups[role].length) return '';
+      var label = groups[role][0].c.roleLabel;
+      return '<div class="ms-config-group ' + esc(groups[role][0].c.roleColor) + '"><b>' + esc(label) + '</b>' + groups[role].map(function (item) {
+        return '<span class="ms-config-chip" title="' + esc(item.c.name + ' · ' + item.build.name + ' — ' + item.c.roleLabel) + '">' + esc(item.c.name + ' · ' + item.build.name) + '</span>';
+      }).join('') + '</div>';
+    }).join('');
+    return html || '<span class="dim">—</span>';
+  }
+
   function pageSlice(list, page, size) {
     var total = Math.max(1, Math.ceil(list.length / size));
     var current = Math.min(Math.max(1, page), total);
@@ -157,6 +174,7 @@
     recentlyActive: recentlyActive,
     isStale: isStale,
     selectMembers: selectMembers,
+    classConfig: classConfig,
     pageSlice: pageSlice,
     seasonSchedule: seasonSchedule
   };
@@ -260,6 +278,7 @@
       lastUpdated: row.lastUpdated || null,
       verified: Boolean(row.verified),
       hidden: Boolean(row.hidden),
+      classes: Array.isArray(row.classes) ? row.classes.map(function (entry) { return { classId: String(entry.classId || ''), buildId: String(entry.buildId || entry.buildPathId || '') }; }) : [],
       svFloor: normaliseSvFloor(row.svFloor === undefined ? row.SVFloor : row.svFloor),
       dungeons: dungeons
     };
@@ -328,9 +347,9 @@
     var season = state.season;
     var now = Date.now();
     var html = '<table class="ms-table"><thead>' +
-      '<tr><th colspan="9"></th><th colspan="6" class="ms-group-head">Chaotic Realm Dungeons<small>(best Master clear)</small></th></tr>' +
+      '<tr><th colspan="10"></th><th colspan="6" class="ms-group-head">Chaotic Realm Dungeons<small>(best Master clear)</small></th></tr>' +
       '<tr>' +
-      '<th scope="col">Rank</th><th scope="col">Character</th><th scope="col">Total Score</th>' +
+      '<th scope="col">Rank</th><th scope="col">Character</th><th scope="col">Config</th><th scope="col">Total Score</th>' +
       '<th scope="col">Progress</th><th scope="col">Remaining</th><th scope="col">Cleared</th>' +
       '<th scope="col">Mount</th><th scope="col">Last Updated</th><th scope="col">SV Floor</th>' +
       season.dungeons.map(function (d) {
@@ -355,6 +374,7 @@
           (m.hidden ? '<span class="badge hidden-badge" title="Hidden from other viewers — only you can see this row">Hidden — only you</span>' : '') +
           '<span class="sr-only">' + (active ? 'Active in the last 24 hours' : 'Not active recently') + '</span>' +
         '</span></td>' +
+        '<td data-l="Config" class="ms-config">' + classConfig(m) + '</td>' +
         '<td data-l="Total"><span class="ms-total">' + num(m.totalScore) + '<small>/ ' + num(season.maxScore) + '</small></span></td>' +
         '<td data-l="Progress"><span class="ms-pct">' + pct + '%</span>' +
           '<span class="ms-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '">' +
