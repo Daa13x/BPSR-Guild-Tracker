@@ -122,7 +122,7 @@ test('Master Seal board applies a weekly Raid reset without per-member identity 
   const c = runtime();
   const dax = call(c, 'createAccount', { characterName: 'Dax' });
   call(c, 'masterSealUpdate', { token: dax.session.token, dungeons: {}, difficulty: { easy: false, hard: false, raid: true, master: false } });
-  setCell(c, dax.member.memberId, 'RaidDate', new Date('2026-08-03T07:00:00Z'));
+  setCell(c, dax.member.memberId, 'RaidDate', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000));
   const original = c.linkedPlayer_;
   c.linkedPlayer_ = function () { throw new Error('board must use its loaded Players rows'); };
   const board = c.masterSealBoard_('');
