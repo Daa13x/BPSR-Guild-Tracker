@@ -544,13 +544,14 @@ test('the Master Seal editor submits the Stim Vault and six dungeons, deriving c
   // The editor lives in its own #seal-ui section, not in My Progress.
   const form = formByButton(app.seal, 'Save Master Seal progress');
   assert.ok(form, 'seal editor renders in its own section');
-  // The personal Easy/Hard tick boxes sit directly above Stim Vault.
+  // The personal Easy/Hard/Raid tick boxes sit directly above Stim Vault.
   const difficulty = form.querySelector('fieldset[data-seal-difficulty="true"]');
   assert.ok(difficulty, 'difficulty tick boxes render above Stim Vault');
   const difficultyBoxes = difficulty.querySelectorAll('input[type="checkbox"]');
-  assert.equal(difficultyBoxes.length, 2);
-  assert.deepEqual(difficultyBoxes.map(box => box.value), ['easy', 'hard']);
+  assert.equal(difficultyBoxes.length, 3);
+  assert.deepEqual(difficultyBoxes.map(box => box.value), ['easy', 'hard', 'raid']);
   difficultyBoxes[1].checked = true;
+  difficultyBoxes[2].checked = true;
 
   // Stim Vault is the first progress row.
   const rows = form.querySelectorAll('fieldset[data-seal]');
@@ -571,7 +572,7 @@ test('the Master Seal editor submits the Stim Vault and six dungeons, deriving c
   assert.deepEqual(update.data.dungeons['towering-ruin'], { cleared: true, bestMasterLevel: 5, points: 316 });
   assert.deepEqual(update.data.dungeons['sea-ringed-reef'], { cleared: false, bestMasterLevel: null, points: 0 });
   assert.deepEqual(update.data.stimVault, { cleared: true, bestMasterLevel: null, points: 40 });
-  assert.deepEqual(update.data.difficulty, { easy: false, hard: true });
+  assert.deepEqual(update.data.difficulty, { easy: false, hard: true, raid: true });
   assert.match(app.seal.querySelector('.notice').textContent, /Master Seal progress saved/);
 });
 

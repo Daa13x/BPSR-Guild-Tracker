@@ -230,7 +230,7 @@ function ensureMemberPlayerLinks_() {
     if (matches.length === 1) return;
     writePlayerRow_({
       UserId: id, CharacterName: String(m.CharacterName || ''), SVFloor: 0, SVFloorDate: '',
-      EasyComplete: false, EasyDate: '', HardComplete: false, HardDate: '',
+      EasyComplete: false, EasyDate: '', HardComplete: false, HardDate: '', RaidComplete: false, RaidDate: '',
       MasterPoints: 0, MasterPointsDate: '', MountEarned: false, MountEarnedAt: '',
       MountPosition: '', MountPointsWhenEarned: '', LastUpdated: '',
       RegisteredAt: m.CreatedAt || new Date(), IsAdmin: false, Notes: '', Hidden: false, Verified: false
@@ -319,7 +319,7 @@ function createAccount_(d) {
     var id = uid_('MEM'), code = newBackupCode_(), now = new Date();
     SpreadsheetApp.getActiveSpreadsheet().getSheetByName(AUTH_SHEETS.MEMBERS)
       .appendRow([id, name, n, '', '', now, '', code, now, now, now]);
-    writePlayerRow_({ UserId: id, CharacterName: name, SVFloor: 0, SVFloorDate: '', EasyComplete: false, EasyDate: '', HardComplete: false, HardDate: '', MasterPoints: 0, MasterPointsDate: '', MountEarned: false, MountEarnedAt: '', MountPosition: '', MountPointsWhenEarned: '', LastUpdated: now, RegisteredAt: now, IsAdmin: false, Notes: '' });
+    writePlayerRow_({ UserId: id, CharacterName: name, SVFloor: 0, SVFloorDate: '', EasyComplete: false, EasyDate: '', HardComplete: false, HardDate: '', RaidComplete: false, RaidDate: '', MasterPoints: 0, MasterPointsDate: '', MountEarned: false, MountEarnedAt: '', MountPosition: '', MountPointsWhenEarned: '', LastUpdated: now, RegisteredAt: now, IsAdmin: false, Notes: '' });
     syncBackupCodeRow_({ MemberId: id, CharacterName: name, BackupCode: code, BackupCodeCreatedAt: now, BackupCodeUpdatedAt: now, DisabledAt: '' });
     return { member: profile_(id), session: newSession_(id, 'member'), backupCode: code };
   } finally {

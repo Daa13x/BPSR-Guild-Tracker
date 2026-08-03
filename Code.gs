@@ -82,7 +82,10 @@ var PLAYER_HEADERS = [
   'EasyComplete', 'EasyDate', 'HardComplete', 'HardDate',
   'MasterPoints', 'MasterPointsDate',
   'MountEarned', 'MountEarnedAt', 'MountPosition', 'MountPointsWhenEarned',
-  'LastUpdated', 'RegisteredAt', 'IsAdmin', 'Notes', 'Hidden', 'Verified'
+  'LastUpdated', 'RegisteredAt', 'IsAdmin', 'Notes', 'Hidden', 'Verified',
+  // New columns stay at the end so existing Players rows never shift during
+  // the in-place spreadsheet upgrade.
+  'RaidComplete', 'RaidDate'
 ];
 
 // ---------------------------------------------------------------------------
@@ -335,7 +338,7 @@ function startNewPeriod() {
 
 /**
  * payload = {
- *   characterName, svFloor, easyComplete, hardComplete, masterPoints,
+ *   characterName, svFloor, easyComplete, hardComplete, raidComplete, masterPoints,
  *   masterRanks: { ACT1: 14, ... }, notes
  * }
  * The server diffs against the stored record; only genuine changes create
@@ -359,11 +362,12 @@ function submitProgress(payload) {
     var points = clampInt_(payload.masterPoints, 0, 100000, stored ? Number(stored.MasterPoints) || 0 : 0);
     var easy = !!payload.easyComplete;
     var hard = !!payload.hardComplete;
+    var raid = !!payload.raidComplete;
     var ranks = payload.masterRanks || {};
 
     var player = stored || {
       UserId: email, CharacterName: name, SVFloor: 0, SVFloorDate: '',
-      EasyComplete: false, EasyDate: '', HardComplete: false, HardDate: '',
+      EasyComplete: false, EasyDate: '', HardComplete: false, HardDate: '', RaidComplete: false, RaidDate: '',
       MasterPoints: 0, MasterPointsDate: '',
       MountEarned: false, MountEarnedAt: '', MountPosition: '', MountPointsWhenEarned: '',
       LastUpdated: now, RegisteredAt: now, IsAdmin: false, Notes: ''
@@ -380,7 +384,7 @@ function submitProgress(payload) {
       player.SVFloorDate = now;              // date the current highest floor was achieved
     }
 
-    // -- Easy / Hard newly completed (one-way flags) --
+    // -- Dungeon difficulties / raid newly completed (one-way flags) --
     if (easy && !truthy_(player.EasyComplete)) {
       events.push(evt_(email, name, 'EASY_COMPLETE', '', false, true, period, true, true));
       player.EasyComplete = true; player.EasyDate = now;
@@ -388,6 +392,10 @@ function submitProgress(payload) {
     if (hard && !truthy_(player.HardComplete)) {
       events.push(evt_(email, name, 'HARD_COMPLETE', '', false, true, period, true, true));
       player.HardComplete = true; player.HardDate = now;
+    }
+    if (raid && !truthy_(player.RaidComplete)) {
+      events.push(evt_(email, name, 'RAID_COMPLETE', '', false, true, period, true, true));
+      player.RaidComplete = true; player.RaidDate = now;
     }
 
     // -- Master points: any actual change counts; date only refreshes on change --
@@ -703,6 +711,7 @@ function buildBundle_() {
       svComplete: sv >= SV_MAX_FLOOR,
       easy: truthy_(p.EasyComplete),
       hard: truthy_(p.HardComplete),
+      raid: truthy_(p.RaidComplete),
       points: pts,
       pointsPct: Math.min(100, Math.round(pts / mountTarget * 100)),
       pointsRemaining: Math.max(0, mountTarget - pts),

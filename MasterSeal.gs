@@ -216,27 +216,30 @@ function stimWrite_(memberId, entry) {
   return true;
 }
 
-/** Per-player Easy/Hard completion state is stored on the existing Players
- * row, alongside the date on which each completion was recorded. */
+/** Per-player difficulty and Raid completion state is stored on the existing
+ * Players row, alongside the date on which each completion was recorded. */
 function sealDifficultyPublic_(memberId) {
   var p = linkedPlayer_(memberId);
   return {
     easy: truthy_(p.EasyComplete),
     easyDate: iso_(p.EasyDate),
     hard: truthy_(p.HardComplete),
-    hardDate: iso_(p.HardDate)
+    hardDate: iso_(p.HardDate),
+    raid: truthy_(p.RaidComplete),
+    raidDate: iso_(p.RaidDate)
   };
 }
 
 function sealDifficultyWrite_(memberId, entry) {
   if (!entry || typeof entry !== 'object' ||
-      typeof entry.easy !== 'boolean' || typeof entry.hard !== 'boolean') {
-    throw apiError_('VALIDATION', 'Easy and Hard completion values must be true or false.');
+      typeof entry.easy !== 'boolean' || typeof entry.hard !== 'boolean' || typeof entry.raid !== 'boolean') {
+    throw apiError_('VALIDATION', 'Easy, Hard and Raid completion values must be true or false.');
   }
   var p = linkedPlayer_(memberId);
   var easyChanged = truthy_(p.EasyComplete) !== entry.easy;
   var hardChanged = truthy_(p.HardComplete) !== entry.hard;
-  if (!easyChanged && !hardChanged) return false;
+  var raidChanged = truthy_(p.RaidComplete) !== entry.raid;
+  if (!easyChanged && !hardChanged && !raidChanged) return false;
   var now = new Date();
   if (easyChanged) {
     p.EasyComplete = entry.easy;
@@ -245,6 +248,10 @@ function sealDifficultyWrite_(memberId, entry) {
   if (hardChanged) {
     p.HardComplete = entry.hard;
     p.HardDate = entry.hard ? now : '';
+  }
+  if (raidChanged) {
+    p.RaidComplete = entry.raid;
+    p.RaidDate = entry.raid ? now : '';
   }
   p.LastUpdated = now;
   writePlayerRow_(p);
