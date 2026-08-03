@@ -716,16 +716,19 @@
     var generation = ++loadGeneration;
     setConnection('', 'Connecting…');
     var token = root.BPSR_SESSION ? root.BPSR_SESSION.token() : '';
-    loadInFlight = api('masterSeal', token ? { token: token } : {}).then(function (data) {
+    var definitions = root.BPSR_STATIC ? root.BPSR_STATIC.load().then(function (staticData) { return staticData.masterSeal; }) : Promise.resolve(null);
+    loadInFlight = Promise.all([definitions, api('masterSeal', token ? { token: token } : {})]).then(function (parts) {
+      var season = parts[0] || parts[1].season, data = parts[1];
+      if (!season) throw Object.assign(new Error('Public Master Seal definitions are unavailable.'), { code: 'STATIC_SCHEMA' });
       if (generation !== loadGeneration) return;
-      state.season = data.season;
-      state.members = (data.board || []).map(function (row, i) { return adaptMember(row, data.season, i); });
+      state.season = season;
+      state.members = (data.board || []).map(function (row, i) { return adaptMember(row, season, i); });
       state.status = 'ready';
       var maxValue = byId('ms-maxscore-value');
-      if (maxValue) maxValue.textContent = num(data.season.maxScore) + ' PTS';
+      if (maxValue) maxValue.textContent = num(season.maxScore) + ' PTS';
       var tag = byId('ms-season-tag');
-      if (tag) tag.textContent = data.season.displayName;
-      document.title = data.season.displayName + ' Master Seal · BPSR Guild Tracker';
+      if (tag) tag.textContent = season.displayName;
+      document.title = season.displayName + ' Master Seal · BPSR Guild Tracker';
       setConnection('ok', 'Connected');
       renderSeasonNote();   // show the real season schedule as soon as it arrives
       refreshView();

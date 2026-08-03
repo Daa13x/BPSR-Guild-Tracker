@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "colours": { "green": "#58D68D", "red": "#F06A78", "blue": "#5FA8FF" },
+  "iconSource": {
+    "beat-performer": "Profession_13.png", "frost-mage": "Profession_2.png", "heavy-guardian": "Profession_9.png",
+    "marksman": "Profession_11.png", "shield-knight": "Profession_1.png", "stormblade": "Profession_12.png",
+    "twin-striker": "Profession_3.png", "verdant-oracle": "Profession_5.png", "wind-knight": "Profession_4.png"
+  },
+  "classes": [
+    { "id": "beat-performer", "name": "Beat Performer", "displayName": "Beat Performer", "iconAsset": "verdant-oracle.png", "colour": "green", "colourFamily": "green", "role": "healer", "roleLabel": "Healer", "roleColor": "green", "combatRole": "healer", "builds": [{ "id": "main", "name": "Main" }, { "id": "concerto", "name": "Concerto" }] },
+    { "id": "frost-mage", "name": "Frost Mage", "displayName": "Frost Mage", "iconAsset": "frost-mage.png", "colour": "red", "colourFamily": "red", "role": "dps", "roleLabel": "DPS", "roleColor": "red", "combatRole": "dps", "builds": [{ "id": "main", "name": "Main" }, { "id": "frostbeam", "name": "Frostbeam" }, { "id": "icicle", "name": "Icicle" }] },
+    { "id": "heavy-guardian", "name": "Heavy Guardian", "displayName": "Heavy Guardian", "iconAsset": "heavy-guardian.png", "colour": "blue", "colourFamily": "blue", "role": "tank", "roleLabel": "Tank", "roleColor": "blue", "combatRole": "tank", "builds": [{ "id": "main", "name": "Main" }, { "id": "block", "name": "Block" }, { "id": "earthfort", "name": "Earthfort" }] },
+    { "id": "marksman", "name": "Marksman", "displayName": "Marksman", "iconAsset": "twin-striker.png", "colour": "red", "colourFamily": "red", "role": "dps", "roleLabel": "DPS", "roleColor": "red", "combatRole": "dps", "builds": [{ "id": "main", "name": "Main" }, { "id": "falconry", "name": "Falconry" }, { "id": "wildpack", "name": "Wildpack" }] },
+    { "id": "shield-knight", "name": "Shield Knight", "displayName": "Shield Knight", "iconAsset": "shield-knight.png", "colour": "blue", "colourFamily": "blue", "role": "tank", "roleLabel": "Tank", "roleColor": "blue", "combatRole": "tank", "builds": [{ "id": "main", "name": "Main" }, { "id": "shield", "name": "Shield" }, { "id": "recovery", "name": "Recovery" }] },
+    { "id": "stormblade", "name": "Stormblade", "displayName": "Stormblade", "iconAsset": "stormblade.png", "colour": "red", "colourFamily": "red", "role": "dps", "roleLabel": "DPS", "roleColor": "red", "combatRole": "dps", "builds": [{ "id": "main", "name": "Main" }, { "id": "moonstrike", "name": "Moonstrike" }, { "id": "slash", "name": "Slash" }] },
+    { "id": "twin-striker", "name": "Twin Striker", "displayName": "Twin Striker", "iconAsset": "beat-performer.png", "colour": "red", "colourFamily": "red", "role": "dps", "roleLabel": "DPS", "roleColor": "red", "combatRole": "dps", "builds": [{ "id": "main", "name": "Main" }, { "id": "formless", "name": "Formless" }, { "id": "crimson", "name": "Crimson" }] },
+    { "id": "verdant-oracle", "name": "Verdant Oracle", "displayName": "Verdant Oracle", "iconAsset": "marksman.png", "colour": "green", "colourFamily": "green", "role": "healer", "roleLabel": "Healer", "roleColor": "green", "combatRole": "healer", "builds": [{ "id": "main", "name": "Main" }, { "id": "lifebind", "name": "Lifebind" }, { "id": "smite", "name": "Smite" }] },
+    { "id": "wind-knight", "name": "Wind Knight", "displayName": "Wind Knight", "iconAsset": "wind-knight.png", "colour": "red", "colourFamily": "red", "role": "dps", "roleLabel": "DPS", "roleColor": "red", "combatRole": "dps", "builds": [{ "id": "main", "name": "Main" }, { "id": "skyward", "name": "Skyward" }, { "id": "vanguard", "name": "Vanguard" }] }
+  ]
+}

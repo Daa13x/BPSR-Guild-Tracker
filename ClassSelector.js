@@ -9,6 +9,7 @@
   function token() { return root.BPSR_SESSION ? root.BPSR_SESSION.token() : ''; }
   function signedIn() { return Boolean(token()); }
   function configured() { return CONFIG.isConfigured ? CONFIG.isConfigured() : Boolean(CONFIG.apiUrl); }
+  function definitionsReady() { return CAT.ready ? Promise.resolve(CAT) : (root.BPSR_STATIC ? root.BPSR_STATIC.load().then(function () { return CAT; }) : Promise.reject(new Error('Public class definitions are unavailable.'))); }
   function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
   function classOf(id) { return CAT.getClass(id); }
   function key(x) { return x.classId + '|' + x.buildId; }
@@ -19,7 +20,7 @@
   function describe(e) { if (root.BPSR_ERRORS) return root.BPSR_ERRORS.describe(e, 'classes'); return (e && e.message) || 'Classes could not be saved.'; }
   function ensureTrigger() { if (els.trigger) return; var host = document.getElementById('class-selector'); if (!host) return; var b = el('button', 'cls-trigger'); b.type = 'button'; b.id = 'cls-trigger'; b.setAttribute('aria-haspopup', 'dialog'); b.addEventListener('click', open); host.appendChild(b); els.trigger = b; }
   function renderTrigger() { ensureTrigger(); if (!els.trigger) return; var host = document.getElementById('class-selector'); if (host) host.hidden = !signedIn(); if (!signedIn()) return; var b = els.trigger; b.replaceChildren(); if (!state.entries.length) { b.className = 'cls-trigger empty'; b.textContent = state.loaded ? 'Set your classes' : 'Loading…'; b.setAttribute('aria-label', 'Choose your classes'); return; } b.className = 'cls-trigger'; b.appendChild(glyph(state.entries[0].classId, 26)); var info = el('span', 'cls-trigger-body'); info.appendChild(el('span', 'cls-trigger-name', classOf(state.entries[0].classId).name)); info.appendChild(el('span', 'cls-trigger-build', state.entries.length === 1 ? buildName(state.entries[0]) : state.entries.length + ' saved class builds')); b.appendChild(info); b.setAttribute('aria-label', 'Edit ' + state.entries.length + ' saved class builds'); }
-  function open() { if (!signedIn() || !configured()) return; lastFocus = document.activeElement; state.open = true; state.error = ''; state.drafts = state.entries.map(function (x) { return { classId: x.classId, buildId: x.buildId }; }); state.picker = null; document.body.classList.add('cls-open'); var overlay = el('div', 'cls-modal'), dialog = el('section', 'cls-dialog'); dialog.setAttribute('role', 'dialog'); dialog.setAttribute('aria-modal', 'true'); dialog.setAttribute('aria-labelledby', 'cls-dialog-title'); overlay.appendChild(dialog); els.modal = overlay; els.dialog = dialog; document.body.appendChild(overlay); document.addEventListener('keydown', onKey, true); render(); var x = dialog.querySelector('.cls-x'); if (x) x.focus(); }
+  function open() { if (!signedIn() || !configured()) return; definitionsReady().then(function () { lastFocus = document.activeElement; state.open = true; state.error = ''; state.drafts = state.entries.map(function (x) { return { classId: x.classId, buildId: x.buildId }; }); state.picker = null; document.body.classList.add('cls-open'); var overlay = el('div', 'cls-modal'), dialog = el('section', 'cls-dialog'); dialog.setAttribute('role', 'dialog'); dialog.setAttribute('aria-modal', 'true'); dialog.setAttribute('aria-labelledby', 'cls-dialog-title'); overlay.appendChild(dialog); els.modal = overlay; els.dialog = dialog; document.body.appendChild(overlay); document.addEventListener('keydown', onKey, true); render(); var x = dialog.querySelector('.cls-x'); if (x) x.focus(); }).catch(function (error) { state.error = describe(error); renderTrigger(); }); }
   function close() { state.open = false; document.body.classList.remove('cls-open'); document.removeEventListener('keydown', onKey, true); if (els.modal && els.modal.parentNode) els.modal.parentNode.removeChild(els.modal); els.modal = null; if (lastFocus && lastFocus.focus) lastFocus.focus(); }
   function onKey(e) { if (e.key === 'Escape') { e.preventDefault(); close(); } }
   function pickerValid() { return state.picker && CAT.validate(state.picker.classId, state.picker.buildId).ok && !state.drafts.some(function (x) { return key(x) === key(state.picker); }); }
@@ -40,7 +41,7 @@
     if (loadInFlight) return loadInFlight;
     if (state.loaded && !force) return Promise.resolve(state.entries);
     var generation = ++loadGeneration;
-    loadInFlight = api('myClasses', { token: token() }).then(function (data) {
+    loadInFlight = definitionsReady().then(function () { return api('myClasses', { token: token() }); }).then(function (data) {
       if (generation !== loadGeneration) return null;
       accept(data); state.loaded = true; state.error = ''; renderTrigger(); if (state.open) render();
       return state.entries;

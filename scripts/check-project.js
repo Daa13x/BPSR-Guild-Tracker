@@ -10,6 +10,10 @@ const required = [
   'AuthApi.gs',
   'MasterSeal.gs',
   'Classes.gs',
+  'StaticData.js',
+  'data/manifest.json',
+  'data/classes.json',
+  'data/master-seal.json',
   'AppFrontend.js',
   'Boards.js',
   'classes.js',
@@ -80,6 +84,7 @@ requireText('Leaderboard.html', [
   { label: 'must load repository-relative styles.css with a cache version token', regex: /<link rel="stylesheet" href="styles\.css\?v=[\w.-]+">/ },
   { label: 'must load the dashboard stylesheet with a cache version token', regex: /<link rel="stylesheet" href="master-seal\.css\?v=[\w.-]+">/ },
   { label: 'must load repository-relative AppFrontend.js with a cache version token', regex: /<script src="AppFrontend\.js\?v=[\w.-]+"><\/script>/ },
+  { label: 'must load the public static-data loader with a cache version token', regex: /<script src="StaticData\.js\?v=[\w.-]+"><\/script>/ },
   { label: 'must load the shared board script with a cache version token', regex: /<script src="Boards\.js\?v=[\w.-]+"><\/script>/ },
   { label: 'must load MasterSealPage.js with a cache version token', regex: /<script src="MasterSealPage\.js\?v=[\w.-]+"><\/script>/ },
   { label: 'must host the Master Seal and both leaderboards on one page', regex: /id="master-seal"[\s\S]*id="sv-board"[\s\S]*id="masters-board"/ },
@@ -124,7 +129,7 @@ requireText('.github/workflows/pages.yml', [
   { label: 'must use deploy-pages', regex: /actions\/deploy-pages@v\d+/ }
 ]);
 
-for (const relative of ['Code.gs', 'AuthApi.gs', 'MasterSeal.gs', 'Classes.gs', 'config.js', 'classes.js', 'AppFrontend.js', 'MasterSealPage.js', 'Boards.js', 'ClassSelector.js']) {
+for (const relative of ['Code.gs', 'AuthApi.gs', 'MasterSeal.gs', 'Classes.gs', 'StaticData.js', 'config.js', 'classes.js', 'AppFrontend.js', 'MasterSealPage.js', 'Boards.js', 'ClassSelector.js']) {
   const absolute = path.join(root, relative);
   if (!fs.existsSync(absolute)) continue;
   try {

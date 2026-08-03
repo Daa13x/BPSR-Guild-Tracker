@@ -5,7 +5,9 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const ROOT = path.join(__dirname, '..', '..');
+const STATIC = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'classes.json'), 'utf8'));
 const FRONTEND = require(path.join(ROOT, 'classes.js'));
+FRONTEND.install(STATIC);
 
 /** Load the backend catalogue out of Classes.gs in a bare sandbox. */
 function backendCatalogue() {
@@ -99,13 +101,13 @@ test('validate accepts only builds that belong to the class', () => {
   assert.equal(FRONTEND.validate('nope', 'main').ok, false);
 });
 
-test('the backend Classes.gs catalogue is identical to classes.js', () => {
+test('the backend Classes.gs catalogue is identical to the versioned public registry', () => {
   // Cross a vm-realm boundary via JSON so prototype identity doesn't matter.
   const back = JSON.parse(JSON.stringify(backendCatalogue()));
-  assert.deepEqual(back.colours, FRONTEND.colours, 'colours match');
+  assert.deepEqual(back.colours, STATIC.colours, 'colours match');
   assert.deepEqual(
     back.catalogue.map(c => ({ id: c.id, name: c.name, displayName: c.displayName, iconAsset: c.iconAsset, colour: c.colour, colourFamily: c.colourFamily, role: c.role, roleLabel: c.roleLabel, roleColor: c.roleColor, combatRole: c.combatRole, builds: c.builds.map(b => b.id + ':' + b.name) })),
-    FRONTEND.catalogue.map(c => ({ id: c.id, name: c.name, displayName: c.displayName, iconAsset: c.iconAsset, colour: c.colour, colourFamily: c.colourFamily, role: c.role, roleLabel: c.roleLabel, roleColor: c.roleColor, combatRole: c.combatRole, builds: c.builds.map(b => b.id + ':' + b.name) })),
+    STATIC.classes.map(c => ({ id: c.id, name: c.name, displayName: c.displayName, iconAsset: c.iconAsset, colour: c.colour, colourFamily: c.colourFamily, role: c.role, roleLabel: c.roleLabel, roleColor: c.roleColor, combatRole: c.combatRole, builds: c.builds.map(b => b.id + ':' + b.name) })),
     'frontend and backend catalogues must not drift'
   );
 });

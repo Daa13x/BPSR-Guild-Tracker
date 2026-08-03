@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "season-3",
+  "displayName": "Season 3",
+  "maxScore": 3650,
+  "maxMasterLevel": 20,
+  "subtitle": "Echoes of Ember",
+  "endDateAnnounced": false,
+  "endsAt": null,
+  "scheduleThrough": "19 August 2026",
+  "dungeons": [
+    { "id": "towering-ruin", "number": 1, "name": "Void - Towering Ruin", "shortName": "Towering Ruin" },
+    { "id": "tinas-mindrealm", "number": 2, "name": "Void - Tina's Mindrealm", "shortName": "Tina's Mindrealm" },
+    { "id": "cursed-radiant-tomb", "number": 3, "name": "Cursed Radiant Tomb", "shortName": "Radiant Tomb" },
+    { "id": "mech-facility", "number": 4, "name": "Mech Facility", "shortName": "Mech Facility" },
+    { "id": "mistveil-hunting-ground", "number": 5, "name": "Mistveil Hunting Ground", "shortName": "Mistveil" },
+    { "id": "sea-ringed-reef", "number": 6, "name": "Sea-Ringed Reef", "shortName": "Sea-Ringed Reef" }
+  ],
+  "rewards": [
+    { "score": 500, "rewardName": "50 Rose Orbs", "rewardType": "currency", "quantity": 50 },
+    { "score": 1000, "rewardName": "50 Rose Orbs", "rewardType": "currency", "quantity": 50 },
+    { "score": 1500, "rewardName": "50 Rose Orbs", "rewardType": "currency", "quantity": 50 },
+    { "score": 2000, "rewardName": "50 Rose Orbs", "rewardType": "currency", "quantity": 50 },
+    { "score": 2500, "rewardName": "Avatar Frame", "rewardType": "frame" },
+    { "score": 3000, "rewardName": "Namecard", "rewardType": "namecard" },
+    { "score": 3650, "rewardName": "Mount: Neon Sonic", "rewardType": "mount" }
+  ]
+}

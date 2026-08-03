@@ -119,6 +119,11 @@
     return queueSurfaceLoad(Boolean(force), false);
   }
 
+  function activeSealDefinition(fallback) {
+    var staticData = root.BPSR_STATIC && root.BPSR_STATIC.get ? root.BPSR_STATIC.get() : null;
+    return staticData && staticData.masterSeal ? staticData.masterSeal : fallback;
+  }
+
   // -------------------------------------------------------------------------
   // Remembered-device cookie — an opaque token only; never the account itself
   // -------------------------------------------------------------------------
@@ -875,11 +880,13 @@
     }
 
     function populate(mine) {
+      var season = activeSealDefinition(mine.season);
+      if (!season) throw new Error('Public Master Seal definitions are unavailable.');
       grid.replaceChildren();
       // Stim Vault first — a floors value with no Master level, resets biweekly.
       grid.appendChild(sealDifficultyBoxes(mine.difficulty));
       var stim = mine.stimVault || { points: 0, bestMasterLevel: null };
-      var stimRow = sealRow('stim-vault', 'Stim Vault', stim, mine.season.maxMasterLevel, mine.season.maxScore,
+      var stimRow = sealRow('stim-vault', 'Stim Vault', stim, season.maxMasterLevel, season.maxScore,
         { withLevel: false, valueLabel: 'Floors', valueMax: stim.max || 60 });
       if (mine.stimVault && mine.stimVault.nextResetAt) {
         var note = E('p', 'Resets ' + fmtSealDate(mine.stimVault.nextResetAt) + (mine.stimVault.justReset ? ' · just reset for the new fortnight' : ''));
@@ -888,10 +895,10 @@
       }
       grid.appendChild(stimRow);
       // Then the six dungeons in order.
-      mine.season.dungeons.forEach(function (dungeon) {
+      season.dungeons.forEach(function (dungeon) {
         var record = null;
         mine.dungeons.forEach(function (d) { if (d.dungeonId === dungeon.id) record = d; });
-        grid.appendChild(sealRow(dungeon.id, dungeon.name, record, mine.season.maxMasterLevel, mine.season.maxScore));
+        grid.appendChild(sealRow(dungeon.id, dungeon.name, record, season.maxMasterLevel, season.maxScore));
       });
       submit.disabled = false;
       renderSealMetric();
@@ -974,7 +981,7 @@
     var cards = document.querySelectorAll('#member-ui .metric-card');
     if (cards.length >= 3 && state.mySeal) {
       cards[2].querySelector('strong').textContent =
-        String(state.mySeal.totals.totalScore) + ' / ' + String(state.mySeal.season.maxScore);
+        String(state.mySeal.totals.totalScore) + ' / ' + String(activeSealDefinition(state.mySeal.season).maxScore);
     }
   }
 
