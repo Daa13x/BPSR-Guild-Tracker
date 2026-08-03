@@ -118,6 +118,7 @@ function setupSpreadsheet() {
   ensureMasterSealSheet_();
   ensureClassSheet_();   // legacy personal class / build selections
   ensureClassSlotSheet_(); // two-slot editor state, additive and non-destructive
+  ensureClassCollectionSheet_(); // ordered dynamic class/build collection
 
   // Seed config defaults without overwriting existing values.
   var cfgSheet = ss.getSheetByName(SHEETS.CONFIG);

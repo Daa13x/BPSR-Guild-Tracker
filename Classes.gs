@@ -10,6 +10,8 @@ var CLASS_SHEET = 'Classes';
 var CLASS_HEADERS = ['SelectionId', 'MemberId', 'EntryType', 'ClassId', 'BuildId', 'Active', 'CreatedAt', 'UpdatedAt'];
 var CLASS_SLOT_SHEET = 'ClassSlots';
 var CLASS_SLOT_HEADERS = ['MemberId', 'PrimaryClassId', 'PrimaryBuildId', 'SecondaryClassId', 'SecondaryBuildId', 'CreatedAt', 'UpdatedAt'];
+var CLASS_COLLECTION_SHEET = 'ClassSelections';
+var CLASS_COLLECTION_HEADERS = ['MemberId', 'SelectionsJson', 'CreatedAt', 'UpdatedAt'];
 
 var CLASS_COLOURS = { green: '#58D68D', red: '#F06A78', blue: '#5FA8FF' };
 
@@ -59,6 +61,12 @@ function ensureClassSlotSheet_() {
   ensureColumns_(ss.getSheetByName(CLASS_SLOT_SHEET), CLASS_SLOT_HEADERS);
 }
 
+function ensureClassCollectionSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  ensureSheet_(ss, CLASS_COLLECTION_SHEET, CLASS_COLLECTION_HEADERS);
+  ensureColumns_(ss.getSheetByName(CLASS_COLLECTION_SHEET), CLASS_COLLECTION_HEADERS);
+}
+
 function classRows_(memberId) {
   return readTable_(CLASS_SHEET).rows.filter(function (r) { return String(r.MemberId) === String(memberId); });
 }
@@ -79,20 +87,59 @@ function classPublic_(r) {
 function myClasses_(token) {
   ensureClassSheet_();
   ensureClassSlotSheet_();
+  ensureClassCollectionSheet_();
   var s = session_(token, 'member');
+  var collection = readTable_(CLASS_COLLECTION_SHEET).rows.filter(function (r) { return String(r.MemberId) === String(s.MemberId); })[0];
+  if (collection) {
+    var entries;
+    try { entries = JSON.parse(String(collection.SelectionsJson || '[]')); } catch (_) { entries = []; }
+    entries = Array.isArray(entries) ? entries : [];
+    return { catalogueVersion: 3, selections: entries.map(function (x, i) { return { id: 'saved-' + i, entryType: i === 0 ? 'primary' : 'secondary', classId: String(x.classId), buildId: String(x.buildId), active: i === 0 }; }), entries: entries };
+  }
   var slot = readTable_(CLASS_SLOT_SHEET).rows.filter(function (r) { return String(r.MemberId) === String(s.MemberId); })[0];
   if (slot) {
     var selections = [{ id: 'primary', entryType: 'primary', classId: String(slot.PrimaryClassId), buildId: String(slot.PrimaryBuildId), active: true }];
     if (slot.SecondaryClassId) selections.push({ id: 'secondary', entryType: 'secondary', classId: String(slot.SecondaryClassId), buildId: String(slot.SecondaryBuildId), active: false });
-    return { catalogueVersion: 2, selections: selections, slots: { primary: selections[0], secondary: selections[1] || null } };
+    return { catalogueVersion: 2, selections: selections, entries: selections.map(function (x) { return { classId: x.classId, buildId: x.buildId }; }), slots: { primary: selections[0], secondary: selections[1] || null } };
   }
   var rows = classRows_(s.MemberId).map(classPublic_);
   rows.sort(function (a, b) {
     if (a.entryType !== b.entryType) return a.entryType === 'primary' ? -1 : 1;
     return String(a.createdAt).localeCompare(String(b.createdAt));
   });
-  return { catalogueVersion: 1, selections: rows, slots: { primary: rows.filter(function (r) { return r.entryType === 'primary'; })[0] || null, secondary: rows.filter(function (r) { return r.entryType === 'secondary'; })[0] || null } };
+  return { catalogueVersion: 1, selections: rows, entries: rows.map(function (r) { return { classId: r.classId, buildId: r.buildId }; }), slots: { primary: rows.filter(function (r) { return r.entryType === 'primary'; })[0] || null, secondary: rows.filter(function (r) { return r.entryType === 'secondary'; })[0] || null } };
 }
+
+/** Persist the ordered, complete class/build collection in one locked update. */
+function saveClasses_(token, d) {
+  ensureClassCollectionSheet_();
+  var s = session_(token, 'member');
+  var entries = d.entries;
+  if (!Array.isArray(entries)) throw apiError_('VALIDATION', 'Classes must be a list.');
+  var seen = {};
+  var clean = entries.map(function (entry) {
+    if (!entry || typeof entry !== 'object') throw apiError_('VALIDATION', 'Each class entry must be valid.');
+    var classId = String(entry.classId || '');
+    var buildId = String(entry.buildId || entry.buildPathId || '');
+    classValidate_(classId, buildId);
+    var key = classId + '|' + buildId;
+    if (seen[key]) throw apiError_('DUPLICATE', 'That class and build are already in your list.');
+    seen[key] = true;
+    return { classId: classId, buildId: buildId };
+  });
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var table = readTable_(CLASS_COLLECTION_SHEET);
+    var existing = table.rows.filter(function (r) { return String(r.MemberId) === String(s.MemberId); })[0];
+    var now = new Date();
+    var row = [s.MemberId, JSON.stringify(clean), existing ? existing.CreatedAt : now, now];
+    if (existing) classCollectionSheet_().getRange(existing._row, 1, 1, CLASS_COLLECTION_HEADERS.length).setValues([row]);
+    else classCollectionSheet_().appendRow(row);
+    return myClasses_(token);
+  } finally { lock.releaseLock(); }
+}
+
+function classCollectionSheet_() { return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CLASS_COLLECTION_SHEET); }
 
 /** Save the complete two-slot editor state in one locked, single-row update. */
 function saveClassSlots_(token, d) {

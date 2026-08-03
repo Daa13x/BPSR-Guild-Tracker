@@ -28,6 +28,34 @@ test('two slots save together, reload together, and allow an empty Secondary', (
   assert.equal(c.__sheets.ClassSlots.rows.length, 2, 'update replaces the complete slot row');
 });
 
+test('saveClasses persists an ordered collection in one record and reloads it unchanged', () => {
+  const c = runtime(); const t = member(c, 'Dax');
+  const entries = [
+    { classId: 'marksman', buildId: 'main' }, { classId: 'marksman', buildId: 'falconry' },
+    { classId: 'marksman', buildId: 'wildpack' }, { classId: 'frost-mage', buildId: 'icicle' }
+  ];
+  const saved = call(c, 'saveClasses', { token: t, entries });
+  assert.deepEqual(JSON.parse(JSON.stringify(saved.entries)), entries);
+  assert.equal(c.__sheets.ClassSelections.rows.length, 2, 'one header and one complete collection row');
+  assert.deepEqual(JSON.parse(JSON.stringify(call(c, 'myClasses', { token: t }).entries)), entries, 'reload preserves order');
+});
+
+test('saveClasses rejects malformed, invalid and exact duplicate combinations without writing', () => {
+  const c = runtime(); const t = member(c, 'Dax');
+  assert.throws(() => call(c, 'saveClasses', { token: t, entries: {} }), /list/);
+  assert.throws(() => call(c, 'saveClasses', { token: t, entries: [{ classId: 'marksman', buildId: 'nope' }] }), /does not belong/);
+  assert.throws(() => call(c, 'saveClasses', { token: t, entries: [{ classId: 'marksman', buildId: 'main' }, { classId: 'marksman', buildId: 'main' }] }), /already in your list/);
+  assert.equal(c.__sheets.ClassSelections.rows.length, 1, 'invalid requests create no collection');
+});
+
+test('saveClasses migrates legacy Primary/Secondary and slot data on the next collection save', () => {
+  const c = runtime(); const t = member(c, 'Dax');
+  call(c, 'saveClassSlots', { token: t, primary: { classId: 'stormblade', buildId: 'slash' }, secondary: { classId: 'frost-mage', buildId: 'icicle' } });
+  assert.deepEqual(JSON.parse(JSON.stringify(call(c, 'myClasses', { token: t }).entries)), [{ classId: 'stormblade', buildId: 'slash' }, { classId: 'frost-mage', buildId: 'icicle' }]);
+  const r = call(c, 'saveClasses', { token: t, entries: [{ classId: 'stormblade', buildId: 'slash' }, { classId: 'marksman', buildId: 'falconry' }, { classId: 'marksman', buildId: 'wildpack' }] });
+  assert.equal(r.catalogueVersion, 3); assert.equal(r.entries.length, 3);
+});
+
 test('two slots reject duplicate stable class IDs and keep saved state intact', () => {
   const c = runtime(); const t = member(c, 'Dax');
   call(c, 'saveClassSlots', { token: t, primary: { classId: 'stormblade', buildId: 'slash' }, secondary: { classId: 'frost-mage', buildId: 'icicle' } });

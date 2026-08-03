@@ -588,6 +588,7 @@ function api_(a, d) {
   if (a === 'adminAudit') { admin_(d.token); return table_(SHEETS.AUDIT).rows.slice(-100).map(function (r) { return { at: iso_(r.Timestamp), action: String(r.Action), target: String(r.Target), details: String(r.Details) }; }); }
   // Personal class / build selections.
   if (a === 'myClasses') return myClasses_(d.token);
+  if (a === 'saveClasses') return saveClasses_(d.token, d);
   if (a === 'saveClassSlots') return saveClassSlots_(d.token, d);
   if (a === 'saveClass') return saveClass_(d.token, d);
   if (a === 'setActiveClass') return setActiveClass_(d.token, d);
