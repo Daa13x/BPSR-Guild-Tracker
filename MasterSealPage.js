@@ -8,6 +8,7 @@
   var ACTIVE_WINDOW_MS = 24 * 60 * 60 * 1000;   // "recently active" indicator
   var STALE_DAYS = 14;
   var DEFAULT_PAGE_SIZE = 10;
+  var loadInFlight = null;
 
   var state = {
     season: null,
@@ -702,9 +703,10 @@
   }
 
   function load() {
+    if (loadInFlight) return loadInFlight;
     setConnection('', 'Connecting…');
     var token = root.BPSR_SESSION ? root.BPSR_SESSION.token() : '';
-    return api('masterSeal', token ? { token: token } : {}).then(function (data) {
+    loadInFlight = api('masterSeal', token ? { token: token } : {}).then(function (data) {
       state.season = data.season;
       state.members = (data.board || []).map(function (row, i) { return adaptMember(row, data.season, i); });
       state.status = 'ready';
@@ -727,7 +729,8 @@
       setConnection('bad', classified.status);
       renderTable();
       renderDetail();
-    });
+    }).finally(function () { loadInFlight = null; });
+    return loadInFlight;
   }
 
   /** The account controller tells the board who is signed in so the detail

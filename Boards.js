@@ -5,6 +5,7 @@
  * ribbon and the hash routing for the single dashboard page. */
 'use strict';
 var DATA = null;
+var leaderboardLoadInFlight = null;
 // Each board owns its own search and filter state so the SV and Masters
 // sections behave as two independent leaderboards.
 var BOARDS = ['sv', 'mp'];
@@ -30,6 +31,7 @@ function classify(failure, context){
 
 // ---------- data loading ----------
 function load(){
+  if (leaderboardLoadInFlight) return leaderboardLoadInFlight;
   var stampEl = document.getElementById('stamp');
   if (stampEl) stampEl.textContent = API_URL ? 'Loading…' : 'Preview data — no backend connected';
   setConnectionStatus(API_URL ? 'connecting' : 'not configured');
@@ -37,15 +39,17 @@ function load(){
   if (API_URL) {
     // Send the session token so a hidden viewer still receives their own row.
     var token = window.BPSR_SESSION ? window.BPSR_SESSION.token() : '';
-    api('leaderboard', token ? { token: token } : {}).then(function(d){DATA=d;setConnectionStatus('connected');render();}).catch(function(err){
+    leaderboardLoadInFlight = api('leaderboard', token ? { token: token } : {}).then(function(d){DATA=d;setConnectionStatus('connected');render();}).catch(function(err){
       var failure = classify(err, 'leaderboard');
       setConnectionStatus(failure.status);
       if (stampEl) stampEl.textContent = failure.title;
       DATA = null;
       BOARDS.forEach(function(key){ renderBoardState(key, 'error', failure.title, failure.detail); });
-    });
+    }).finally(function(){ leaderboardLoadInFlight = null; });
+    return leaderboardLoadInFlight;
   } else {
     setConnectionStatus('not configured'); DATA = demoData(); render();
+    return Promise.resolve(DATA);
   }
 }
 function setConnectionStatus(value){var el=document.getElementById('connection-status');if(el)el.textContent=value.charAt(0).toUpperCase()+value.slice(1);document.documentElement.dataset.connection=String(value).toLowerCase().replace(/\s+/g,'-');}
