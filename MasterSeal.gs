@@ -265,6 +265,7 @@ function adminMasterSealEdit_(token, d) {
  */
 function masterSealBoard_(viewerMemberId) {
   var grouped = sealRowsByMember_();
+  var classEntries = classEntriesByMember_();
   var flags = {};
   readTable_(SHEETS.PLAYERS).rows.forEach(function (p) {
     // Join by the immutable member id. Character names may be renamed and are
@@ -284,6 +285,7 @@ function masterSealBoard_(viewerMemberId) {
       name: String(m.CharacterName),
       verified: flag.verified,
       hidden: flag.hidden,
+      classes: classEntries[String(m.MemberId)] || [],
       svFloor: flag.svFloor,
       dungeons: dungeons.map(function (d) {
         return { dungeonId: d.dungeonId, bestMasterLevel: d.bestMasterLevel, points: d.points, cleared: d.cleared };

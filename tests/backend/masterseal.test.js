@@ -135,6 +135,15 @@ test('the public board ranks by total score, includes zero-progress members and 
   });
 });
 
+test('the Guild Members board exposes only saved public class/build symbols', () => {
+  const c = runtime();
+  const a = call(c, 'createAccount', { characterName: 'Tank' });
+  call(c, 'saveClasses', { token: a.session.token, entries: [{ classId: 'heavy-guardian', buildId: 'main' }] });
+  const row = call(c, 'masterSeal', {}).board.filter(r => r.name === 'Tank')[0];
+  assert.deepEqual(JSON.parse(JSON.stringify(row.classes)), [{ classId: 'heavy-guardian', buildId: 'main' }]);
+  assert.equal('memberId' in row, false);
+});
+
 test('administrators can correct another member’s seal with an audit trail; members cannot', () => {
   const c = runtime();
   const dax = call(c, 'createAccount', { characterName: 'Dax' });

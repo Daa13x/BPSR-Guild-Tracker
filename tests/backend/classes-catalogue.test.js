@@ -92,8 +92,8 @@ test('the backend Classes.gs catalogue is identical to classes.js', () => {
   const back = JSON.parse(JSON.stringify(backendCatalogue()));
   assert.deepEqual(back.colours, FRONTEND.colours, 'colours match');
   assert.deepEqual(
-    back.catalogue.map(c => ({ id: c.id, name: c.name, displayName: c.displayName, iconAsset: c.iconAsset, colour: c.colour, colourFamily: c.colourFamily, role: c.role, builds: c.builds.map(b => b.id + ':' + b.name) })),
-    FRONTEND.catalogue.map(c => ({ id: c.id, name: c.name, displayName: c.displayName, iconAsset: c.iconAsset, colour: c.colour, colourFamily: c.colourFamily, role: c.role, builds: c.builds.map(b => b.id + ':' + b.name) })),
+    back.catalogue.map(c => ({ id: c.id, name: c.name, displayName: c.displayName, iconAsset: c.iconAsset, colour: c.colour, colourFamily: c.colourFamily, role: c.role, combatRole: c.combatRole, builds: c.builds.map(b => b.id + ':' + b.name) })),
+    FRONTEND.catalogue.map(c => ({ id: c.id, name: c.name, displayName: c.displayName, iconAsset: c.iconAsset, colour: c.colour, colourFamily: c.colourFamily, role: c.role, combatRole: c.combatRole, builds: c.builds.map(b => b.id + ':' + b.name) })),
     'frontend and backend catalogues must not drift'
   );
 });

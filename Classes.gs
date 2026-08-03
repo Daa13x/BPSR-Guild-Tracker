@@ -16,23 +16,23 @@ var CLASS_COLLECTION_HEADERS = ['MemberId', 'SelectionsJson', 'CreatedAt', 'Upda
 var CLASS_COLOURS = { green: '#58D68D', red: '#F06A78', blue: '#5FA8FF' };
 
 var CLASS_CATALOGUE = [
-  { id: 'beat-performer', name: 'Beat Performer', displayName: 'Beat Performer', iconAsset: 'verdant-oracle.png', colour: 'green', colourFamily: 'green', role: 'support',
+  { id: 'beat-performer', name: 'Beat Performer', displayName: 'Beat Performer', iconAsset: 'verdant-oracle.png', colour: 'green', colourFamily: 'green', role: 'support', combatRole: 'dps',
     builds: [{ id: 'main', name: 'Main' }, { id: 'concerto', name: 'Concerto' }] },
-  { id: 'frost-mage', name: 'Frost Mage', displayName: 'Frost Mage', iconAsset: 'frost-mage.png', colour: 'red', colourFamily: 'red', role: 'ranged magic',
+  { id: 'frost-mage', name: 'Frost Mage', displayName: 'Frost Mage', iconAsset: 'frost-mage.png', colour: 'red', colourFamily: 'red', role: 'ranged magic', combatRole: 'dps',
     builds: [{ id: 'main', name: 'Main' }, { id: 'frostbeam', name: 'Frostbeam' }, { id: 'icicle', name: 'Icicle' }] },
-  { id: 'heavy-guardian', name: 'Heavy Guardian', displayName: 'Heavy Guardian', iconAsset: 'heavy-guardian.png', colour: 'blue', colourFamily: 'blue', role: 'tank',
+  { id: 'heavy-guardian', name: 'Heavy Guardian', displayName: 'Heavy Guardian', iconAsset: 'heavy-guardian.png', colour: 'blue', colourFamily: 'blue', role: 'tank', combatRole: 'tank',
     builds: [{ id: 'main', name: 'Main' }, { id: 'block', name: 'Block' }, { id: 'earthfort', name: 'Earthfort' }] },
-  { id: 'marksman', name: 'Marksman', displayName: 'Marksman', iconAsset: 'twin-striker.png', colour: 'red', colourFamily: 'red', role: 'ranged',
+  { id: 'marksman', name: 'Marksman', displayName: 'Marksman', iconAsset: 'twin-striker.png', colour: 'red', colourFamily: 'red', role: 'ranged', combatRole: 'dps',
     builds: [{ id: 'main', name: 'Main' }, { id: 'falconry', name: 'Falconry' }, { id: 'wildpack', name: 'Wildpack' }] },
-  { id: 'shield-knight', name: 'Shield Knight', displayName: 'Shield Knight', iconAsset: 'shield-knight.png', colour: 'blue', colourFamily: 'blue', role: 'guard',
+  { id: 'shield-knight', name: 'Shield Knight', displayName: 'Shield Knight', iconAsset: 'shield-knight.png', colour: 'blue', colourFamily: 'blue', role: 'guard', combatRole: 'tank',
     builds: [{ id: 'main', name: 'Main' }, { id: 'shield', name: 'Shield' }, { id: 'recovery', name: 'Recovery' }] },
-  { id: 'stormblade', name: 'Stormblade', displayName: 'Stormblade', iconAsset: 'stormblade.png', colour: 'red', colourFamily: 'red', role: 'melee',
+  { id: 'stormblade', name: 'Stormblade', displayName: 'Stormblade', iconAsset: 'stormblade.png', colour: 'red', colourFamily: 'red', role: 'melee', combatRole: 'dps',
     builds: [{ id: 'main', name: 'Main' }, { id: 'moonstrike', name: 'Moonstrike' }, { id: 'slash', name: 'Slash' }] },
-  { id: 'twin-striker', name: 'Twin Striker', displayName: 'Twin Striker', iconAsset: 'beat-performer.png', colour: 'red', colourFamily: 'red', role: 'melee',
+  { id: 'twin-striker', name: 'Twin Striker', displayName: 'Twin Striker', iconAsset: 'beat-performer.png', colour: 'red', colourFamily: 'red', role: 'melee', combatRole: 'dps',
     builds: [{ id: 'main', name: 'Main' }, { id: 'formless', name: 'Formless' }, { id: 'crimson', name: 'Crimson' }] },
-  { id: 'verdant-oracle', name: 'Verdant Oracle', displayName: 'Verdant Oracle', iconAsset: 'marksman.png', colour: 'green', colourFamily: 'green', role: 'healer',
+  { id: 'verdant-oracle', name: 'Verdant Oracle', displayName: 'Verdant Oracle', iconAsset: 'marksman.png', colour: 'green', colourFamily: 'green', role: 'healer', combatRole: 'healer',
     builds: [{ id: 'main', name: 'Main' }, { id: 'lifebind', name: 'Lifebind' }, { id: 'smite', name: 'Smite' }] },
-  { id: 'wind-knight', name: 'Wind Knight', displayName: 'Wind Knight', iconAsset: 'wind-knight.png', colour: 'red', colourFamily: 'red', role: 'lance',
+  { id: 'wind-knight', name: 'Wind Knight', displayName: 'Wind Knight', iconAsset: 'wind-knight.png', colour: 'red', colourFamily: 'red', role: 'lance', combatRole: 'dps',
     builds: [{ id: 'main', name: 'Main' }, { id: 'skyward', name: 'Skyward' }, { id: 'vanguard', name: 'Vanguard' }] }
 ];
 
@@ -69,6 +69,16 @@ function ensureClassCollectionSheet_() {
 
 function classRows_(memberId) {
   return readTable_(CLASS_SHEET).rows.filter(function (r) { return String(r.MemberId) === String(memberId); });
+}
+
+/** Public class/build entries keyed by member id; collection data wins over legacy rows. */
+function classEntriesByMember_() {
+  ensureClassSheet_(); ensureClassSlotSheet_(); ensureClassCollectionSheet_();
+  var out = {}, collections = readTable_(CLASS_COLLECTION_SHEET).rows, slots = readTable_(CLASS_SLOT_SHEET).rows, legacy = readTable_(CLASS_SHEET).rows;
+  collections.forEach(function (r) { try { var entries = JSON.parse(String(r.SelectionsJson || '[]')); out[String(r.MemberId)] = Array.isArray(entries) ? entries : []; } catch (_) { out[String(r.MemberId)] = []; } });
+  slots.forEach(function (r) { var id = String(r.MemberId); if (out[id]) return; out[id] = [{ classId: String(r.PrimaryClassId), buildId: String(r.PrimaryBuildId) }]; if (r.SecondaryClassId) out[id].push({ classId: String(r.SecondaryClassId), buildId: String(r.SecondaryBuildId) }); });
+  legacy.forEach(function (r) { var id = String(r.MemberId); if (out[id]) return; if (!out[id]) out[id] = []; out[id].push({ classId: String(r.ClassId), buildId: String(r.BuildId) }); });
+  return out;
 }
 
 function classPublic_(r) {

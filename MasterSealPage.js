@@ -79,6 +79,9 @@
       if (query && String(m.name).toLowerCase().indexOf(query) === -1) return false;
       var active = recentlyActive(m.lastUpdated, now);
       switch (o.filter) {
+        case 'tank': if (!hasCombatRole(m, 'tank')) return false; break;
+        case 'healer': if (!hasCombatRole(m, 'healer')) return false; break;
+        case 'dps': if (!hasCombatRole(m, 'dps')) return false; break;
         case 'online': if (!active) return false; break;
         case 'offline': if (active) return false; break;
         case 'mount': if (!m.mountUnlocked) return false; break;
@@ -104,6 +107,21 @@
       name: function (a, b) { return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : a.name.toLowerCase() > b.name.toLowerCase() ? 1 : 0; }
     };
     return list.sort(sorters[o.sort] || sorters.rank);
+  }
+
+  function hasCombatRole(member, role) {
+    return (member.classes || []).some(function (entry) {
+      var c = root.BPSR_CLASSES && root.BPSR_CLASSES.getClass(entry.classId);
+      return c && c.combatRole === role;
+    });
+  }
+
+  function classSymbols(member) {
+    return (member.classes || []).map(function (entry) {
+      var c = root.BPSR_CLASSES && root.BPSR_CLASSES.getClass(entry.classId);
+      if (!c) return '';
+      return '<span class="ms-class-symbol" title="' + esc(c.name + ' · ' + entry.buildId) + '" aria-label="' + esc(c.name + ' · ' + entry.buildId) + '" style="--cls-colour:' + esc(root.BPSR_CLASSES.colourHex(c.id)) + ';--cls-icon:url(\'' + esc(root.BPSR_CLASSES.iconPath(c.id)) + '\')"></span>';
+    }).join('');
   }
 
   function pageSlice(list, page, size) {
@@ -333,6 +351,7 @@
           '<span class="ms-avatar" aria-hidden="true">' + esc(m.name.charAt(0).toUpperCase()) +
             '<span class="ms-status' + (active ? ' on' : '') + '"></span></span>' +
           '<span class="ms-char-name">' + esc(m.name) + '</span>' + (m.verified ? verifiedMark() : '') +
+          '<span class="ms-class-symbols">' + classSymbols(m) + '</span>' +
           (m.hidden ? '<span class="badge hidden-badge" title="Hidden from other viewers — only you can see this row">Hidden — only you</span>' : '') +
           '<span class="sr-only">' + (active ? 'Active in the last 24 hours' : 'Not active recently') + '</span>' +
         '</span></td>' +

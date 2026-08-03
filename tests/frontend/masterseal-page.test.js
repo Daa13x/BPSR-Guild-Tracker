@@ -5,7 +5,7 @@ const vm = require('node:vm');
 
 /** Load the dashboard controller's pure helpers without a DOM. */
 function helpers() {
-  const ctx = { console, JSON, Date, Number, String, Math, isFinite, Promise };
+  const ctx = { console, JSON, Date, Number, String, Math, isFinite, Promise, BPSR_CLASSES: require('../../classes.js') };
   vm.createContext(ctx);
   vm.runInContext(fs.readFileSync('MasterSealPage.js', 'utf8'), ctx);
   return ctx.MS_HELPERS;
@@ -116,6 +116,18 @@ test('filters work, including together with search', () => {
   // search + filter compose
   assert.deepEqual(pick({ query: 'da', filter: 'locked' }), ['Daria']);
   assert.deepEqual(pick({ query: 'da', filter: 'mount' }), ['Dax']);
+});
+
+test('combat-role filters use the canonical class registry', () => {
+  const members = [
+    member({ name: 'Tank', classes: [{ classId: 'heavy-guardian', buildId: 'main' }] }),
+    member({ name: 'Healer', classes: [{ classId: 'verdant-oracle', buildId: 'lifebind' }] }),
+    member({ name: 'Dps', classes: [{ classId: 'marksman', buildId: 'falconry' }] })
+  ];
+  members.forEach((m, i) => { m.classes = [{ classId: ['heavy-guardian', 'verdant-oracle', 'marksman'][i], buildId: 'main' }]; });
+  assert.deepEqual(H.selectMembers(members, { filter: 'tank' }).map(m => m.name), ['Tank']);
+  assert.deepEqual(H.selectMembers(members, { filter: 'healer' }).map(m => m.name), ['Healer']);
+  assert.deepEqual(H.selectMembers(members, { filter: 'dps' }).map(m => m.name), ['Dps']);
 });
 
 test('pagination slices correctly and clamps out-of-range pages', () => {
