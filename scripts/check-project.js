@@ -95,6 +95,22 @@ requireText('config.js', [
   },
   { label: 'must expose the authoritative BPSR_CONFIG object', regex: /root\.BPSR_CONFIG\s*=/ }
 ]);
+requireText('Code.gs', [
+  { label: 'must contain the shared spreadsheet sheet map', regex: /var SHEETS\s*=\s*\{/ },
+  { label: 'must contain the web-app GET health handler', regex: /function doGet\s*\(/ },
+  { label: 'must contain the shared table reader', regex: /function readTable_\s*\(/ }
+]);
+requireText('AuthApi.gs', [
+  { label: 'must contain the account API dispatcher', regex: /function api_\s*\(/ },
+  { label: 'must contain the web-app POST handler', regex: /function doPost\s*\(/ }
+]);
+requireText('MasterSeal.gs', [
+  { label: 'must contain the Master Seal store', regex: /var MASTER_SEAL_SHEET\s*=\s*['"]MasterSeal['"]/ }
+]);
+requireText('Classes.gs', [
+  { label: 'must contain the class catalogue', regex: /var CLASS_CATALOGUE\s*=\s*\[/ },
+  { label: 'must contain the persistent class store', regex: /var CLASS_SHEET\s*=\s*['"]Classes['"]/ }
+]);
 requireText('MasterSeal.html', [
   { label: 'must redirect to the single guild dashboard', regex: /Leaderboard\.html/ }
 ]);

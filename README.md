@@ -96,7 +96,7 @@ A signed-in member can record any number of unique class/build combinations from
 ## Backend setup and redeployment
 
 1. Back up the production spreadsheet and open **Extensions → Apps Script**.
-2. Copy the final `Code.gs`, `AuthApi.gs` and `MasterSeal.gs` into the bound Apps Script project. `Leaderboard.html` is not required or served there: GitHub Pages hosts the interface, while Apps Script `/exec` hosts only the JSON API.
+2. Copy each backend file into the identically named Apps Script file: `Code.gs` → `Code.gs`, `AuthApi.gs` → `AuthApi.gs`, `MasterSeal.gs` → `MasterSeal.gs`, and `Classes.gs` → `Classes.gs`. Before saving, verify `Code.gs` begins with “Guild Leaderboard & Achievements” and contains `doGet`; pasting `MasterSeal.gs` into `Code.gs` removes the shared runtime and breaks every data action. `Leaderboard.html` is not required or served there: GitHub Pages hosts the interface, while Apps Script `/exec` hosts only the JSON API.
 3. Run `setupSpreadsheet()` once. It is idempotent, does not seed demo members, appends the new `Members` columns (`BackupCode`, `BackupCodeCreatedAt`, `BackupCodeUpdatedAt`, `LastAccessAt`), adds `Sessions.LastUsedAt` and creates the `MasterSeal` sheet without touching existing data.
 4. Verify every `Members.MemberId` has exactly one matching `Players.UserId`. In particular, verify Dax’s matching player row has `IsAdmin=TRUE` before relying on normal administrator access.
 5. Review `Config` (including `MEMBER_SESSION_DAYS`), configure `MasterActivities`, and protect `Members`, `Sessions`, `LoginAttempts`, `MasterSeal`, events, achievements, resets and audit sheets. `Members` now holds readable backup codes and must stay private.
@@ -115,7 +115,7 @@ Opening `/exec` directly sends a `GET` request and returns this static JSON heal
 }
 ```
 
-This confirms only that the deployed GET handler is reachable; it does not verify spreadsheet authorization, POST routing, authentication or Pages-origin behavior. The tracker interface remains `https://daa13x.github.io/BPSR-Guild-Tracker/`. Public and protected API actions use JSON `POST` requests, and credentials or session tokens must never be placed in the URL.
+This confirms only that the deployed GET handler is reachable; it does not verify spreadsheet authorization, POST routing, authentication or Pages-origin behavior. After every deployment, run `npm run smoke:deployment -- <the /exec URL>` to verify the GET handler plus `activities`, `leaderboard`, `masterSeal`, and unknown-action POST routing. The tracker interface remains `https://daa13x.github.io/BPSR-Guild-Tracker/`. Public and protected API actions use JSON `POST` requests, and credentials or session tokens must never be placed in the URL.
 
 ## Configure the one API URL
 

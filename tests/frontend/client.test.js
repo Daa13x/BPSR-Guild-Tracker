@@ -78,6 +78,25 @@ test('API client reports unconfigured, safe backend and invalid-response failure
   })).api('me', {}), /invalid response/);
 });
 
+test('safe reads retry one incomplete success envelope while writes never replay', async () => {
+  let reads = 0;
+  const ui = client(() => {
+    reads++;
+    const envelope = reads === 1 ? { ok: true } : { ok: true, data: { profile: { characterName: 'Dax' } } };
+    return Promise.resolve({ text: () => Promise.resolve(JSON.stringify(envelope)) });
+  });
+  assert.deepEqual(await ui.api('refresh', { token: 'opaque', kind: 'member' }), { profile: { characterName: 'Dax' } });
+  assert.equal(reads, 2, 'the malformed read is retried once and only once');
+
+  let writes = 0;
+  const mutation = client(() => {
+    writes++;
+    return Promise.resolve({ text: () => Promise.resolve(JSON.stringify({ ok: true })) });
+  });
+  await assert.rejects(mutation.api('createAccount', { characterName: 'Dax' }), failure => failure.code === 'BAD_RESPONSE');
+  assert.equal(writes, 1, 'a mutation with an ambiguous response must never be replayed');
+});
+
 function runConfig(search, initialStore, storageThrows, keepConstant) {
   const store = { ...(initialStore || {}) };
   const ctx = {

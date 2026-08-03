@@ -239,7 +239,7 @@
   // API
   // ---------------------------------------------------------------------
 
-  function api(action, data) {
+  function api(action, data, retried) {
     var config = root.BPSR_CONFIG;
     if (!config || !config.isConfigured || !config.isConfigured()) {
       return Promise.reject(Object.assign(new Error('The API is not configured yet.'), { code: 'CONFIGURATION' }));
@@ -253,13 +253,19 @@
       signal: controller.signal
     }).then(function (r) { return r.text(); }).then(function (text) {
       var envelope;
-      try { envelope = JSON.parse(text); } catch (_) { throw new Error('The API returned an invalid response.'); }
+      try { envelope = JSON.parse(text); } catch (_) { throw Object.assign(new Error('The API returned an invalid response.'), { code: 'BAD_RESPONSE' }); }
       if (!envelope.ok) {
         var failure = new Error((envelope.error && envelope.error.message) || 'Request could not be completed.');
         failure.code = envelope.error && envelope.error.code;
         throw failure;
       }
+      if (!Object.prototype.hasOwnProperty.call(envelope, 'data')) {
+        throw Object.assign(new Error('The API returned an incomplete response.'), { code: 'BAD_RESPONSE' });
+      }
       return envelope.data;
+    }).catch(function (failure) {
+      if (!retried && failure && failure.code === 'BAD_RESPONSE') return api(action, data, true);
+      throw failure;
     }).finally(function () { root.clearTimeout(timer); });
   }
 
@@ -762,6 +768,5 @@
   document.addEventListener('DOMContentLoaded', function () {
     wireControls();
     renderSeasonNote();
-    load();
   });
 }(typeof window === 'undefined' ? globalThis : window));

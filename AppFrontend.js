@@ -22,14 +22,23 @@
     mySeal: null,
     accounts: null,
     switchingAccount: false,
-    accountEpoch: 0
+    accountEpoch: 0,
+    mySealKey: ''
   };
+  var surfaceLoadInFlight = null;
+  var sealLoadInFlight = null, sealLoadKey = '';
 
   function configured() {
     return CONFIG.isConfigured ? CONFIG.isConfigured() : Boolean(CONFIG.apiUrl);
   }
 
-  function api(action, data) {
+  var RETRYABLE_READS = {
+    refresh: true, myMasterSeal: true, myClasses: true, leaderboard: true, masterSeal: true,
+    listAccessibleAccounts: true, previewAltAccount: true, adminMembers: true,
+    adminRead: true, adminDuplicates: true, adminAudit: true
+  };
+
+  function api(action, data, retried) {
     if (!configured()) {
       return Promise.reject(Object.assign(
         new Error('API URL is not configured. Set configuredApiUrl in config.js to the Apps Script /exec URL.'),
@@ -49,7 +58,7 @@
     }).then(function (text) {
       var envelope;
       try { envelope = JSON.parse(text); } catch (_) {
-        throw new Error('The API returned an invalid response.');
+        throw Object.assign(new Error('The API returned an invalid response.'), { code: 'BAD_RESPONSE' });
       }
       if (!envelope.ok) {
         var failure = new Error(
@@ -58,8 +67,14 @@
         failure.code = envelope.error && envelope.error.code;
         throw failure;
       }
+      if (!Object.prototype.hasOwnProperty.call(envelope, 'data')) {
+        throw Object.assign(new Error('The API returned an incomplete response.'), { code: 'BAD_RESPONSE' });
+      }
       return envelope.data;
     }).catch(function (failure) {
+      if (!retried && RETRYABLE_READS[action] && failure && failure.code === 'BAD_RESPONSE') {
+        return api(action, data, true);
+      }
       if (failure && failure.name === 'AbortError') {
         throw new Error('The request timed out. Check the connection and try again.');
       }
@@ -67,6 +82,41 @@
     }).finally(function () {
       root.clearTimeout(timer);
     });
+  }
+
+  /** Run Apps Script readers one at a time. Apps Script executions can become
+   * very slow when the same browser starts every sheet reader concurrently. */
+  function queueSurfaceLoad(force, includePersonal) {
+    if (surfaceLoadInFlight && !force) return surfaceLoadInFlight;
+    var epoch = state.accountEpoch;
+    var previous = surfaceLoadInFlight || Promise.resolve();
+    var job = previous.catch(function () { return null; }).then(function () {
+      if (epoch !== state.accountEpoch) return null;
+      return root.loadMasterSeal ? root.loadMasterSeal(Boolean(force)) : null;
+    }).then(function () {
+      if (epoch !== state.accountEpoch) return null;
+      return root.load ? root.load(Boolean(force)) : null;
+    }).then(function () {
+      if (!includePersonal || epoch !== state.accountEpoch || state.switchingAccount || !state.session) return null;
+      return renderSealEditor({ force: Boolean(force) });
+    }).then(function () {
+      if (!includePersonal || epoch !== state.accountEpoch || state.switchingAccount || !state.session) return null;
+      return root.CLASS_SELECTOR && root.CLASS_SELECTOR.reload
+        ? root.CLASS_SELECTOR.reload(Boolean(force)) : null;
+    });
+    var wrapped = job.finally(function () {
+      if (surfaceLoadInFlight === wrapped) surfaceLoadInFlight = null;
+    });
+    surfaceLoadInFlight = wrapped;
+    return wrapped;
+  }
+
+  function loadRequiredSurfaces(force) {
+    return queueSurfaceLoad(Boolean(force), true);
+  }
+
+  function loadPublicSurfaces(force) {
+    return queueSurfaceLoad(Boolean(force), false);
   }
 
   // -------------------------------------------------------------------------
@@ -127,6 +177,7 @@
   }
 
   function signedOutLocally() {
+    state.accountEpoch++;
     clearCookie();
     state.member = null;
     state.session = null;
@@ -135,6 +186,9 @@
     state.mySeal = null;
     state.accounts = null;
     state.switchingAccount = false;
+    state.mySealKey = '';
+    sealLoadInFlight = null; sealLoadKey = '';
+    if (root.CLASS_SELECTOR && root.CLASS_SELECTOR.reset) root.CLASS_SELECTOR.reset();
     syncAdminVisibility(Boolean(state.recoveryToken));
     renderMember();
     renderAdmin();
@@ -391,6 +445,8 @@
     state.accountEpoch++;
     state.session = { token: result.session.token, expiresAt: result.session.expiresAt };
     state.member = result.member;
+    state.mySeal = null; state.mySealKey = '';
+    sealLoadInFlight = null; sealLoadKey = '';
     writeCookie(result.session.token, result.session.expiresAt);
     removeLegacy();
     if (options && options.showCode && result.backupCode) {
@@ -399,11 +455,10 @@
     }
     hideGate();
     syncAdminVisibility(Boolean(state.member.isAdmin || state.recoveryToken));
+    if (root.CLASS_SELECTOR && root.CLASS_SELECTOR.reset) root.CLASS_SELECTOR.reset();
     renderMember();
     if (state.member.isAdmin) renderAdmin();
-    if (root.load) root.load();
-    if (root.loadMasterSeal) root.loadMasterSeal();
-    refreshAccessibleAccounts().catch(function () { /* chooser retries on open */ });
+    loadRequiredSurfaces(true);
   }
 
   // -------------------------------------------------------------------------
@@ -583,15 +638,21 @@
   function switchActiveAccount(memberId) {
     var epoch = ++state.accountEpoch;
     state.switchingAccount = true; state.mySeal = null;
+    state.mySealKey = ''; sealLoadInFlight = null; sealLoadKey = '';
+    if (root.CLASS_SELECTOR && root.CLASS_SELECTOR.reset) root.CLASS_SELECTOR.reset();
     renderMember();
-    return api('switchActiveAccount', { token: memberToken(), memberId: memberId }).then(function (result) {
+    // Let an already-running Apps Script read finish before changing the
+    // server-side active account. This prevents old/new account bursts.
+    var beforeSwitch = surfaceLoadInFlight || Promise.resolve();
+    return beforeSwitch.catch(function () { return null; }).then(function () {
+      return api('switchActiveAccount', { token: memberToken(), memberId: memberId });
+    }).then(function (result) {
       if (epoch !== state.accountEpoch) return;
       state.member = result.member; state.accounts = result.accounts; state.switchingAccount = false;
       closeAccountChooser();
       renderMember();
-      if (root.load) root.load(true);
       if (root.MS_PAGE && root.MS_PAGE.setViewer) root.MS_PAGE.setViewer(state.member.characterName);
-      if (root.loadMasterSeal) root.loadMasterSeal(true);
+      return loadRequiredSurfaces(true);
     }).catch(function (failure) {
       if (epoch === state.accountEpoch) { state.switchingAccount = false; renderMember(); }
       throw failure;
@@ -605,13 +666,13 @@
   function renderMember() {
     // The Master Seal editor lives in its own section; keep it in sync with
     // sign-in state on every member re-render.
-    renderSealEditor();
+    renderSealEditor({ defer: true });
     // Tell the board who is signed in so the detail panel opens on their row.
     if (root.MS_PAGE && root.MS_PAGE.setViewer) {
       root.MS_PAGE.setViewer(state.member ? state.member.characterName : null);
     }
     // Refresh the personal class selector for the current sign-in state.
-    if (root.CLASS_SELECTOR && root.CLASS_SELECTOR.reload) root.CLASS_SELECTOR.reload();
+    if (root.CLASS_SELECTOR && root.CLASS_SELECTOR.sync) root.CLASS_SELECTOR.sync();
     var host = document.getElementById('member-ui');
     if (!host) return;
     host.replaceChildren();
@@ -774,9 +835,10 @@
 
   /** Render the Master Seal editor into its own section. Stim Vault leads,
    * then the six dungeons; a single Save sits at the bottom. */
-  function renderSealEditor() {
+  function renderSealEditor(options) {
+    options = options || {};
     var host = document.getElementById('seal-ui');
-    if (!host) return;
+    if (!host) return Promise.resolve(null);
     host.replaceChildren();
     var message = E('div');
     message.className = 'notice';
@@ -787,7 +849,7 @@
       message.textContent = configured()
         ? 'Sign in from My Progress to record your Master Seal and Stim Vault progress.'
         : 'Connect the Apps Script API to record Master Seal progress.';
-      return;
+      return Promise.resolve(null);
     }
 
     var form = E('form');
@@ -807,8 +869,12 @@
     form.appendChild(footer);
     host.appendChild(form);
 
-    api('myMasterSeal', { token: memberToken() }).then(function (mine) {
-      state.mySeal = mine;
+    if (state.switchingAccount) {
+      grid.textContent = 'Switching accountâ€¦';
+      return Promise.resolve(null);
+    }
+
+    function populate(mine) {
       grid.replaceChildren();
       // Stim Vault first — a floors value with no Master level, resets biweekly.
       grid.appendChild(sealDifficultyBoxes(mine.difficulty));
@@ -829,11 +895,12 @@
       });
       submit.disabled = false;
       renderSealMetric();
-    }).catch(function (failure) {
-      grid.textContent = '';
-      message.className = 'notice error';
-      message.textContent = friendlyFailure(failure);
-    });
+      return mine;
+    }
+
+    if (state.mySeal && state.mySealKey === state.accountEpoch + '|' + memberToken() && !options.force) {
+      populate(state.mySeal);
+    }
 
     form.addEventListener('submit', function (event) {
       event.preventDefault();
@@ -864,14 +931,36 @@
         message.className = 'notice';
         message.textContent = result.changed ? 'Master Seal progress saved.' : 'No Master Seal changes.';
         renderSealMetric();
-        if (root.load) root.load();
-        if (root.loadMasterSeal) root.loadMasterSeal();
+        loadPublicSurfaces(true);
       }).catch(function (failure) {
         message.className = 'notice error';
         message.textContent = friendlyFailure(failure);
       }).finally(function () {
         submit.disabled = false;
       });
+    });
+
+    if (options.defer || (state.mySeal && state.mySealKey === state.accountEpoch + '|' + memberToken() && !options.force)) {
+      return Promise.resolve(state.mySeal);
+    }
+
+    var requestKey = state.accountEpoch + '|' + memberToken();
+    if (!sealLoadInFlight || sealLoadKey !== requestKey) {
+      sealLoadKey = requestKey;
+      sealLoadInFlight = api('myMasterSeal', { token: memberToken() }).finally(function () {
+        if (sealLoadKey === requestKey) { sealLoadInFlight = null; sealLoadKey = ''; }
+      });
+    }
+    return sealLoadInFlight.then(function (mine) {
+      if (requestKey !== state.accountEpoch + '|' + memberToken() || state.switchingAccount) return null;
+      state.mySeal = mine; state.mySealKey = requestKey;
+      return populate(mine);
+    }).catch(function (failure) {
+      if (requestKey !== state.accountEpoch + '|' + memberToken()) return null;
+      grid.textContent = '';
+      message.className = 'notice error';
+      message.textContent = friendlyFailure(failure);
+      return null;
     });
   }
 
@@ -1453,7 +1542,8 @@
     state: state,
     configured: configured,
     cookieName: cookieName,
-    cookiePath: cookiePath
+    cookiePath: cookiePath,
+    loadSurfaces: loadRequiredSurfaces
   };
   root.BPSR_ACCOUNTS = {
     open: showAccountChooser,
@@ -1466,6 +1556,6 @@
     var preview = document.getElementById('preview-notice');
     if (preview) preview.hidden = configured();
     clearDemoPreview();
-    boot();
+    boot().then(function () { return loadRequiredSurfaces(false); });
   });
 }(window));

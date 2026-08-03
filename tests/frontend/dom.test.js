@@ -313,6 +313,7 @@ function createHarness(handler, options) {
     }
   };
   ctx.window = ctx;
+  Object.assign(ctx, opts.globals || {});
   vm.createContext(ctx);
   // config.js owns the real failure classifier; load it, then keep the
   // harness's API stub so requests still run against the fake fetch.
@@ -464,6 +465,90 @@ test('a remembered cookie restores the account silently; an expired one reopens 
   await expired.ready();
   assert.equal(expired.cookies[COOKIE], undefined, 'dead cookie is cleared');
   assert.equal(expired.gate.hidden, false);
+});
+
+test('startup and account switching serialize every sheet reader after session restore', async () => {
+  const order = [];
+  const pending = {};
+  function waitFor(name, value) {
+    order.push(name);
+    return new Promise(resolve => { pending[name] = () => resolve(value); });
+  }
+  async function release(name) {
+    assert.ok(pending[name], name + ' should be the only pending reader');
+    const done = pending[name];
+    delete pending[name];
+    done();
+    await settle(4);
+  }
+
+  const classes = {
+    sync() {}, reset() {},
+    reload() { return waitFor('myClasses', []); }
+  };
+  const app = createHarness((action, data) => {
+    if (action === 'refresh') {
+      return waitFor('refresh', { profile: profile(), expiresAt: farFuture(), accounts: null });
+    }
+    if (action === 'myMasterSeal') return waitFor('myMasterSeal', emptySeal());
+    if (action === 'switchActiveAccount') {
+      assert.equal(data.memberId, 'MEM-ALT');
+      return waitFor('switchActiveAccount', {
+        member: profile({ memberId: 'MEM-ALT', characterName: 'Alt Paw' }),
+        accounts: { mainMemberId: 'MEM-1', activeMemberId: 'MEM-ALT', accounts: [] }
+      });
+    }
+  }, {
+    cookies: { [COOKIE]: 'remembered-token' },
+    globals: {
+      CLASS_SELECTOR: classes,
+      loadMasterSeal: () => waitFor('masterSeal', {}),
+      load: () => waitFor('leaderboard', {})
+    }
+  });
+
+  app.document.fire('DOMContentLoaded');
+  await settle(4);
+  assert.deepEqual(order, ['refresh'], 'no sheet reader races remembered-session restore');
+  await release('refresh');
+  assert.deepEqual(order, ['refresh', 'masterSeal']);
+  await release('masterSeal');
+  assert.deepEqual(order, ['refresh', 'masterSeal', 'leaderboard']);
+  await release('leaderboard');
+  assert.deepEqual(order, ['refresh', 'masterSeal', 'leaderboard', 'myMasterSeal']);
+  await release('myMasterSeal');
+  assert.deepEqual(order, ['refresh', 'masterSeal', 'leaderboard', 'myMasterSeal', 'myClasses']);
+  await release('myClasses');
+
+  order.length = 0;
+  const switched = app.ctx.BPSR_ACCOUNTS.switchTo('MEM-ALT');
+  await settle(4);
+  assert.deepEqual(order, ['switchActiveAccount'], 'switching does not read the old account in parallel');
+  await release('switchActiveAccount');
+  assert.deepEqual(order, ['switchActiveAccount', 'masterSeal']);
+  await release('masterSeal');
+  await release('leaderboard');
+  await release('myMasterSeal');
+  assert.deepEqual(order, ['switchActiveAccount', 'masterSeal', 'leaderboard', 'myMasterSeal', 'myClasses']);
+  await release('myClasses');
+  await switched;
+  assert.equal(order.filter(item => item === 'myMasterSeal').length, 1);
+  assert.equal(order.filter(item => item === 'myClasses').length, 1);
+});
+
+test('anonymous startup loads both public surfaces once and no personal data', async () => {
+  const order = [];
+  const app = createHarness(null, {
+    globals: {
+      CLASS_SELECTOR: { sync() {}, reset() {}, reload() { order.push('myClasses'); } },
+      loadMasterSeal: () => { order.push('masterSeal'); return Promise.resolve({}); },
+      load: () => { order.push('leaderboard'); return Promise.resolve({}); }
+    }
+  });
+  await app.ready();
+  await settle(6);
+  assert.deepEqual(order, ['masterSeal', 'leaderboard']);
+  assert.equal(app.calls.some(call => call.action === 'myMasterSeal'), false);
 });
 
 test('a transient failure during migration keeps the legacy session for a later retry', async () => {

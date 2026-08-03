@@ -16,11 +16,12 @@ var state = {
 };
 // GitHub Pages and the protected controller share this one configuration source.
 var API_URL = window.BPSR_CONFIG ? window.BPSR_CONFIG.apiUrl : '';
-function api(action,data){ if(!API_URL) return Promise.reject(Object.assign(new Error('The tracker API is not configured.'),{code:'CONFIGURATION'}));
+function api(action,data,retried){ if(!API_URL) return Promise.reject(Object.assign(new Error('The tracker API is not configured.'),{code:'CONFIGURATION'}));
   return fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:action,data:data||{}})})
     .then(function(r){return r.text();}).then(function(t){var j;try{j=JSON.parse(t);}catch(e){throw Object.assign(new Error('The API returned a response the tracker could not read.'),{code:'BAD_RESPONSE'});}
       if(!j.ok){var failure=new Error((j.error&&j.error.message)||'Request could not be completed.');failure.code=j.error&&j.error.code;throw failure;}
-      return j.data;}); }
+      if(!Object.prototype.hasOwnProperty.call(j,'data')){throw Object.assign(new Error('The API returned an incomplete response.'),{code:'BAD_RESPONSE'});}
+      return j.data;}).catch(function(failure){if(!retried&&failure&&failure.code==='BAD_RESPONSE')return api(action,data,true);throw failure;}); }
 
 /** Honest, specific failure text; raw backend strings go to the console. */
 function classify(failure, context){
@@ -325,4 +326,5 @@ function demoData(){
   };
 }
 
-load();
+// AppFrontend.js starts the public surfaces after remembered-session restore.
+// Starting here would race that restore and the other Apps Script readers.

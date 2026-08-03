@@ -4,6 +4,7 @@
   var CAT = root.BPSR_CLASSES, CONFIG = root.BPSR_CONFIG || {};
   if (!CAT || typeof document === 'undefined') return;
   var state = { entries: [], drafts: [], picker: null, loaded: false, open: false, busy: false, error: '' };
+  var loadInFlight = null, loadGeneration = 0;
   var els = {}, lastFocus = null;
   function token() { return root.BPSR_SESSION ? root.BPSR_SESSION.token() : ''; }
   function signedIn() { return Boolean(token()); }
@@ -14,7 +15,7 @@
   function buildName(x) { var c = x && classOf(x.classId), b = c && c.builds.filter(function (v) { return v.id === x.buildId; })[0]; return b ? b.name : ''; }
   function glyph(id, size) { var g = el('span', 'cls-glyph'); g.style.setProperty('--cls-colour', CAT.colourHex(id)); g.style.setProperty('--cls-icon', 'url("' + CAT.iconPath(id) + '")'); if (size) { g.style.width = size + 'px'; g.style.height = size + 'px'; } g.setAttribute('aria-hidden', 'true'); return g; }
   function allCount() { return CAT.catalogue.reduce(function (n, c) { return n + c.builds.length; }, 0); }
-  function api(action, data) { var controller = new AbortController(), timer = root.setTimeout(function () { controller.abort(); }, CONFIG.timeoutMs || 45000); return root.fetch(CONFIG.apiUrl, { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: action, data: data }), signal: controller.signal }).then(function (r) { return r.text(); }).then(function (text) { var env; try { env = JSON.parse(text); } catch (_) { throw new Error('The server returned an invalid response.'); } if (!env.ok) { var e = new Error((env.error || {}).message || 'Class saving failed.'); e.code = (env.error || {}).code; throw e; } return env.data; }).finally(function () { root.clearTimeout(timer); }); }
+  function api(action, data, retried) { var controller = new AbortController(), timer = root.setTimeout(function () { controller.abort(); }, CONFIG.timeoutMs || 45000); return root.fetch(CONFIG.apiUrl, { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: action, data: data }), signal: controller.signal }).then(function (r) { return r.text(); }).then(function (text) { var env; try { env = JSON.parse(text); } catch (_) { throw Object.assign(new Error('The server returned an invalid response.'), { code: 'BAD_RESPONSE' }); } if (!env.ok) { var e = new Error((env.error || {}).message || 'Class saving failed.'); e.code = (env.error || {}).code; throw e; } if (!Object.prototype.hasOwnProperty.call(env, 'data')) { throw Object.assign(new Error('The server returned an incomplete response.'), { code: 'BAD_RESPONSE' }); } return env.data; }).catch(function (failure) { if (!retried && action === 'myClasses' && failure && failure.code === 'BAD_RESPONSE') return api(action, data, true); throw failure; }).finally(function () { root.clearTimeout(timer); }); }
   function describe(e) { if (root.BPSR_ERRORS) return root.BPSR_ERRORS.describe(e, 'classes'); return (e && e.message) || 'Classes could not be saved.'; }
   function ensureTrigger() { if (els.trigger) return; var host = document.getElementById('class-selector'); if (!host) return; var b = el('button', 'cls-trigger'); b.type = 'button'; b.id = 'cls-trigger'; b.setAttribute('aria-haspopup', 'dialog'); b.addEventListener('click', open); host.appendChild(b); els.trigger = b; }
   function renderTrigger() { ensureTrigger(); if (!els.trigger) return; var host = document.getElementById('class-selector'); if (host) host.hidden = !signedIn(); if (!signedIn()) return; var b = els.trigger; b.replaceChildren(); if (!state.entries.length) { b.className = 'cls-trigger empty'; b.textContent = state.loaded ? 'Set your classes' : 'Loading…'; b.setAttribute('aria-label', 'Choose your classes'); return; } b.className = 'cls-trigger'; b.appendChild(glyph(state.entries[0].classId, 26)); var info = el('span', 'cls-trigger-body'); info.appendChild(el('span', 'cls-trigger-name', classOf(state.entries[0].classId).name)); info.appendChild(el('span', 'cls-trigger-build', state.entries.length === 1 ? buildName(state.entries[0]) : state.entries.length + ' saved class builds')); b.appendChild(info); b.setAttribute('aria-label', 'Edit ' + state.entries.length + ' saved class builds'); }
@@ -33,7 +34,27 @@
     d.appendChild(body); var foot = el('div', 'cls-foot'); var cancel = el('button', 'cls-btn ghost', 'Cancel'); cancel.type = 'button'; cancel.addEventListener('click', close); foot.appendChild(cancel); var save = el('button', 'cls-btn primary', state.busy ? 'Saving…' : 'Save classes'); save.type = 'button'; save.disabled = state.busy; save.addEventListener('click', saveAll); foot.appendChild(save); d.appendChild(foot); }
   function saveAll() { if (state.busy) return; state.busy = true; state.error = ''; render(); api('saveClasses', { token: token(), entries: state.drafts.map(function (entry, i) { return { classId: entry.classId, buildId: entry.buildId, entryType: i === 0 ? 'primary' : 'secondary' }; }) }).then(function (data) { accept(data); state.busy = false; renderTrigger(); close(); if (typeof root.toast === 'function') root.toast('Classes saved.'); }).catch(function (e) { state.busy = false; state.error = describe(e); render(); }); }
   function accept(data) { state.entries = (data.entries || data.selections || []).map(function (x) { return { classId: x.classId, buildId: x.buildId }; }); }
-  function reload() { renderTrigger(); if (!signedIn() || !configured()) { state.loaded = true; return renderTrigger(); } api('myClasses', { token: token() }).then(function (data) { accept(data); state.loaded = true; renderTrigger(); if (state.open) render(); }).catch(function (e) { state.error = describe(e); state.loaded = true; renderTrigger(); }); }
-  root.CLASS_SELECTOR = { reload: reload, state: state, open: open, close: close };
-  document.addEventListener('DOMContentLoaded', function () { renderTrigger(); reload(); });
+  function reload(force) {
+    renderTrigger();
+    if (!signedIn() || !configured()) { state.loaded = true; renderTrigger(); return Promise.resolve(null); }
+    if (loadInFlight) return loadInFlight;
+    if (state.loaded && !force) return Promise.resolve(state.entries);
+    var generation = ++loadGeneration;
+    loadInFlight = api('myClasses', { token: token() }).then(function (data) {
+      if (generation !== loadGeneration) return null;
+      accept(data); state.loaded = true; state.error = ''; renderTrigger(); if (state.open) render();
+      return state.entries;
+    }).catch(function (e) {
+      if (generation !== loadGeneration) return null;
+      state.error = describe(e); state.loaded = true; renderTrigger();
+      return null;
+    }).finally(function () { if (generation === loadGeneration) loadInFlight = null; });
+    return loadInFlight;
+  }
+  function reset() {
+    loadGeneration++; loadInFlight = null; state.entries = []; state.drafts = [];
+    state.loaded = false; state.error = ''; renderTrigger();
+  }
+  root.CLASS_SELECTOR = { reload: reload, reset: reset, sync: renderTrigger, state: state, open: open, close: close };
+  document.addEventListener('DOMContentLoaded', renderTrigger);
 }(typeof window === 'undefined' ? globalThis : window));

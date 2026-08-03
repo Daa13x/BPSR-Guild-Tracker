@@ -3,7 +3,7 @@
 ## Google Sheet and stable identities
 
 - [ ] Back up the production spreadsheet before setup, migration, merge or role work.
-- [ ] Open **Extensions → Apps Script** and add the final `Code.gs`, `AuthApi.gs` and `MasterSeal.gs`.
+- [ ] Open **Extensions → Apps Script** and copy all four backends into the identically named files: `Code.gs`, `AuthApi.gs`, `MasterSeal.gs` and `Classes.gs`. Confirm `Code.gs` begins with “Guild Leaderboard & Achievements” and contains `doGet`, `SHEETS` and `readTable_`; never paste the Master Seal source into `Code.gs`.
 - [ ] Run the idempotent `setupSpreadsheet()` function and confirm no demo members were inserted.
 - [ ] Confirm all required sheets and exact headers exist, including the appended `Members` columns (`BackupCode`, `BackupCodeCreatedAt`, `BackupCodeUpdatedAt`, `LastAccessAt`), `Sessions.LastUsedAt` and the new `MasterSeal` sheet, with all existing data intact.
 - [ ] Confirm each `Members.MemberId` maps to exactly one `Players.UserId`; resolve missing or duplicate mappings before deployment.
@@ -28,6 +28,7 @@
 - [ ] Use the execute-as and access options appropriate to the production spreadsheet and intended guild members.
 - [ ] Copy the final HTTPS URL ending in `/exec` without adding credentials.
 - [ ] Open `/exec` directly and confirm the `GET` health response is JSON with `ok: true` and `status: "ready"`.
+- [ ] Run `npm run smoke:deployment -- <the /exec URL>` and confirm health, activities, leaderboard, Master Seal and unknown-action routing all pass before opening Pages.
 - [ ] Confirm the health payload contains only the four static `ok`, `service`, `status` and `message` fields, with no Sheet, member, administrator or session data.
 - [ ] Treat the health response as a reachability check only; it does not replace live POST, authorization, redirect or Pages-origin verification.
 - [ ] Confirm public and protected API operations use JSON `POST` requests; never place backup codes, session tokens or other credentials in the URL.

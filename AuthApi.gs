@@ -78,8 +78,8 @@ function newBackupCode_() {
 function normalizeCode_(v) { return String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
 function validCodeInput_(v) { if (typeof v !== 'string') return false; var n = normalizeCode_(v); return n.length >= 8 && n.length <= 32; }
 
-function writeMemberCell_(memberRow, header, value) {
-  var t = table_(AUTH_SHEETS.MEMBERS), col = colIndex_(t, header);
+function writeMemberCell_(memberRow, header, value, membersTable) {
+  var t = membersTable || table_(AUTH_SHEETS.MEMBERS), col = colIndex_(t, header);
   if (col > 0) t.sheet.getRange(memberRow._row, col).setValue(value);
 }
 
@@ -256,11 +256,16 @@ function ensureRecoveryRecords_() {
   return { issued: issued, mirrored: mirrored };
 }
 
-function touchMemberAccess_(id, force) {
-  var m = member_(id);
+function touchMemberAccess_(id, force, membersTable) {
+  var rows = membersTable ? membersTable.rows : table_(AUTH_SHEETS.MEMBERS).rows;
+  var m = rows.filter(function (r) { return String(r.MemberId) === String(id); })[0] || null;
   if (!m) return;
   var last = m.LastAccessAt ? new Date(m.LastAccessAt).getTime() : 0;
-  if (force || !last || Date.now() - last > TOUCH_INTERVAL_MS) writeMemberCell_(m, 'LastAccessAt', new Date());
+  if (force || !last || Date.now() - last > TOUCH_INTERVAL_MS) {
+    var now = new Date();
+    writeMemberCell_(m, 'LastAccessAt', now, membersTable);
+    m.LastAccessAt = now;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -271,13 +276,31 @@ function memberSessionMs_() { return clampInt_(cfg_('MEMBER_SESSION_DAYS'), 1, 3
 
 function session_(token, kind) {
   if (typeof token !== 'string' || token.length < 40) throw apiError_('SESSION_EXPIRED', 'Session expired.');
-  var t = table_(AUTH_SHEETS.SESSIONS);
-  var r = t.rows.filter(function (x) { return equal_(x.TokenHash, hash_(token)) && String(x.Kind) === kind && !x.RevokedAt && new Date(x.ExpiresAt) > new Date(); })[0];
+  var t = table_(AUTH_SHEETS.SESSIONS), tokenHash = hash_(token), now = new Date(), r = null;
+  for (var i = 0; i < t.rows.length; i++) {
+    var candidate = t.rows[i];
+    if (equal_(candidate.TokenHash, tokenHash) && String(candidate.Kind) === kind &&
+        !candidate.RevokedAt && new Date(candidate.ExpiresAt) > now) {
+      r = candidate;
+      break;
+    }
+  }
   if (!r) throw apiError_('SESSION_EXPIRED', 'Session expired.');
-  var col = colIndex_(t, 'LastUsedAt');
-  var used = r.LastUsedAt ? new Date(r.LastUsedAt).getTime() : 0;
-  if (col > 0 && (!used || Date.now() - used > TOUCH_INTERVAL_MS)) t.sheet.getRange(r._row, col).setValue(new Date());
+  r._sessionSheet = t.sheet;
+  r._lastUsedColumn = colIndex_(t, 'LastUsedAt');
   return r;
+}
+
+/** Session validation is deliberately read-only. Only refresh records usage,
+ * once per request, so concurrent signed board loads never contend on Sheets. */
+function touchSession_(session) {
+  var used = session.LastUsedAt ? new Date(session.LastUsedAt).getTime() : 0;
+  if (session._sessionSheet && session._lastUsedColumn > 0 &&
+      (!used || Date.now() - used > TOUCH_INTERVAL_MS)) {
+    var now = new Date();
+    session._sessionSheet.getRange(session._row, session._lastUsedColumn).setValue(now);
+    session.LastUsedAt = now;
+  }
 }
 
 function sessionMaybe_(token, kind) { try { return session_(token, kind); } catch (e) { return null; } }
@@ -313,8 +336,9 @@ function revokeMember_(id, kind) { var t = table_(AUTH_SHEETS.SESSIONS); t.rows.
 // stable ids; display names and recovery codes are never relationship keys.
 // ---------------------------------------------------------------------------
 
-function activeLinks_() {
-  return table_(AUTH_SHEETS.LINKS).rows.filter(function (r) { return !r.UnlinkedAt; });
+function activeLinks_(linkRows) {
+  var rows = linkRows || table_(AUTH_SHEETS.LINKS).rows;
+  return rows.filter(function (r) { return !r.UnlinkedAt; });
 }
 function incomingAccountLink_(id) {
   return activeLinks_().filter(function (r) { return String(r.AltMemberId) === String(id); })[0] || null;
@@ -325,26 +349,32 @@ function outgoingAccountLinks_(id) {
 function sessionGroupRoot_(s) { return String(s.GroupRootMemberId || s.MemberId); }
 function sessionActiveMemberId_(s) { return String(s.ActiveMemberId || s.MemberId); }
 function sessionCanManageLinkedAccounts_(s) { return truthy_(s.AccountGroupAccess); }
-function accessibleAccountIds_(s) {
+function accessibleAccountIds_(s, links) {
   var root = sessionGroupRoot_(s);
   if (!sessionCanManageLinkedAccounts_(s)) return [String(s.MemberId)];
   var ids = [root];
-  outgoingAccountLinks_(root).forEach(function (r) { ids.push(String(r.AltMemberId)); });
+  activeLinks_(links).forEach(function (r) {
+    if (String(r.MainMemberId) === root) ids.push(String(r.AltMemberId));
+  });
   return ids;
 }
-function assertAccessibleAccount_(s, memberId) {
+function assertAccessibleAccount_(s, memberId, links, memberRows) {
   var id = String(memberId || '');
-  if (accessibleAccountIds_(s).indexOf(id) === -1) throw apiError_('FORBIDDEN', 'That account is not available in this session.');
-  var member = member_(id);
+  if (accessibleAccountIds_(s, links).indexOf(id) === -1) throw apiError_('FORBIDDEN', 'That account is not available in this session.');
+  var member = memberRows
+    ? memberRows.filter(function (r) { return String(r.MemberId) === id; })[0] || null
+    : member_(id);
   if (!member || member.DisabledAt) throw apiError_('NOT_FOUND', 'Account is unavailable.');
   return id;
 }
-function activeMemberSession_(token) {
-  var s = session_(token, 'member');
-  s.ActiveMemberId = assertAccessibleAccount_(s, sessionActiveMemberId_(s));
+function activeMemberSession_(token, validatedSession, links, memberRows) {
+  var s = validatedSession || session_(token, 'member');
+  s.ActiveMemberId = assertAccessibleAccount_(s, sessionActiveMemberId_(s), links, memberRows);
   return s;
 }
-function activeMemberId_(token) { return String(activeMemberSession_(token).ActiveMemberId); }
+function activeMemberId_(token, validatedSession, links, memberRows) {
+  return String(activeMemberSession_(token, validatedSession, links, memberRows).ActiveMemberId);
+}
 function writeSessionCell_(session, header, value) {
   var t = table_(AUTH_SHEETS.SESSIONS), col = colIndex_(t, header);
   if (col > 0) t.sheet.getRange(session._row, col).setValue(value);
@@ -356,11 +386,12 @@ function accountSummary_(member, player, mainId, activeId) {
     isMain: String(member.MemberId) === String(mainId), active: String(member.MemberId) === String(activeId)
   };
 }
-function listAccessibleAccounts_(token) {
-  var s = activeMemberSession_(token), ids = accessibleAccountIds_(s), root = sessionGroupRoot_(s), active = sessionActiveMemberId_(s);
+function listAccessibleAccounts_(token, validatedSession, links, memberRows, playerRows) {
+  var s = activeMemberSession_(token, validatedSession, links, memberRows);
+  var ids = accessibleAccountIds_(s, links), root = sessionGroupRoot_(s), active = sessionActiveMemberId_(s);
   var members = {}, players = {};
-  table_(AUTH_SHEETS.MEMBERS).rows.forEach(function (m) { members[String(m.MemberId)] = m; });
-  table_(SHEETS.PLAYERS).rows.forEach(function (p) { players[String(p.UserId)] = p; });
+  (memberRows || table_(AUTH_SHEETS.MEMBERS).rows).forEach(function (m) { members[String(m.MemberId)] = m; });
+  (playerRows || table_(SHEETS.PLAYERS).rows).forEach(function (p) { players[String(p.UserId)] = p; });
   return { mainMemberId: root, activeMemberId: active, canManage: sessionCanManageLinkedAccounts_(s),
     accounts: ids.filter(function (id) { return members[id] && !members[id].DisabledAt && players[id]; })
       .map(function (id) { return accountSummary_(members[id], players[id], root, active); }) };
@@ -499,9 +530,9 @@ function revokeAllDevices_(token) {
 // Profiles and progression (unchanged model)
 // ---------------------------------------------------------------------------
 
-function linkedPlayer_(id) { var members = table_(AUTH_SHEETS.MEMBERS).rows.filter(function (m) { return String(m.MemberId) === String(id); }), players = table_(SHEETS.PLAYERS).rows.filter(function (p) { return String(p.UserId) === String(id); }); if (members.length !== 1 || players.length !== 1) throw apiError_('IDENTITY_MISMATCH', 'Member identity is not linked to exactly one progression record.'); return players[0]; }
-function profile_(id) { var p = linkedPlayer_(id); return { memberId: String(id), characterName: String(p.CharacterName || ''), svFloor: Number(p.SVFloor) || 0, masterPoints: Number(p.MasterPoints) || 0, masterRanks: myRanks_(id), isAdmin: truthy_(p.IsAdmin), hidden: truthy_(p.Hidden), verified: truthy_(p.Verified) }; }
-function myRanks_(id) { var o = {}; table_(SHEETS.MASTER_PROGRESS).rows.forEach(function (r) { if (String(r.UserId) === String(id)) o[String(r.ActivityId)] = Number(r.Rank) || 0; }); return o; }
+function linkedPlayer_(id, memberRows, playerRows) { var members = (memberRows || table_(AUTH_SHEETS.MEMBERS).rows).filter(function (m) { return String(m.MemberId) === String(id); }), players = (playerRows || table_(SHEETS.PLAYERS).rows).filter(function (p) { return String(p.UserId) === String(id); }); if (members.length !== 1 || players.length !== 1) throw apiError_('IDENTITY_MISMATCH', 'Member identity is not linked to exactly one progression record.'); return players[0]; }
+function profile_(id, memberRows, playerRows, rankRows) { var p = linkedPlayer_(id, memberRows, playerRows); return { memberId: String(id), characterName: String(p.CharacterName || ''), svFloor: Number(p.SVFloor) || 0, masterPoints: Number(p.MasterPoints) || 0, masterRanks: myRanks_(id, rankRows), isAdmin: truthy_(p.IsAdmin), hidden: truthy_(p.Hidden), verified: truthy_(p.Verified) }; }
+function myRanks_(id, rankRows) { var o = {}; (rankRows || table_(SHEETS.MASTER_PROGRESS).rows).forEach(function (r) { if (String(r.UserId) === String(id)) o[String(r.ActivityId)] = Number(r.Rank) || 0; }); return o; }
 function integer_(v, min, max) { if (typeof v === 'string' && v.trim() === '') throw apiError_('VALIDATION', 'Invalid progression.'); var n = Number(v); if (!isFinite(n) || Math.floor(n) !== n || n < min || n > max) throw apiError_('VALIDATION', 'Invalid progression.'); return n; }
 function progress_(id, d) {
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
@@ -691,8 +722,18 @@ function api_(a, d) {
   if (a === 'refresh') {
     var kind = d.kind === 'admin' ? 'admin' : 'member';
     var x = kind === 'admin' ? admin_(d.token) : session_(d.token, 'member');
+    touchSession_(x);
     var out = { expiresAt: iso_(x.ExpiresAt) };
-    if (kind === 'member') { var activeId = activeMemberId_(d.token); touchMemberAccess_(activeId); out.profile = profile_(activeId); out.accounts = listAccessibleAccounts_(d.token); }
+    if (kind === 'member') {
+      var links = activeLinks_();
+      var membersTable = table_(AUTH_SHEETS.MEMBERS), memberRows = membersTable.rows;
+      var playerRows = table_(SHEETS.PLAYERS).rows;
+      var rankRows = table_(SHEETS.MASTER_PROGRESS).rows;
+      var activeId = activeMemberId_(d.token, x, links, memberRows);
+      touchMemberAccess_(activeId, false, membersTable);
+      out.profile = profile_(activeId, memberRows, playerRows, rankRows);
+      out.accounts = listAccessibleAccounts_(d.token, x, links, memberRows, playerRows);
+    }
     return out;
   }
   if (a === 'progress') return progress_(activeMemberId_(d.token), d);
@@ -729,4 +770,4 @@ function api_(a, d) {
   throw apiError_('UNKNOWN_ACTION', 'Unknown action.');
 }
 
-function doPost(e) { try { var raw = (e && e.postData && e.postData.contents) || ''; if (raw.length > MAX_BODY) throw apiError_('TOO_LARGE', 'Invalid request.'); var p = JSON.parse(raw); if (!p || typeof p.action !== 'string' || typeof p.data !== 'object') throw apiError_('MALFORMED', 'Invalid request.'); return ContentService.createTextOutput(JSON.stringify({ ok: true, data: api_(p.action, p.data || {}) })).setMimeType(ContentService.MimeType.JSON); } catch (err) { return ContentService.createTextOutput(JSON.stringify({ ok: false, error: { code: err.code || 'REQUEST_FAILED', message: err.code ? err.message : 'Request could not be completed.' } })).setMimeType(ContentService.MimeType.JSON); } }
+function doPost(e) { try { var raw = (e && e.postData && e.postData.contents) || ''; if (raw.length > MAX_BODY) throw apiError_('TOO_LARGE', 'Invalid request.'); var p = JSON.parse(raw); if (!p || typeof p.action !== 'string' || typeof p.data !== 'object') throw apiError_('MALFORMED', 'Invalid request.'); return ContentService.createTextOutput(JSON.stringify({ ok: true, data: api_(p.action, p.data || {}) })).setMimeType(ContentService.MimeType.JSON); } catch (err) { console.error('BPSR API failure: ' + String(err && (err.stack || err.message) || err)); return ContentService.createTextOutput(JSON.stringify({ ok: false, error: { code: err.code || 'REQUEST_FAILED', message: err.code ? err.message : 'Request could not be completed.' } })).setMimeType(ContentService.MimeType.JSON); } }
