@@ -544,7 +544,17 @@ test('the Master Seal editor submits the Stim Vault and six dungeons, deriving c
   // The editor lives in its own #seal-ui section, not in My Progress.
   const form = formByButton(app.seal, 'Save Master Seal progress');
   assert.ok(form, 'seal editor renders in its own section');
-  // Stim Vault is the first row.
+  // The personal Easy/Hard tick boxes sit directly above Stim Vault.
+  const difficulty = form.querySelector('fieldset[data-seal-difficulty="true"]');
+  assert.ok(difficulty, 'difficulty tick boxes render above Stim Vault');
+  const difficultyBoxes = difficulty.querySelectorAll('input[type="checkbox"]');
+  assert.equal(difficultyBoxes.length, 2);
+  assert.deepEqual(difficultyBoxes.map(box => box.value), ['easy', 'hard']);
+  difficultyBoxes[1].checked = true;
+  difficultyBoxes[1].dispatch('change');
+  assert.equal(JSON.parse(app.store['bpsr.master-seal.difficulty']).hard, true, 'difficulty choice remains in this browser');
+
+  // Stim Vault is the first progress row.
   const rows = form.querySelectorAll('fieldset[data-seal]');
   assert.equal(rows[0].dataset.seal, 'stim-vault', 'Stim Vault leads the editor');
   assert.equal(rows.length, 7, 'Stim Vault plus six dungeons');

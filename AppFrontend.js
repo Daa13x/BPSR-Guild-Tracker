@@ -10,6 +10,7 @@
     isConfigured: function () { return false; }
   };
   var LEGACY_KEYS = { member: 'bpsr.member.session', admin: 'bpsr.admin.session' };
+  var SEAL_DIFFICULTY_KEY = 'bpsr.master-seal.difficulty';
   var state = {
     member: null,
     session: null,
@@ -629,6 +630,44 @@
     return { cleared: cleared, bestMasterLevel: hasLevel ? Number(level) : null, points: cleared ? points : 0 };
   }
 
+  /** The Easy/Hard boxes are a personal planning aid, not score data. */
+  function readSealDifficulty() {
+    try {
+      var value = JSON.parse(root.localStorage.getItem(SEAL_DIFFICULTY_KEY) || '{}');
+      return { easy: Boolean(value.easy), hard: Boolean(value.hard) };
+    } catch (_) {
+      return { easy: false, hard: false };
+    }
+  }
+
+  function sealDifficultyBoxes() {
+    var values = readSealDifficulty();
+    var group = E('fieldset');
+    group.className = 'seal-difficulty';
+    group.dataset.sealDifficulty = 'true';
+    group.appendChild(E('legend', 'Dungeon difficulty'));
+    ['easy', 'hard'].forEach(function (difficulty) {
+      var label = E('label');
+      label.className = 'seal-difficulty-option';
+      var input = document.createElement('input');
+      input.type = 'checkbox';
+      input.name = 'seal-difficulty-' + difficulty;
+      input.value = difficulty;
+      input.checked = values[difficulty];
+      input.addEventListener('change', function () {
+        var next = {};
+        group.querySelectorAll('input[type="checkbox"]').forEach(function (box) {
+          next[box.value] = Boolean(box.checked);
+        });
+        try { root.localStorage.setItem(SEAL_DIFFICULTY_KEY, JSON.stringify(next)); } catch (_) { /* best effort */ }
+      });
+      label.appendChild(input);
+      label.appendChild(E('span', difficulty.charAt(0).toUpperCase() + difficulty.slice(1)));
+      group.appendChild(label);
+    });
+    return group;
+  }
+
   /** Render the Master Seal editor into its own section. Stim Vault leads,
    * then the six dungeons; a single Save sits at the bottom. */
   function renderSealEditor() {
@@ -668,6 +707,7 @@
       state.mySeal = mine;
       grid.replaceChildren();
       // Stim Vault first — a floors value with no Master level, resets biweekly.
+      grid.appendChild(sealDifficultyBoxes());
       var stim = mine.stimVault || { points: 0, bestMasterLevel: null };
       var stimRow = sealRow('stim-vault', 'Stim Vault', stim, mine.season.maxMasterLevel, mine.season.maxScore,
         { withLevel: false, valueLabel: 'Floors', valueMax: stim.max || 60 });

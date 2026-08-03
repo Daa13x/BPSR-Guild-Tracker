@@ -474,6 +474,10 @@ button { cursor: pointer; }
 #seal-editor .ms-section-head { margin-bottom: 10px; }
 #seal-ui .seal-form { display: grid; gap: 10px; }
 .seal-edit-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.seal-difficulty { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 11px; margin: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel-bg-raised); }
+.seal-difficulty legend { width: 100%; padding: 0; color: var(--accent-soft); font-family: var(--ui); font-size: 11px; font-weight: 800; letter-spacing: .02em; }
+.seal-difficulty-option { display: inline-flex; align-items: center; gap: 5px; color: var(--text-secondary); font-size: 11px; font-weight: 700; cursor: pointer; }
+.seal-difficulty-option input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); cursor: pointer; }
 .seal-edit { display: grid; grid-template-columns: 1fr 1fr; align-items: end; gap: 6px 8px; margin: 0; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel-bg-raised); }
 /* The Stim Vault is a floors value with no Master level — one field only. */
 .seal-edit-single { grid-template-columns: 1fr; }
