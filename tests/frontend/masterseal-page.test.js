@@ -144,6 +144,14 @@ test('Guild Members CONFIG groups saved selections by role while preserving each
   assert.match(H.classConfig({ classes: [] }), /—/);
 });
 
+test('Guild Members Raid status uses a circled tick or cross', () => {
+  const { raidStatus } = helpers();
+  assert.match(raidStatus({ raid: true }), /ms-raid-status complete/);
+  assert.match(raidStatus({ raid: true }), /✓/);
+  assert.match(raidStatus({ raid: false }), /ms-raid-status incomplete/);
+  assert.match(raidStatus({ raid: false }), /×/);
+});
+
 test('pagination slices correctly and clamps out-of-range pages', () => {
   const list = Array.from({ length: 28 }, (_, i) => ({ n: i + 1 }));
   const first = H.pageSlice(list, 1, 10);

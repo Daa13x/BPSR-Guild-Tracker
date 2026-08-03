@@ -140,6 +140,13 @@
     return html || '<span class="dim">—</span>';
   }
 
+  function raidStatus(member) {
+    var complete = Boolean(member && member.raid);
+    var label = complete ? 'Raid completed this week' : 'Raid not completed this week';
+    return '<span class="ms-raid-status ' + (complete ? 'complete' : 'incomplete') + '" title="' + label + '" aria-label="' + label + '">' +
+      '<span aria-hidden="true">' + (complete ? '✓' : '×') + '</span></span>';
+  }
+
   function pageSlice(list, page, size) {
     var total = Math.max(1, Math.ceil(list.length / size));
     var current = Math.min(Math.max(1, page), total);
@@ -174,6 +181,7 @@
     isStale: isStale,
     selectMembers: selectMembers,
     classConfig: classConfig,
+    raidStatus: raidStatus,
     pageSlice: pageSlice,
     seasonSchedule: seasonSchedule
   };
@@ -348,7 +356,7 @@
     var html = '<table class="ms-table"><thead>' +
       '<tr><th colspan="10"></th><th colspan="6" class="ms-group-head">Chaotic Realm Dungeons<small>(best Master clear)</small></th></tr>' +
       '<tr>' +
-      '<th scope="col">Rank</th><th scope="col">Character</th><th scope="col">Config</th><th scope="col">Total Score</th>' +
+      '<th scope="col">Rank</th><th scope="col">Character</th><th scope="col">Raid</th><th scope="col">Config</th><th scope="col">Total Score</th>' +
       '<th scope="col">Progress</th><th scope="col">Remaining</th><th scope="col">Cleared</th>' +
       '<th scope="col">Mount</th><th scope="col">Last Updated</th><th scope="col">SV Floor</th>' +
       season.dungeons.map(function (d) {
@@ -373,6 +381,7 @@
           (m.hidden ? '<span class="badge hidden-badge" title="Hidden from other viewers — only you can see this row">Hidden — only you</span>' : '') +
           '<span class="sr-only">' + (active ? 'Active in the last 24 hours' : 'Not active recently') + '</span>' +
         '</span></td>' +
+        '<td data-l="Raid" class="ms-raid-cell">' + raidStatus(m) + '</td>' +
         '<td data-l="Config" class="ms-config">' + classConfig(m) + '</td>' +
         '<td data-l="Total"><span class="ms-total">' + num(m.totalScore) + '<small>/ ' + num(season.maxScore) + '</small></span></td>' +
         '<td data-l="Progress"><span class="ms-pct">' + pct + '%</span>' +

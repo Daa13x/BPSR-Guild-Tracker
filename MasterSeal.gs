@@ -216,9 +216,23 @@ function stimWrite_(memberId, entry) {
   return true;
 }
 
+/** Clear a completed Raid when the next weekly Monday reset has passed. */
+function applyRaidReset_(memberId, now) {
+  var p = linkedPlayer_(memberId);
+  var when = now || new Date();
+  if (!truthy_(p.RaidComplete) || !raidStale_(p.RaidDate, when, stimAnchor_())) return false;
+  p.RaidComplete = false;
+  p.RaidDate = '';
+  p.LastUpdated = when;
+  writePlayerRow_(p);
+  bustCache_();
+  return true;
+}
+
 /** Per-player difficulty and Raid completion state is stored on the existing
  * Players row, alongside the date on which each completion was recorded. */
 function sealDifficultyPublic_(memberId) {
+  applyRaidReset_(memberId);
   var p = linkedPlayer_(memberId);
   return {
     easy: truthy_(p.EasyComplete),
@@ -325,13 +339,17 @@ function masterSealBoard_(viewerMemberId) {
   readTable_(SHEETS.PLAYERS).rows.forEach(function (p) {
     // Join by the immutable member id. Character names may be renamed and are
     // presentation only, never a progression key.
-    flags[String(p.UserId)] = { hidden: truthy_(p.Hidden), verified: truthy_(p.Verified), svFloor: masterSealSvFloor_(p.SVFloor) };
+    applyRaidReset_(p.UserId);
+    flags[String(p.UserId)] = {
+      hidden: truthy_(p.Hidden), verified: truthy_(p.Verified),
+      svFloor: masterSealSvFloor_(p.SVFloor), raid: truthy_(p.RaidComplete)
+    };
   });
   var rows = [];
   readTable_(AUTH_SHEETS.MEMBERS).rows.forEach(function (m) {
     if (m.DisabledAt) return;
     // Hidden members stay off the board for everyone except themselves.
-    var flag = flags[String(m.MemberId)] || { hidden: false, verified: false, svFloor: null };
+    var flag = flags[String(m.MemberId)] || { hidden: false, verified: false, svFloor: null, raid: false };
     var isViewer = viewerMemberId && String(m.MemberId) === String(viewerMemberId);
     if (flag.hidden && !isViewer) return;
     var dungeons = sealProgress_(grouped[String(m.MemberId)]);
@@ -342,6 +360,7 @@ function masterSealBoard_(viewerMemberId) {
       hidden: flag.hidden,
       classes: classEntries[String(m.MemberId)] || [],
       svFloor: flag.svFloor,
+      raid: flag.raid,
       dungeons: dungeons.map(function (d) {
         return { dungeonId: d.dungeonId, bestMasterLevel: d.bestMasterLevel, points: d.points, cleared: d.cleared };
       }),

@@ -103,6 +103,21 @@ test('the floor is not cleared within the same fortnight', () => {
   assert.equal(call(c, 'myMasterSeal', { token }).stimVault.points, 30, 'a fresh floor survives a reload');
 });
 
+test('Raid completion resets weekly on Monday at the same time as Stim Vault', () => {
+  const c = runtime();
+  const dax = call(c, 'createAccount', { characterName: 'Dax' });
+  call(c, 'masterSealUpdate', {
+    token: dax.session.token, dungeons: {}, difficulty: { easy: false, hard: false, raid: true, master: false }
+  });
+  const anchor = '2026-08-03T07:00:00Z';
+  assert.equal(c.lastRaidReset_(new Date('2026-08-10T07:00:00Z'), anchor).toISOString(), '2026-08-10T07:00:00.000Z');
+  setCell(c, dax.member.memberId, 'RaidDate', new Date('2026-08-03T07:00:00Z'));
+  assert.equal(c.applyRaidReset_(dax.member.memberId, new Date('2026-08-10T07:00:00Z')), true);
+  const { row } = playerRow(c, dax.member.memberId);
+  assert.equal(row.RaidComplete, false);
+  assert.equal(row.RaidDate, '');
+});
+
 test('the Master Seal board carries each member SV floor for display and sorting', () => {
   const c = runtime();
   const dax = call(c, 'createAccount', { characterName: 'Dax' });

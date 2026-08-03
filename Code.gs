@@ -544,6 +544,7 @@ function clampInt_(v, min, max, fallback) {
 // Stim Vault biweekly reset
 // ---------------------------------------------------------------------------
 var STIM_RESET_PERIOD_MS = 14 * 24 * 60 * 60 * 1000;
+var RAID_RESET_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * The most recent Stim Vault reset instant at or before `now`. Resets fall on
@@ -561,6 +562,16 @@ function lastStimReset_(now, anchorIso) {
   return new Date(anchor + periods * STIM_RESET_PERIOD_MS);
 }
 
+/** Raid completions reset every Monday at the same 07:00 UTC boundary as
+ * Stim Vault, but weekly rather than every second Monday. */
+function lastRaidReset_(now, anchorIso) {
+  var anchor = new Date(anchorIso || DEFAULT_CONFIG.STIM_RESET_ANCHOR).getTime();
+  var t = (now instanceof Date ? now.getTime() : Number(now));
+  if (!isFinite(anchor) || !isFinite(t)) return null;
+  var periods = Math.floor((t - anchor) / RAID_RESET_PERIOD_MS);
+  return new Date(anchor + periods * RAID_RESET_PERIOD_MS);
+}
+
 /**
  * True when a reset boundary has passed between `lastSeen` and `now` — i.e. the
  * viewer last loaded the site before the latest reset, so their Stim Vault is
@@ -572,6 +583,14 @@ function stimVaultStale_(lastSeen, now, anchorIso) {
   if (!isFinite(seen)) return false;
   var boundary = lastStimReset_(now, anchorIso);
   return Boolean(boundary && seen < boundary.getTime());
+}
+
+function raidStale_(completedAt, now, anchorIso) {
+  if (!completedAt) return false;
+  var completed = (completedAt instanceof Date ? completedAt.getTime() : new Date(completedAt).getTime());
+  if (!isFinite(completed)) return false;
+  var boundary = lastRaidReset_(now, anchorIso);
+  return Boolean(boundary && completed < boundary.getTime());
 }
 
 function customMilestones_() {

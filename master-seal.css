@@ -448,6 +448,10 @@ button { cursor: pointer; }
 .badge.hard { border-color: #ff8a32; color: #ff8a32; background: rgba(255, 138, 50, .10); }
 .badge.master { border-color: #ff5d72; color: #ff5d72; background: rgba(255, 93, 114, .10); }
 .badge.ember { border-color: var(--warning); color: var(--warning); }
+.ms-raid-cell { text-align: center; }
+.ms-raid-status { display: inline-grid; place-items: center; width: 20px; height: 20px; border: 1px solid currentColor; border-radius: 50%; font-size: 14px; font-weight: 900; line-height: 1; }
+.ms-raid-status.complete { color: var(--success); background: rgba(75, 222, 141, .10); }
+.ms-raid-status.incomplete { color: #ff5d72; background: rgba(255, 93, 114, .08); }
 .empty { padding: 22px 16px; text-align: center; color: var(--text-muted); font-size: 12.5px; }
 
 /* Shared loading / empty / failure presentation for both boards */
