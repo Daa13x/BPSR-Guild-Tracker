@@ -636,7 +636,7 @@
         tools.replaceChildren();
         var form = E('form'); form.className = 'account-link-form';
         form.appendChild(E('p', 'Create a new alt character linked to this main account. You will receive one recovery code for it.'));
-        var name = field('Secondary character name', 'alt-character-name', 'text', 'Enter character name'); name.input.autocomplete = 'off'; form.appendChild(name.wrap);
+        var name = field('Alt character name', 'alt-character-name', 'text', 'Enter character name'); name.input.autocomplete = 'off'; form.appendChild(name.wrap);
         var submit = E('button', 'Create and link character'); submit.type = 'submit'; submit.className = 'btn'; form.appendChild(submit);
         form.addEventListener('submit', function (event) {
           event.preventDefault(); submit.disabled = true;
@@ -667,6 +667,25 @@
     // never waits on a duplicate Apps Script/Sheets read. Refresh afterwards
     // only to pick up a link or unlink made in another tab.
     var cachedAccounts = state.accounts && Array.isArray(state.accounts.accounts) ? state.accounts : null;
+    // Older API deployments may restore a valid profile without the optional
+    // account summary. Keep the account-management paths reachable for the
+    // signed-in owner while the background request catches up. The backend is
+    // still the authority for every link, switch and creation action.
+    if (!cachedAccounts && state.member) {
+      cachedAccounts = {
+        mainMemberId: state.member.memberId,
+        activeMemberId: state.member.memberId,
+        canManage: true,
+        accounts: [{
+          memberId: state.member.memberId,
+          characterName: state.member.characterName,
+          svFloor: state.member.svFloor || 0,
+          masterPoints: state.member.masterPoints || 0,
+          isMain: true,
+          active: true
+        }]
+      };
+    }
     if (cachedAccounts) render(cachedAccounts);
     refreshAccessibleAccounts().then(function (accounts) { if (document.body.contains(modal) && accounts) render(accounts); })
       .catch(function (failure) { if (!cachedAccounts) error(friendlyFailure(failure)); });
