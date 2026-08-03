@@ -189,7 +189,12 @@ function badges(p, ctx){
   var out = '';
   if (p.svComplete) out += '<span class="badge blue">SV complete</span>';
   if (p.mount) out += '<span class="badge gold">Mount</span>';
-  if (ctx==='sv'){ if (p.easy) out += '<span class="badge ok">Easy</span>'; if (p.hard) out += '<span class="badge ok">Hard</span>'; if (p.raid) out += '<span class="badge ok">Raid</span>'; }
+  if (ctx==='sv'){
+    if (p.easy) out += '<span class="badge ok">Easy</span>';
+    if (p.hard) out += '<span class="badge hard">Hard</span>';
+    if (p.raid) out += '<span class="badge ok">All Raids Completed</span>';
+    if (p.master) out += '<span class="badge master">M1 First Runs</span>';
+  }
   return out || '<span class="dim">—</span>';
 }
 function updated(p){

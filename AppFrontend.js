@@ -630,12 +630,12 @@
   }
 
   function sealDifficultyBoxes(values) {
-    values = values || { easy: false, hard: false, raid: false };
+    values = values || { easy: false, hard: false, raid: false, master: false };
     var group = E('fieldset');
     group.className = 'seal-difficulty';
     group.dataset.sealDifficulty = 'true';
     group.appendChild(E('legend', 'Dungeon difficulty'));
-    ['easy', 'hard', 'raid'].forEach(function (difficulty) {
+    ['easy', 'hard', 'raid', 'master'].forEach(function (difficulty) {
       var label = E('label');
       label.className = 'seal-difficulty-option';
       var input = document.createElement('input');
@@ -717,7 +717,7 @@
       event.preventDefault();
       if (submit.disabled) return;
       submit.disabled = true;
-      var dungeons = {}, stimVault = null, difficulty = { easy: false, hard: false, raid: false };
+      var dungeons = {}, stimVault = null, difficulty = { easy: false, hard: false, raid: false, master: false };
       grid.querySelectorAll('fieldset[data-seal]').forEach(function (group) {
         var key = group.dataset.seal;
         if (key === 'stim-vault') stimVault = readSealRow(group);

@@ -85,7 +85,7 @@ var PLAYER_HEADERS = [
   'LastUpdated', 'RegisteredAt', 'IsAdmin', 'Notes', 'Hidden', 'Verified',
   // New columns stay at the end so existing Players rows never shift during
   // the in-place spreadsheet upgrade.
-  'RaidComplete', 'RaidDate'
+  'RaidComplete', 'RaidDate', 'MasterComplete', 'MasterDate'
 ];
 
 // ---------------------------------------------------------------------------
@@ -338,7 +338,7 @@ function startNewPeriod() {
 
 /**
  * payload = {
- *   characterName, svFloor, easyComplete, hardComplete, raidComplete, masterPoints,
+ *   characterName, svFloor, easyComplete, hardComplete, raidComplete, masterComplete, masterPoints,
  *   masterRanks: { ACT1: 14, ... }, notes
  * }
  * The server diffs against the stored record; only genuine changes create
@@ -363,11 +363,12 @@ function submitProgress(payload) {
     var easy = !!payload.easyComplete;
     var hard = !!payload.hardComplete;
     var raid = !!payload.raidComplete;
+    var master = !!payload.masterComplete;
     var ranks = payload.masterRanks || {};
 
     var player = stored || {
       UserId: email, CharacterName: name, SVFloor: 0, SVFloorDate: '',
-      EasyComplete: false, EasyDate: '', HardComplete: false, HardDate: '', RaidComplete: false, RaidDate: '',
+      EasyComplete: false, EasyDate: '', HardComplete: false, HardDate: '', RaidComplete: false, RaidDate: '', MasterComplete: false, MasterDate: '',
       MasterPoints: 0, MasterPointsDate: '',
       MountEarned: false, MountEarnedAt: '', MountPosition: '', MountPointsWhenEarned: '',
       LastUpdated: now, RegisteredAt: now, IsAdmin: false, Notes: ''
@@ -396,6 +397,10 @@ function submitProgress(payload) {
     if (raid && !truthy_(player.RaidComplete)) {
       events.push(evt_(email, name, 'RAID_COMPLETE', '', false, true, period, true, true));
       player.RaidComplete = true; player.RaidDate = now;
+    }
+    if (master && !truthy_(player.MasterComplete)) {
+      events.push(evt_(email, name, 'MASTER_COMPLETE', '', false, true, period, true, true));
+      player.MasterComplete = true; player.MasterDate = now;
     }
 
     // -- Master points: any actual change counts; date only refreshes on change --
@@ -712,6 +717,7 @@ function buildBundle_() {
       easy: truthy_(p.EasyComplete),
       hard: truthy_(p.HardComplete),
       raid: truthy_(p.RaidComplete),
+      master: truthy_(p.MasterComplete),
       points: pts,
       pointsPct: Math.min(100, Math.round(pts / mountTarget * 100)),
       pointsRemaining: Math.max(0, mountTarget - pts),
@@ -826,6 +832,8 @@ function describeEvent_(e, actNames) {
     case 'SV_FLOOR': return n + ' reached SV Floor ' + next;
     case 'EASY_COMPLETE': return n + ' completed Easy';
     case 'HARD_COMPLETE': return n + ' completed Hard';
+    case 'RAID_COMPLETE': return n + ' completed Raid';
+    case 'MASTER_COMPLETE': return n + ' completed Master';
     case 'MASTER_POINTS': return n + ' is on ' + Number(next).toLocaleString() + ' Master points';
     case 'MASTER_RANK': return n + ' completed M' + next + ' in ' + actName;
     case 'MOUNT_EARNED': return n + ' earned the mount';

@@ -445,6 +445,8 @@ button { cursor: pointer; }
 .badge.gold { border-color: var(--gold); color: var(--gold); }
 .badge.blue { border-color: #8b9ff5; color: #8b9ff5; }
 .badge.ok { border-color: var(--success); color: var(--success); }
+.badge.hard { border-color: #ff8a32; color: #ff8a32; background: rgba(255, 138, 50, .10); }
+.badge.master { border-color: #ff5d72; color: #ff5d72; background: rgba(255, 93, 114, .10); }
 .badge.ember { border-color: var(--warning); color: var(--warning); }
 .empty { padding: 22px 16px; text-align: center; color: var(--text-muted); font-size: 12.5px; }
 

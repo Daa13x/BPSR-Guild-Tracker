@@ -226,20 +226,23 @@ function sealDifficultyPublic_(memberId) {
     hard: truthy_(p.HardComplete),
     hardDate: iso_(p.HardDate),
     raid: truthy_(p.RaidComplete),
-    raidDate: iso_(p.RaidDate)
+    raidDate: iso_(p.RaidDate),
+    master: truthy_(p.MasterComplete),
+    masterDate: iso_(p.MasterDate)
   };
 }
 
 function sealDifficultyWrite_(memberId, entry) {
   if (!entry || typeof entry !== 'object' ||
-      typeof entry.easy !== 'boolean' || typeof entry.hard !== 'boolean' || typeof entry.raid !== 'boolean') {
-    throw apiError_('VALIDATION', 'Easy, Hard and Raid completion values must be true or false.');
+      typeof entry.easy !== 'boolean' || typeof entry.hard !== 'boolean' || typeof entry.raid !== 'boolean' || typeof entry.master !== 'boolean') {
+    throw apiError_('VALIDATION', 'Easy, Hard, Raid and Master completion values must be true or false.');
   }
   var p = linkedPlayer_(memberId);
   var easyChanged = truthy_(p.EasyComplete) !== entry.easy;
   var hardChanged = truthy_(p.HardComplete) !== entry.hard;
   var raidChanged = truthy_(p.RaidComplete) !== entry.raid;
-  if (!easyChanged && !hardChanged && !raidChanged) return false;
+  var masterChanged = truthy_(p.MasterComplete) !== entry.master;
+  if (!easyChanged && !hardChanged && !raidChanged && !masterChanged) return false;
   var now = new Date();
   if (easyChanged) {
     p.EasyComplete = entry.easy;
@@ -252,6 +255,10 @@ function sealDifficultyWrite_(memberId, entry) {
   if (raidChanged) {
     p.RaidComplete = entry.raid;
     p.RaidDate = entry.raid ? now : '';
+  }
+  if (masterChanged) {
+    p.MasterComplete = entry.master;
+    p.MasterDate = entry.master ? now : '';
   }
   p.LastUpdated = now;
   writePlayerRow_(p);
