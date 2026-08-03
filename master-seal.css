@@ -605,12 +605,10 @@ body.cls-open { overflow: hidden; }
 .cls-mbtn:hover { border-color: var(--border-bright); color: var(--text-primary); }
 .cls-mbtn.danger { border-color: rgba(239,104,104,.5); color: var(--danger); }
 
-.ms-config { min-width: 175px; max-width: 260px; }
-.ms-config-group { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 2px 0; }
-.ms-config-group > b { width: 100%; font-size: 8px; letter-spacing: .1em; text-transform: uppercase; }
-.ms-config-group.red > b { color: var(--cls-red); }.ms-config-group.blue > b { color: var(--cls-blue); }.ms-config-group.green > b { color: var(--cls-green); }
-.ms-config-chip { padding: 3px 5px; border: 1px solid currentColor; border-radius: 6px; color: var(--text-secondary); font-size: 10px; line-height: 1.2; white-space: normal; }
-.ms-config-group.red .ms-config-chip { border-color: color-mix(in srgb, var(--cls-red) 60%, transparent); }.ms-config-group.blue .ms-config-chip { border-color: color-mix(in srgb, var(--cls-blue) 60%, transparent); }.ms-config-group.green .ms-config-chip { border-color: color-mix(in srgb, var(--cls-green) 60%, transparent); }
+.ms-config { min-width: 85px; white-space: nowrap; }
+.ms-config-role { display: inline-block; margin-right: 7px; font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; cursor: help; }
+.ms-config-role.red { color: var(--cls-red); }.ms-config-role.blue { color: var(--cls-blue); }.ms-config-role.green { color: var(--cls-green); }
+.ms-config-role:focus-visible { outline: 1px solid currentColor; outline-offset: 3px; border-radius: 2px; }
 
 @media (max-width: 900px) {
   .cls-selector { display: block; }

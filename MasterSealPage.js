@@ -134,9 +134,8 @@
     var html = order.map(function (role) {
       if (!groups[role].length) return '';
       var label = groups[role][0].c.roleLabel;
-      return '<div class="ms-config-group ' + esc(groups[role][0].c.roleColor) + '"><b>' + esc(label) + '</b>' + groups[role].map(function (item) {
-        return '<span class="ms-config-chip" title="' + esc(item.c.name + ' · ' + item.build.name + ' — ' + item.c.roleLabel) + '">' + esc(item.c.name + ' · ' + item.build.name) + '</span>';
-      }).join('') + '</div>';
+      var details = groups[role].map(function (item) { return item.c.name + ' · ' + item.build.name; }).join('\n');
+      return '<span class="ms-config-role ' + esc(groups[role][0].c.roleColor) + '" tabindex="0" title="' + esc(details) + '" aria-label="' + esc(label + ': ' + details.replace(/\n/g, ', ')) + '">' + esc(label) + '</span>';
     }).join('');
     return html || '<span class="dim">—</span>';
   }

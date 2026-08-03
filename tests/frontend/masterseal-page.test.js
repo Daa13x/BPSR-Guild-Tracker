@@ -136,6 +136,9 @@ test('Guild Members CONFIG groups saved selections by role while preserving each
     { classId: 'shield-knight', buildId: 'recovery' }, { classId: 'marksman', buildId: 'wildpack' }
   ] });
   assert.match(html, /DPS/); assert.match(html, /Tank/); assert.match(html, /Healer/);
+  assert.match(html, /ms-config-role/);
+  assert.doesNotMatch(html, /ms-config-chip/);
+  assert.match(html, /title="Marksman · Falconry\nMarksman · Wildpack"/);
   assert.ok(html.indexOf('Marksman · Falconry') < html.indexOf('Marksman · Wildpack'));
   assert.ok(html.indexOf('DPS') < html.indexOf('Tank') && html.indexOf('Tank') < html.indexOf('Healer'));
   assert.match(H.classConfig({ classes: [] }), /—/);
