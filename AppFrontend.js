@@ -662,8 +662,14 @@
     modal.addEventListener('click', function (event) { if (event.target === modal) closeAccountChooser(); });
     modal.addEventListener('keydown', function (event) { if (event.key === 'Escape') closeAccountChooser(); });
     document.body.appendChild(modal); close.focus();
+    // The signed-in refresh already receives the accessible-account summary.
+    // Render that cached, authorized result immediately so opening this menu
+    // never waits on a duplicate Apps Script/Sheets read. Refresh afterwards
+    // only to pick up a link or unlink made in another tab.
+    var cachedAccounts = state.accounts && Array.isArray(state.accounts.accounts) ? state.accounts : null;
+    if (cachedAccounts) render(cachedAccounts);
     refreshAccessibleAccounts().then(function (accounts) { if (document.body.contains(modal) && accounts) render(accounts); })
-      .catch(function (failure) { error(friendlyFailure(failure)); });
+      .catch(function (failure) { if (!cachedAccounts) error(friendlyFailure(failure)); });
   }
 
   function switchActiveAccount(memberId) {
