@@ -116,7 +116,8 @@ function setupSpreadsheet() {
   ensureMemberPlayerLinks_();
   ensureRecoveryRecords_();
   ensureMasterSealSheet_();
-  ensureClassSheet_();   // personal class / build selections (additive, no data loss)
+  ensureClassSheet_();   // legacy personal class / build selections
+  ensureClassSlotSheet_(); // two-slot editor state, additive and non-destructive
 
   // Seed config defaults without overwriting existing values.
   var cfgSheet = ss.getSheetByName(SHEETS.CONFIG);

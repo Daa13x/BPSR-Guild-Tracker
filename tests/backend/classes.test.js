@@ -15,6 +15,34 @@ test('a new member has no class selections', () => {
   assert.equal(call(c, 'myClasses', { token: t }).selections.length, 0);
 });
 
+test('two slots save together, reload together, and allow an empty Secondary', () => {
+  const c = runtime(); const t = member(c, 'Dax');
+  let r = call(c, 'saveClassSlots', { token: t, primary: { classId: 'stormblade', buildId: 'slash' }, secondary: { classId: 'frost-mage', buildId: 'icicle' } });
+  assert.equal(r.slots.primary.classId, 'stormblade');
+  assert.equal(r.slots.secondary.classId, 'frost-mage');
+  assert.equal(c.__sheets.ClassSlots.rows.length, 2, 'one header plus one atomic member record');
+  r = call(c, 'saveClassSlots', { token: t, primary: { classId: 'marksman', buildId: 'falconry' }, secondary: null });
+  assert.equal(r.slots.primary.classId, 'marksman'); assert.equal(r.slots.secondary, null);
+  const restored = call(c, 'myClasses', { token: t });
+  assert.equal(restored.slots.primary.classId, 'marksman'); assert.equal(restored.slots.secondary, null);
+  assert.equal(c.__sheets.ClassSlots.rows.length, 2, 'update replaces the complete slot row');
+});
+
+test('two slots reject duplicate stable class IDs and keep saved state intact', () => {
+  const c = runtime(); const t = member(c, 'Dax');
+  call(c, 'saveClassSlots', { token: t, primary: { classId: 'stormblade', buildId: 'slash' }, secondary: { classId: 'frost-mage', buildId: 'icicle' } });
+  assert.throws(() => call(c, 'saveClassSlots', { token: t, primary: { classId: 'stormblade', buildId: 'main' }, secondary: { classId: 'stormblade', buildId: 'slash' } }), /different classes/);
+  const r = call(c, 'myClasses', { token: t });
+  assert.equal(r.slots.primary.classId, 'stormblade'); assert.equal(r.slots.secondary.classId, 'frost-mage');
+});
+
+test('legacy one-class records remain readable until the member uses the two-slot editor', () => {
+  const c = runtime(); const t = member(c, 'Dax');
+  call(c, 'saveClass', { token: t, entryType: 'primary', classId: 'stormblade', buildId: 'slash' });
+  const r = call(c, 'myClasses', { token: t });
+  assert.equal(r.slots.primary.classId, 'stormblade'); assert.equal(r.slots.secondary, null);
+});
+
 test('saving a primary stores it, makes it active, and enforces one primary per user', () => {
   const c = runtime();
   const t = member(c, 'Dax');

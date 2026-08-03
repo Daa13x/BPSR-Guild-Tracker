@@ -549,6 +549,20 @@ button { cursor: pointer; }
 .cls-tile-name { font-size: 10.5px; font-weight: 700; text-align: center; line-height: 1.2; }
 .cls-tile[disabled] { opacity: .4; cursor: not-allowed; }
 
+/* Two-slot class editor: modal so mobile never clips an anchored popover. */
+body.cls-open { overflow: hidden; }
+.cls-modal { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 12px; background: rgba(8, 4, 16, .72); }
+.cls-dialog { width: min(620px, 100%); max-height: calc(100vh - 24px); overflow: auto; padding: 16px; border: 1px solid var(--border-bright); border-radius: 14px; background: var(--panel-bg, #17101f); box-shadow: 0 24px 60px rgba(0,0,0,.55); }
+.cls-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
+.cls-slot { display: grid; gap: 3px; min-width: 0; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-bg-raised); }
+.cls-slot strong { font-size: 10px; letter-spacing: .08em; }
+.cls-slot span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-size: 12px; }
+.cls-slot.primary strong { color: var(--accent); }
+.cls-slot.secondary strong { color: #5FA8FF; }
+.cls-dialog .cls-body { max-height: none; }
+.cls-dialog .cls-foot { position: sticky; bottom: -16px; padding: 12px 0 0; background: var(--panel-bg, #17101f); }
+@media (max-width: 420px) { .cls-modal { padding: 6px; } .cls-dialog { max-height: calc(100vh - 12px); padding: 12px; } .cls-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .cls-slots { grid-template-columns: 1fr; } .cls-foot { flex-wrap: wrap; } .cls-foot .cls-btn { flex: 1 1 120px; } }
+
 .cls-builds { display: flex; flex-wrap: wrap; gap: 8px; }
 .cls-build { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel-bg-raised); color: var(--text-primary); font-size: 12px; font-weight: 700; }
 .cls-build:hover { border-color: var(--border-bright); }

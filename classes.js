@@ -22,23 +22,23 @@
 
   // Ordered exactly as the selector grid must present them.
   var CLASS_CATALOGUE = [
-    { id: 'beat-performer', name: 'Beat Performer', colour: 'green',
+    { id: 'beat-performer', name: 'Beat Performer', displayName: 'Beat Performer', iconAsset: 'verdant-oracle.png', colour: 'green', colourFamily: 'green', role: 'support',
       builds: [{ id: 'main', name: 'Main' }, { id: 'concerto', name: 'Concerto' }] },
-    { id: 'frost-mage', name: 'Frost Mage', colour: 'red',
+    { id: 'frost-mage', name: 'Frost Mage', displayName: 'Frost Mage', iconAsset: 'frost-mage.png', colour: 'red', colourFamily: 'red', role: 'ranged magic',
       builds: [{ id: 'main', name: 'Main' }, { id: 'frostbeam', name: 'Frostbeam' }, { id: 'icicle', name: 'Icicle' }] },
-    { id: 'heavy-guardian', name: 'Heavy Guardian', colour: 'blue',
+    { id: 'heavy-guardian', name: 'Heavy Guardian', displayName: 'Heavy Guardian', iconAsset: 'heavy-guardian.png', colour: 'blue', colourFamily: 'blue', role: 'tank',
       builds: [{ id: 'main', name: 'Main' }, { id: 'block', name: 'Block' }, { id: 'earthfort', name: 'Earthfort' }] },
-    { id: 'marksman', name: 'Marksman', colour: 'red',
+    { id: 'marksman', name: 'Marksman', displayName: 'Marksman', iconAsset: 'twin-striker.png', colour: 'red', colourFamily: 'red', role: 'ranged',
       builds: [{ id: 'main', name: 'Main' }, { id: 'falconry', name: 'Falconry' }, { id: 'wildpack', name: 'Wildpack' }] },
-    { id: 'shield-knight', name: 'Shield Knight', colour: 'blue',
+    { id: 'shield-knight', name: 'Shield Knight', displayName: 'Shield Knight', iconAsset: 'shield-knight.png', colour: 'blue', colourFamily: 'blue', role: 'guard',
       builds: [{ id: 'main', name: 'Main' }, { id: 'shield', name: 'Shield' }, { id: 'recovery', name: 'Recovery' }] },
-    { id: 'stormblade', name: 'Stormblade', colour: 'red',
+    { id: 'stormblade', name: 'Stormblade', displayName: 'Stormblade', iconAsset: 'stormblade.png', colour: 'red', colourFamily: 'red', role: 'melee',
       builds: [{ id: 'main', name: 'Main' }, { id: 'moonstrike', name: 'Moonstrike' }, { id: 'slash', name: 'Slash' }] },
-    { id: 'twin-striker', name: 'Twin Striker', colour: 'red',
+    { id: 'twin-striker', name: 'Twin Striker', displayName: 'Twin Striker', iconAsset: 'beat-performer.png', colour: 'red', colourFamily: 'red', role: 'melee',
       builds: [{ id: 'main', name: 'Main' }, { id: 'formless', name: 'Formless' }, { id: 'crimson', name: 'Crimson' }] },
-    { id: 'verdant-oracle', name: 'Verdant Oracle', colour: 'green',
+    { id: 'verdant-oracle', name: 'Verdant Oracle', displayName: 'Verdant Oracle', iconAsset: 'marksman.png', colour: 'green', colourFamily: 'green', role: 'healer',
       builds: [{ id: 'main', name: 'Main' }, { id: 'lifebind', name: 'Lifebind' }, { id: 'smite', name: 'Smite' }] },
-    { id: 'wind-knight', name: 'Wind Knight', colour: 'red',
+    { id: 'wind-knight', name: 'Wind Knight', displayName: 'Wind Knight', iconAsset: 'wind-knight.png', colour: 'red', colourFamily: 'red', role: 'lance',
       builds: [{ id: 'main', name: 'Main' }, { id: 'skyward', name: 'Skyward' }, { id: 'vanguard', name: 'Vanguard' }] }
   ];
 
@@ -46,18 +46,18 @@
   // copied into assets/classes/<id>.png. Kept as an explicit map so the source
   // profession numbers never leak into the rest of the code.
   var CLASS_ICON_SOURCE = {
-    'beat-performer': 'Profession_3.png',
+    'beat-performer': 'Profession_13.png',
     'frost-mage': 'Profession_2.png',
     'heavy-guardian': 'Profession_9.png',
-    'marksman': 'Profession_5.png',
+    'marksman': 'Profession_11.png',
     'shield-knight': 'Profession_1.png',
     'stormblade': 'Profession_12.png',
-    'twin-striker': 'Profession_11.png',
-    'verdant-oracle': 'Profession_13.png',
+    'twin-striker': 'Profession_3.png',
+    'verdant-oracle': 'Profession_5.png',
     'wind-knight': 'Profession_4.png'
   };
 
-  function iconPath(classId) { return 'assets/classes/' + classId + '.png'; }
+  function iconPath(classId) { var c = byId[classId]; return c ? 'assets/classes/' + c.iconAsset : ''; }
 
   var byId = {};
   CLASS_CATALOGUE.forEach(function (c) { byId[c.id] = c; });

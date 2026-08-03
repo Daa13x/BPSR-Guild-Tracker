@@ -8,27 +8,29 @@
  */
 var CLASS_SHEET = 'Classes';
 var CLASS_HEADERS = ['SelectionId', 'MemberId', 'EntryType', 'ClassId', 'BuildId', 'Active', 'CreatedAt', 'UpdatedAt'];
+var CLASS_SLOT_SHEET = 'ClassSlots';
+var CLASS_SLOT_HEADERS = ['MemberId', 'PrimaryClassId', 'PrimaryBuildId', 'SecondaryClassId', 'SecondaryBuildId', 'CreatedAt', 'UpdatedAt'];
 
 var CLASS_COLOURS = { green: '#58D68D', red: '#F06A78', blue: '#5FA8FF' };
 
 var CLASS_CATALOGUE = [
-  { id: 'beat-performer', name: 'Beat Performer', colour: 'green',
+  { id: 'beat-performer', name: 'Beat Performer', displayName: 'Beat Performer', iconAsset: 'verdant-oracle.png', colour: 'green', colourFamily: 'green', role: 'support',
     builds: [{ id: 'main', name: 'Main' }, { id: 'concerto', name: 'Concerto' }] },
-  { id: 'frost-mage', name: 'Frost Mage', colour: 'red',
+  { id: 'frost-mage', name: 'Frost Mage', displayName: 'Frost Mage', iconAsset: 'frost-mage.png', colour: 'red', colourFamily: 'red', role: 'ranged magic',
     builds: [{ id: 'main', name: 'Main' }, { id: 'frostbeam', name: 'Frostbeam' }, { id: 'icicle', name: 'Icicle' }] },
-  { id: 'heavy-guardian', name: 'Heavy Guardian', colour: 'blue',
+  { id: 'heavy-guardian', name: 'Heavy Guardian', displayName: 'Heavy Guardian', iconAsset: 'heavy-guardian.png', colour: 'blue', colourFamily: 'blue', role: 'tank',
     builds: [{ id: 'main', name: 'Main' }, { id: 'block', name: 'Block' }, { id: 'earthfort', name: 'Earthfort' }] },
-  { id: 'marksman', name: 'Marksman', colour: 'red',
+  { id: 'marksman', name: 'Marksman', displayName: 'Marksman', iconAsset: 'twin-striker.png', colour: 'red', colourFamily: 'red', role: 'ranged',
     builds: [{ id: 'main', name: 'Main' }, { id: 'falconry', name: 'Falconry' }, { id: 'wildpack', name: 'Wildpack' }] },
-  { id: 'shield-knight', name: 'Shield Knight', colour: 'blue',
+  { id: 'shield-knight', name: 'Shield Knight', displayName: 'Shield Knight', iconAsset: 'shield-knight.png', colour: 'blue', colourFamily: 'blue', role: 'guard',
     builds: [{ id: 'main', name: 'Main' }, { id: 'shield', name: 'Shield' }, { id: 'recovery', name: 'Recovery' }] },
-  { id: 'stormblade', name: 'Stormblade', colour: 'red',
+  { id: 'stormblade', name: 'Stormblade', displayName: 'Stormblade', iconAsset: 'stormblade.png', colour: 'red', colourFamily: 'red', role: 'melee',
     builds: [{ id: 'main', name: 'Main' }, { id: 'moonstrike', name: 'Moonstrike' }, { id: 'slash', name: 'Slash' }] },
-  { id: 'twin-striker', name: 'Twin Striker', colour: 'red',
+  { id: 'twin-striker', name: 'Twin Striker', displayName: 'Twin Striker', iconAsset: 'beat-performer.png', colour: 'red', colourFamily: 'red', role: 'melee',
     builds: [{ id: 'main', name: 'Main' }, { id: 'formless', name: 'Formless' }, { id: 'crimson', name: 'Crimson' }] },
-  { id: 'verdant-oracle', name: 'Verdant Oracle', colour: 'green',
+  { id: 'verdant-oracle', name: 'Verdant Oracle', displayName: 'Verdant Oracle', iconAsset: 'marksman.png', colour: 'green', colourFamily: 'green', role: 'healer',
     builds: [{ id: 'main', name: 'Main' }, { id: 'lifebind', name: 'Lifebind' }, { id: 'smite', name: 'Smite' }] },
-  { id: 'wind-knight', name: 'Wind Knight', colour: 'red',
+  { id: 'wind-knight', name: 'Wind Knight', displayName: 'Wind Knight', iconAsset: 'wind-knight.png', colour: 'red', colourFamily: 'red', role: 'lance',
     builds: [{ id: 'main', name: 'Main' }, { id: 'skyward', name: 'Skyward' }, { id: 'vanguard', name: 'Vanguard' }] }
 ];
 
@@ -51,6 +53,12 @@ function ensureClassSheet_() {
   ensureColumns_(ss.getSheetByName(CLASS_SHEET), CLASS_HEADERS);
 }
 
+function ensureClassSlotSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  ensureSheet_(ss, CLASS_SLOT_SHEET, CLASS_SLOT_HEADERS);
+  ensureColumns_(ss.getSheetByName(CLASS_SLOT_SHEET), CLASS_SLOT_HEADERS);
+}
+
 function classRows_(memberId) {
   return readTable_(CLASS_SHEET).rows.filter(function (r) { return String(r.MemberId) === String(memberId); });
 }
@@ -70,14 +78,46 @@ function classPublic_(r) {
 /** All of a member's saved class selections, primary first then secondaries. */
 function myClasses_(token) {
   ensureClassSheet_();
+  ensureClassSlotSheet_();
   var s = session_(token, 'member');
+  var slot = readTable_(CLASS_SLOT_SHEET).rows.filter(function (r) { return String(r.MemberId) === String(s.MemberId); })[0];
+  if (slot) {
+    var selections = [{ id: 'primary', entryType: 'primary', classId: String(slot.PrimaryClassId), buildId: String(slot.PrimaryBuildId), active: true }];
+    if (slot.SecondaryClassId) selections.push({ id: 'secondary', entryType: 'secondary', classId: String(slot.SecondaryClassId), buildId: String(slot.SecondaryBuildId), active: false });
+    return { catalogueVersion: 2, selections: selections, slots: { primary: selections[0], secondary: selections[1] || null } };
+  }
   var rows = classRows_(s.MemberId).map(classPublic_);
   rows.sort(function (a, b) {
     if (a.entryType !== b.entryType) return a.entryType === 'primary' ? -1 : 1;
     return String(a.createdAt).localeCompare(String(b.createdAt));
   });
-  return { catalogueVersion: 1, selections: rows };
+  return { catalogueVersion: 1, selections: rows, slots: { primary: rows.filter(function (r) { return r.entryType === 'primary'; })[0] || null, secondary: rows.filter(function (r) { return r.entryType === 'secondary'; })[0] || null } };
 }
+
+/** Save the complete two-slot editor state in one locked, single-row update. */
+function saveClassSlots_(token, d) {
+  ensureClassSlotSheet_();
+  var s = session_(token, 'member');
+  var primary = d.primary || {};
+  var secondary = d.secondary || null;
+  classValidate_(String(primary.classId || ''), String(primary.buildId || ''));
+  if (secondary && secondary.classId) {
+    classValidate_(String(secondary.classId), String(secondary.buildId || ''));
+    if (String(secondary.classId) === String(primary.classId)) throw apiError_('DUPLICATE', 'Primary and Secondary must be different classes.');
+  }
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var table = readTable_(CLASS_SLOT_SHEET);
+    var existing = table.rows.filter(function (r) { return String(r.MemberId) === String(s.MemberId); })[0];
+    var now = new Date();
+    var row = [s.MemberId, String(primary.classId), String(primary.buildId), secondary && secondary.classId ? String(secondary.classId) : '', secondary && secondary.classId ? String(secondary.buildId) : '', existing ? existing.CreatedAt : now, now];
+    if (existing) classSheetForSlots_().getRange(existing._row, 1, 1, CLASS_SLOT_HEADERS.length).setValues([row]);
+    else classSheetForSlots_().appendRow(row);
+    return myClasses_(token);
+  } finally { lock.releaseLock(); }
+}
+
+function classSheetForSlots_() { return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CLASS_SLOT_SHEET); }
 
 function classSheet_() { return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CLASS_SHEET); }
 

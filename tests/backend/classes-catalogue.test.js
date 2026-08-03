@@ -70,6 +70,17 @@ test('the icon mapping covers every class and points at repo assets that exist',
   });
 });
 
+test('stable IDs resolve to the accepted graphics, independent of display order', () => {
+  const expectedAssets = {
+    'beat-performer': 'verdant-oracle.png', 'frost-mage': 'frost-mage.png', 'heavy-guardian': 'heavy-guardian.png',
+    'marksman': 'twin-striker.png', 'shield-knight': 'shield-knight.png', 'stormblade': 'stormblade.png',
+    'twin-striker': 'beat-performer.png', 'verdant-oracle': 'marksman.png', 'wind-knight': 'wind-knight.png'
+  };
+  for (const [id, asset] of Object.entries(expectedAssets)) assert.equal(FRONTEND.getClass(id).iconAsset, asset, id);
+  const reordered = FRONTEND.catalogue.slice().reverse();
+  for (const c of reordered) assert.equal(FRONTEND.iconPath(c.id), 'assets/classes/' + expectedAssets[c.id]);
+});
+
 test('validate accepts only builds that belong to the class', () => {
   assert.equal(FRONTEND.validate('frost-mage', 'frostbeam').ok, true);
   assert.equal(FRONTEND.validate('frost-mage', 'moonstrike').ok, false);
@@ -81,8 +92,8 @@ test('the backend Classes.gs catalogue is identical to classes.js', () => {
   const back = JSON.parse(JSON.stringify(backendCatalogue()));
   assert.deepEqual(back.colours, FRONTEND.colours, 'colours match');
   assert.deepEqual(
-    back.catalogue.map(c => ({ id: c.id, name: c.name, colour: c.colour, builds: c.builds.map(b => b.id + ':' + b.name) })),
-    FRONTEND.catalogue.map(c => ({ id: c.id, name: c.name, colour: c.colour, builds: c.builds.map(b => b.id + ':' + b.name) })),
+    back.catalogue.map(c => ({ id: c.id, name: c.name, displayName: c.displayName, iconAsset: c.iconAsset, colour: c.colour, colourFamily: c.colourFamily, role: c.role, builds: c.builds.map(b => b.id + ':' + b.name) })),
+    FRONTEND.catalogue.map(c => ({ id: c.id, name: c.name, displayName: c.displayName, iconAsset: c.iconAsset, colour: c.colour, colourFamily: c.colourFamily, role: c.role, builds: c.builds.map(b => b.id + ':' + b.name) })),
     'frontend and backend catalogues must not drift'
   );
 });
