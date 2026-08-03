@@ -375,8 +375,7 @@
         (selected ? ' class="selected"' : '') + '>' +
         '<td data-l="Rank"><span class="ms-rank' + (m.rank <= 3 ? ' r' + m.rank : '') + '">' + m.rank + '</span></td>' +
         '<td data-l="Character"><span class="ms-char">' +
-          '<span class="ms-avatar" aria-hidden="true">' + esc(m.name.charAt(0).toUpperCase()) +
-            '<span class="ms-status' + (active ? ' on' : '') + '"></span></span>' +
+          '<span class="ms-avatar" aria-hidden="true">' + esc(m.name.charAt(0).toUpperCase()) + '</span>' +
           '<span class="ms-char-name">' + esc(m.name) + '</span>' + (m.verified ? verifiedMark() : '') +
           '<span class="ms-class-symbols">' + classSymbols(m) + '</span>' +
           (m.hidden ? '<span class="badge hidden-badge" title="Hidden from other viewers — only you can see this row">Hidden — only you</span>' : '') +
@@ -504,8 +503,7 @@
 
     var html = '<section class="ms-profile">' +
       '<div class="ms-profile-top">' +
-        '<span class="ms-avatar lg" aria-hidden="true">' + esc(member.name.charAt(0).toUpperCase()) +
-          '<span class="ms-status' + (active ? ' on' : '') + '"></span></span>' +
+        '<span class="ms-avatar lg" aria-hidden="true">' + esc(member.name.charAt(0).toUpperCase()) + '</span>' +
         '<div class="ms-profile-id"><h2>' + esc(member.name) + '</h2>' +
           '<p>Rank ' + member.rank + ' · ' + esc(season.displayName) + ' Master Seal · ' +
           (active ? 'active recently' : 'not active recently') + '</p></div>' +
