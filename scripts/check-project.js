@@ -40,6 +40,8 @@ const required = [
   'appsscript.json',
   '.nojekyll',
   'assets/guild-logo.png',
+  'assets/paw.svg',
+  'site.webmanifest',
   'assets/master-seal/dungeons/dungeon-01-void-towering-ruin.webp',
   'assets/master-seal/dungeons/dungeon-02-void-tinas-mindrealm.webp',
   'assets/master-seal/dungeons/dungeon-03-cursed-radiant-tomb.webp',

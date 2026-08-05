@@ -49,34 +49,35 @@ test('editing the Stim Vault floor drives the SV Leaderboard', () => {
   assert.equal(call(c, 'myMasterSeal', { token }).totals.totalScore, 0);
 });
 
-test('Easy, Hard, Raid and Master completion save to the linked Players row with their completion dates', () => {
+const DIFF = (over) => Object.assign({ easy: false, hard: false, nmRaidCompleted: false, easyHardRaidCompleted: false, master: false }, over || {});
+
+test('Easy, Hard, both Raid difficulties and Master save independently with their dates', () => {
   const c = runtime();
   const dax = call(c, 'createAccount', { characterName: 'Dax' });
   const saved = call(c, 'masterSealUpdate', {
-    token: dax.session.token, dungeons: {}, difficulty: { easy: true, hard: true, raid: true, master: true }
+    token: dax.session.token, dungeons: {}, difficulty: DIFF({ easy: true, hard: true, nmRaidCompleted: true, easyHardRaidCompleted: true, master: true })
   });
-  assert.equal(saved.difficulty.easy, true);
-  assert.equal(saved.difficulty.hard, true);
-  assert.equal(saved.difficulty.raid, true);
-  assert.equal(saved.difficulty.master, true);
-  assert.ok(saved.difficulty.easyDate);
-  assert.ok(saved.difficulty.hardDate);
-  assert.ok(saved.difficulty.raidDate);
-  assert.ok(saved.difficulty.masterDate);
+  assert.equal(saved.difficulty.nmRaidCompleted, true);
+  assert.equal(saved.difficulty.easyHardRaidCompleted, true);
+  assert.ok(saved.difficulty.nmRaidDate);
+  assert.ok(saved.difficulty.easyHardRaidDate);
   const { row } = playerRow(c, dax.member.memberId);
-  assert.equal(row.EasyComplete, true);
-  assert.equal(row.HardComplete, true);
-  assert.equal(row.RaidComplete, true);
-  assert.equal(row.MasterComplete, true);
-  assert.ok(row.EasyDate instanceof Date);
-  assert.ok(row.HardDate instanceof Date);
-  assert.ok(row.RaidDate instanceof Date);
-  assert.ok(row.MasterDate instanceof Date);
+  assert.equal(row.NMRaidComplete, true);
+  assert.equal(row.EHRaidComplete, true);
+  assert.equal(row.RaidComplete, '', 'legacy combined column is retired on save');
+  assert.ok(row.NMRaidDate instanceof Date);
+  assert.ok(row.EHRaidDate instanceof Date);
+
+  // Clearing one raid difficulty must not touch the other.
+  const cleared = call(c, 'masterSealUpdate', {
+    token: dax.session.token, dungeons: {}, difficulty: DIFF({ easy: true, hard: true, nmRaidCompleted: false, easyHardRaidCompleted: true, master: true })
+  });
+  assert.equal(cleared.difficulty.nmRaidCompleted, false);
+  assert.equal(cleared.difficulty.easyHardRaidCompleted, true, 'Easy/Hard Raid unchanged when NM cleared');
+
   const loaded = call(c, 'myMasterSeal', { token: dax.session.token });
-  assert.equal(loaded.difficulty.easy, true);
-  assert.equal(loaded.difficulty.hard, true);
-  assert.equal(loaded.difficulty.raid, true);
-  assert.equal(loaded.difficulty.master, true);
+  assert.equal(loaded.difficulty.nmRaidCompleted, false);
+  assert.equal(loaded.difficulty.easyHardRaidCompleted, true);
 });
 
 test('a stale load clears the floor for the new fortnight on both the editor and the board', () => {
@@ -103,31 +104,79 @@ test('the floor is not cleared within the same fortnight', () => {
   assert.equal(call(c, 'myMasterSeal', { token }).stimVault.points, 30, 'a fresh floor survives a reload');
 });
 
-test('Raid completion resets weekly on Monday at the same time as Stim Vault', () => {
+test('NM Raid and Easy/Hard Raid reset weekly on Monday, each independently', () => {
   const c = runtime();
   const dax = call(c, 'createAccount', { characterName: 'Dax' });
   call(c, 'masterSealUpdate', {
-    token: dax.session.token, dungeons: {}, difficulty: { easy: false, hard: false, raid: true, master: false }
+    token: dax.session.token, dungeons: {}, difficulty: DIFF({ nmRaidCompleted: true, easyHardRaidCompleted: true })
   });
   const anchor = '2026-08-03T07:00:00Z';
   assert.equal(c.lastRaidReset_(new Date('2026-08-10T07:00:00Z'), anchor).toISOString(), '2026-08-10T07:00:00.000Z');
-  setCell(c, dax.member.memberId, 'RaidDate', new Date('2026-07-20T07:00:00Z'));
-  assert.equal(c.applyRaidReset_(dax.member.memberId, new Date('2026-08-10T07:00:00Z')), true);
+  // Only NM Raid is stale; Easy/Hard Raid was completed this week.
+  setCell(c, dax.member.memberId, 'NMRaidDate', new Date('2026-07-20T07:00:00Z'));
+  setCell(c, dax.member.memberId, 'EHRaidDate', new Date('2026-08-10T09:00:00Z'));
+  assert.equal(c.applyRaidReset_(dax.member.memberId, new Date('2026-08-10T12:00:00Z')), true);
   const { row } = playerRow(c, dax.member.memberId);
-  assert.equal(row.RaidComplete, false);
-  assert.equal(row.RaidDate, '');
+  assert.equal(row.NMRaidComplete, false, 'stale NM Raid cleared');
+  assert.equal(row.EHRaidComplete, true, 'fresh Easy/Hard Raid preserved');
 });
 
-test('Master Seal board applies a weekly Raid reset without per-member identity lookups', () => {
+test('Master Seal board applies the weekly Raid reset without per-member identity lookups', () => {
   const c = runtime();
   const dax = call(c, 'createAccount', { characterName: 'Dax' });
-  call(c, 'masterSealUpdate', { token: dax.session.token, dungeons: {}, difficulty: { easy: false, hard: false, raid: true, master: false } });
-  setCell(c, dax.member.memberId, 'RaidDate', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000));
+  call(c, 'masterSealUpdate', { token: dax.session.token, dungeons: {}, difficulty: DIFF({ nmRaidCompleted: true, easyHardRaidCompleted: true }) });
+  const stale = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+  setCell(c, dax.member.memberId, 'NMRaidDate', stale);
+  setCell(c, dax.member.memberId, 'EHRaidDate', stale);
   const original = c.linkedPlayer_;
   c.linkedPlayer_ = function () { throw new Error('board must use its loaded Players rows'); };
   const board = c.masterSealBoard_('');
   c.linkedPlayer_ = original;
-  assert.equal(board.board[0].raid, false);
+  assert.equal(board.board[0].nmRaid, false);
+  assert.equal(board.board[0].easyHardRaid, false);
+});
+
+test('legacy combined Raid data migrates into Easy/Hard on first load and never re-writes the old column', () => {
+  const c = runtime();
+  const dax = call(c, 'createAccount', { characterName: 'Dax' });
+  // Simulate a pre-split record: legacy RaidComplete true, no NM/EH columns set.
+  setCell(c, dax.member.memberId, 'RaidComplete', true);
+  setCell(c, dax.member.memberId, 'RaidDate', new Date('2026-08-04T00:00:00Z'));
+  setCell(c, dax.member.memberId, 'NMRaidComplete', '');
+  setCell(c, dax.member.memberId, 'EHRaidComplete', '');
+  const loaded = call(c, 'myMasterSeal', { token: dax.session.token });
+  assert.equal(loaded.difficulty.easyHardRaidCompleted, true, 'legacy Raid -> Easy/Hard');
+  assert.equal(loaded.difficulty.nmRaidCompleted, false, 'NM defaults to false');
+  const { row } = playerRow(c, dax.member.memberId);
+  assert.equal(row.EHRaidComplete, true);
+  assert.equal(row.RaidComplete, '', 'legacy column cleared after migration');
+  // Re-running is idempotent and does not corrupt the migrated value.
+  const again = call(c, 'myMasterSeal', { token: dax.session.token });
+  assert.equal(again.difficulty.easyHardRaidCompleted, true);
+});
+
+test('legacy incomplete Raid migrates to Easy/Hard false, and missing raid data reads as false', () => {
+  const c = runtime();
+  const dax = call(c, 'createAccount', { characterName: 'Dax' });
+  setCell(c, dax.member.memberId, 'RaidComplete', false);
+  setCell(c, dax.member.memberId, 'NMRaidComplete', '');
+  setCell(c, dax.member.memberId, 'EHRaidComplete', '');
+  const loaded = call(c, 'myMasterSeal', { token: dax.session.token });
+  assert.equal(loaded.difficulty.easyHardRaidCompleted, false);
+  assert.equal(loaded.difficulty.nmRaidCompleted, false);
+  // Garbage in the legacy column is treated as not-complete, never thrown.
+  const aria = call(c, 'createAccount', { characterName: 'Aria' });
+  setCell(c, aria.member.memberId, 'RaidComplete', 'garbage');
+  setCell(c, aria.member.memberId, 'EHRaidComplete', '');
+  assert.equal(call(c, 'myMasterSeal', { token: aria.session.token }).difficulty.easyHardRaidCompleted, false);
+});
+
+test('the server rejects a difficulty payload missing the separated raid booleans', () => {
+  const c = runtime();
+  const dax = call(c, 'createAccount', { characterName: 'Dax' });
+  assert.throws(() => call(c, 'masterSealUpdate', {
+    token: dax.session.token, dungeons: {}, difficulty: { easy: true, hard: true, raid: true, master: true }
+  }), /true or false/);
 });
 
 test('the Master Seal board carries each member SV floor for display and sorting', () => {

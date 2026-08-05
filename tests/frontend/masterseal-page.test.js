@@ -144,17 +144,25 @@ test('Guild Members CONFIG groups saved selections by role while preserving each
   assert.match(H.classConfig({ classes: [] }), /—/);
 });
 
-test('Guild Members Raid status uses a circled tick or cross', () => {
-  const { raidStatus } = helpers();
-  assert.match(raidStatus({ raid: true }), /ms-raid-status complete/);
-  assert.match(raidStatus({ raid: true }), /✓/);
-  assert.match(raidStatus({ raid: false }), /ms-raid-status incomplete/);
-  assert.match(raidStatus({ raid: false }), /×/);
+test('NM Raid and Easy/Hard Raid statuses each use a circled tick or cross', () => {
+  const { nmRaidStatus, easyHardRaidStatus } = helpers();
+  // NM Raid column reflects only nmRaid.
+  assert.match(nmRaidStatus({ nmRaid: true, easyHardRaid: false }), /ms-raid-status complete/);
+  assert.match(nmRaidStatus({ nmRaid: true }), /✓/);
+  assert.match(nmRaidStatus({ nmRaid: false, easyHardRaid: true }), /ms-raid-status incomplete/);
+  assert.match(nmRaidStatus({ nmRaid: false }), /×/);
+  assert.match(nmRaidStatus({ nmRaid: true }), /NM Raid completed/);
+  // Easy/Hard Raid column reflects only easyHardRaid — independently.
+  assert.match(easyHardRaidStatus({ nmRaid: true, easyHardRaid: false }), /ms-raid-status incomplete/);
+  assert.match(easyHardRaidStatus({ easyHardRaid: true }), /✓/);
+  assert.match(easyHardRaidStatus({ easyHardRaid: true }), /Easy\/Hard Raid completed/);
 });
 
-test('Guild Members preserves the backend Raid completion flag for its status cell', () => {
+test('Guild Members carries both separated raid flags from the backend row', () => {
   const source = fs.readFileSync('MasterSealPage.js', 'utf8');
-  assert.match(source, /raid:\s*Boolean\(row\.raid\)/);
+  assert.match(source, /nmRaid:\s*Boolean\(row\.nmRaid\)/);
+  assert.match(source, /easyHardRaid:\s*Boolean\(row\.easyHardRaid\)/);
+  assert.equal(/raid:\s*Boolean\(row\.raid\)/.test(source), false, 'no single combined raid field');
 });
 
 test('pagination slices correctly and clamps out-of-range pages', () => {

@@ -868,22 +868,31 @@
     return { cleared: cleared, bestMasterLevel: hasLevel ? Number(level) : null, points: cleared ? points : 0 };
   }
 
+  // NM Raid and Easy/Hard Raid are independent booleans — never one shared value.
+  var SEAL_DIFFICULTIES = [
+    { key: 'easy', label: 'Easy' },
+    { key: 'hard', label: 'Hard' },
+    { key: 'nmRaidCompleted', label: 'NM Raid' },
+    { key: 'easyHardRaidCompleted', label: 'Easy/Hard Raid' },
+    { key: 'master', label: 'Master' }
+  ];
+
   function sealDifficultyBoxes(values) {
-    values = values || { easy: false, hard: false, raid: false, master: false };
+    values = values || {};
     var group = E('fieldset');
     group.className = 'seal-difficulty';
     group.dataset.sealDifficulty = 'true';
     group.appendChild(E('legend', 'Dungeon difficulty'));
-    ['easy', 'hard', 'raid', 'master'].forEach(function (difficulty) {
+    SEAL_DIFFICULTIES.forEach(function (difficulty) {
       var label = E('label');
       label.className = 'seal-difficulty-option';
       var input = document.createElement('input');
       input.type = 'checkbox';
-      input.name = 'seal-difficulty-' + difficulty;
-      input.value = difficulty;
-      input.checked = values[difficulty];
+      input.name = 'seal-difficulty-' + difficulty.key;
+      input.value = difficulty.key;
+      input.checked = Boolean(values[difficulty.key]);
       label.appendChild(input);
-      label.appendChild(E('span', difficulty.charAt(0).toUpperCase() + difficulty.slice(1)));
+      label.appendChild(E('span', difficulty.label));
       group.appendChild(label);
     });
     return group;
@@ -964,7 +973,8 @@
       event.preventDefault();
       if (submit.disabled) return;
       submit.disabled = true;
-      var dungeons = {}, stimVault = null, difficulty = { easy: false, hard: false, raid: false, master: false };
+      var dungeons = {}, stimVault = null;
+      var difficulty = { easy: false, hard: false, nmRaidCompleted: false, easyHardRaidCompleted: false, master: false };
       grid.querySelectorAll('fieldset[data-seal]').forEach(function (group) {
         var key = group.dataset.seal;
         if (key === 'stim-vault') stimVault = readSealRow(group);

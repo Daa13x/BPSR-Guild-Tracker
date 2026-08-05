@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="OnlyPaws paw">
+  <title>OnlyPaws paw</title>
+  <defs>
+    <!-- Right side is the darker pink, split on a slight diagonal like the source art. -->
+    <clipPath id="paw-right"><polygon points="560,0 1024,0 1024,1024 470,1024"/></clipPath>
+  </defs>
+  <!-- Lighter pink base -->
+  <g fill="#E389B4">
+    <ellipse cx="212" cy="360" rx="100" ry="126" transform="rotate(-12 212 360)"/>
+    <ellipse cx="430" cy="208" rx="126" ry="156" transform="rotate(4 430 208)"/>
+    <ellipse cx="690" cy="286" rx="112" ry="150" transform="rotate(24 690 286)"/>
+    <ellipse cx="836" cy="556" rx="102" ry="132" transform="rotate(40 836 556)"/>
+    <path d="M512 500 C 402 506 258 690 214 830 C 176 962 330 1132 502 1132 C 694 1132 846 980 818 828 C 790 664 642 500 512 500 Z"/>
+  </g>
+  <!-- Darker pink right side -->
+  <g fill="#C6497F" clip-path="url(#paw-right)">
+    <ellipse cx="212" cy="360" rx="100" ry="126" transform="rotate(-12 212 360)"/>
+    <ellipse cx="430" cy="208" rx="126" ry="156" transform="rotate(4 430 208)"/>
+    <ellipse cx="690" cy="286" rx="112" ry="150" transform="rotate(24 690 286)"/>
+    <ellipse cx="836" cy="556" rx="102" ry="132" transform="rotate(40 836 556)"/>
+    <path d="M512 500 C 402 506 258 690 214 830 C 176 962 330 1132 502 1132 C 694 1132 846 980 818 828 C 790 664 642 500 512 500 Z"/>
+  </g>
+</svg>

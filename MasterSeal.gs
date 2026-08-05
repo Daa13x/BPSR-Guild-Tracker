@@ -216,31 +216,57 @@ function stimWrite_(memberId, entry) {
   return true;
 }
 
-/** Clear a completed Raid when the next weekly Monday reset has passed. */
+/**
+ * Clear completed NM Raid and Easy/Hard Raid when the weekly Monday reset has
+ * passed since each was recorded. The two difficulties reset independently.
+ * Also migrates a legacy `RaidComplete` value into the Easy/Hard column so the
+ * old single-raid record is preserved during the transition.
+ */
 function applyRaidReset_(memberId, now) {
   var p = linkedPlayer_(memberId);
   var when = now || new Date();
-  if (!truthy_(p.RaidComplete) || !raidStale_(p.RaidDate, when, stimAnchor_())) return false;
-  p.RaidComplete = false;
-  p.RaidDate = '';
+  var raid = raidState_(p);
+  var changed = false;
+
+  // One-time migration of the legacy combined field into Easy/Hard.
+  var ehSet = p.EHRaidComplete !== '' && p.EHRaidComplete !== null && p.EHRaidComplete !== undefined;
+  if (!ehSet && (truthy_(p.RaidComplete) || p.RaidComplete === false)) {
+    p.EHRaidComplete = truthy_(p.RaidComplete);
+    p.EHRaidDate = p.RaidDate || '';
+    p.RaidComplete = '';   // stop carrying the legacy combined field
+    p.RaidDate = '';
+    changed = true;
+    raid = raidState_(p);
+  }
+
+  if (raid.nm && raidStale_(raid.nmDate, when, stimAnchor_())) {
+    p.NMRaidComplete = false; p.NMRaidDate = ''; changed = true;
+  }
+  if (raid.easyHard && raidStale_(raid.easyHardDate, when, stimAnchor_())) {
+    p.EHRaidComplete = false; p.EHRaidDate = ''; changed = true;
+  }
+  if (!changed) return false;
   p.LastUpdated = when;
   writePlayerRow_(p);
   bustCache_();
   return true;
 }
 
-/** Per-player difficulty and Raid completion state is stored on the existing
- * Players row, alongside the date on which each completion was recorded. */
+/** Per-player difficulty state on the Players row. NM Raid and Easy/Hard Raid
+ * are always separate booleans, never combined. */
 function sealDifficultyPublic_(memberId) {
   applyRaidReset_(memberId);
   var p = linkedPlayer_(memberId);
+  var raid = raidState_(p);
   return {
     easy: truthy_(p.EasyComplete),
     easyDate: iso_(p.EasyDate),
     hard: truthy_(p.HardComplete),
     hardDate: iso_(p.HardDate),
-    raid: truthy_(p.RaidComplete),
-    raidDate: iso_(p.RaidDate),
+    nmRaidCompleted: raid.nm,
+    nmRaidDate: iso_(raid.nmDate),
+    easyHardRaidCompleted: raid.easyHard,
+    easyHardRaidDate: iso_(raid.easyHardDate),
     master: truthy_(p.MasterComplete),
     masterDate: iso_(p.MasterDate)
   };
@@ -248,32 +274,31 @@ function sealDifficultyPublic_(memberId) {
 
 function sealDifficultyWrite_(memberId, entry) {
   if (!entry || typeof entry !== 'object' ||
-      typeof entry.easy !== 'boolean' || typeof entry.hard !== 'boolean' || typeof entry.raid !== 'boolean' || typeof entry.master !== 'boolean') {
-    throw apiError_('VALIDATION', 'Easy, Hard, Raid and Master completion values must be true or false.');
+      typeof entry.easy !== 'boolean' || typeof entry.hard !== 'boolean' ||
+      typeof entry.nmRaidCompleted !== 'boolean' || typeof entry.easyHardRaidCompleted !== 'boolean' ||
+      typeof entry.master !== 'boolean') {
+    throw apiError_('VALIDATION', 'Easy, Hard, NM Raid, Easy/Hard Raid and Master completion values must be true or false.');
   }
   var p = linkedPlayer_(memberId);
+  var raid = raidState_(p);
   var easyChanged = truthy_(p.EasyComplete) !== entry.easy;
   var hardChanged = truthy_(p.HardComplete) !== entry.hard;
-  var raidChanged = truthy_(p.RaidComplete) !== entry.raid;
+  var nmChanged = raid.nm !== entry.nmRaidCompleted;
+  var ehChanged = raid.easyHard !== entry.easyHardRaidCompleted;
   var masterChanged = truthy_(p.MasterComplete) !== entry.master;
-  if (!easyChanged && !hardChanged && !raidChanged && !masterChanged) return false;
+  // Always write the separated raid columns so a legacy row is migrated even
+  // when the value itself is unchanged (the legacy column is then cleared).
+  var legacyPresent = p.RaidComplete !== '' && p.RaidComplete !== null && p.RaidComplete !== undefined;
+  if (!easyChanged && !hardChanged && !nmChanged && !ehChanged && !masterChanged && !legacyPresent) return false;
   var now = new Date();
-  if (easyChanged) {
-    p.EasyComplete = entry.easy;
-    p.EasyDate = entry.easy ? now : '';
-  }
-  if (hardChanged) {
-    p.HardComplete = entry.hard;
-    p.HardDate = entry.hard ? now : '';
-  }
-  if (raidChanged) {
-    p.RaidComplete = entry.raid;
-    p.RaidDate = entry.raid ? now : '';
-  }
-  if (masterChanged) {
-    p.MasterComplete = entry.master;
-    p.MasterDate = entry.master ? now : '';
-  }
+  if (easyChanged) { p.EasyComplete = entry.easy; p.EasyDate = entry.easy ? now : ''; }
+  if (hardChanged) { p.HardComplete = entry.hard; p.HardDate = entry.hard ? now : ''; }
+  p.NMRaidComplete = entry.nmRaidCompleted;
+  p.NMRaidDate = entry.nmRaidCompleted ? (nmChanged ? now : (raid.nmDate || now)) : '';
+  p.EHRaidComplete = entry.easyHardRaidCompleted;
+  p.EHRaidDate = entry.easyHardRaidCompleted ? (ehChanged ? now : (raid.easyHardDate || now)) : '';
+  p.RaidComplete = ''; p.RaidDate = '';   // never keep writing the legacy combined field
+  if (masterChanged) { p.MasterComplete = entry.master; p.MasterDate = entry.master ? now : ''; }
   p.LastUpdated = now;
   writePlayerRow_(p);
   bustCache_();
@@ -343,16 +368,21 @@ function masterSealBoard_(viewerMemberId) {
     // This board already has every Players row in memory. Do not call
     // linkedPlayer_ here: that would re-read Players and Members once per
     // guild member and can make the Apps Script request time out.
-    if (truthy_(p.RaidComplete) && raidStale_(p.RaidDate, now, stimAnchor_())) {
-      p.RaidComplete = false;
-      p.RaidDate = '';
-      p.LastUpdated = now;
-      writePlayerRow_(p);
-      raidResetChanged = true;
+    var raid = raidState_(p);
+    var rowChanged = false;
+    // Migrate legacy combined raid into Easy/Hard in place.
+    var ehSet = p.EHRaidComplete !== '' && p.EHRaidComplete !== null && p.EHRaidComplete !== undefined;
+    if (!ehSet && (truthy_(p.RaidComplete) || p.RaidComplete === false)) {
+      p.EHRaidComplete = truthy_(p.RaidComplete); p.EHRaidDate = p.RaidDate || '';
+      p.RaidComplete = ''; p.RaidDate = ''; rowChanged = true; raid = raidState_(p);
     }
+    if (raid.nm && raidStale_(raid.nmDate, now, stimAnchor_())) { p.NMRaidComplete = false; p.NMRaidDate = ''; rowChanged = true; }
+    if (raid.easyHard && raidStale_(raid.easyHardDate, now, stimAnchor_())) { p.EHRaidComplete = false; p.EHRaidDate = ''; rowChanged = true; }
+    if (rowChanged) { p.LastUpdated = now; writePlayerRow_(p); raidResetChanged = true; raid = raidState_(p); }
     flags[String(p.UserId)] = {
       hidden: truthy_(p.Hidden), verified: truthy_(p.Verified),
-      svFloor: masterSealSvFloor_(p.SVFloor), raid: truthy_(p.RaidComplete)
+      svFloor: masterSealSvFloor_(p.SVFloor),
+      nmRaid: raid.nm, easyHardRaid: raid.easyHard
     };
   });
   if (raidResetChanged) bustCache_();
@@ -360,7 +390,7 @@ function masterSealBoard_(viewerMemberId) {
   readTable_(AUTH_SHEETS.MEMBERS).rows.forEach(function (m) {
     if (m.DisabledAt) return;
     // Hidden members stay off the board for everyone except themselves.
-    var flag = flags[String(m.MemberId)] || { hidden: false, verified: false, svFloor: null, raid: false };
+    var flag = flags[String(m.MemberId)] || { hidden: false, verified: false, svFloor: null, nmRaid: false, easyHardRaid: false };
     var isViewer = viewerMemberId && String(m.MemberId) === String(viewerMemberId);
     if (flag.hidden && !isViewer) return;
     var dungeons = sealProgress_(grouped[String(m.MemberId)]);
@@ -371,7 +401,8 @@ function masterSealBoard_(viewerMemberId) {
       hidden: flag.hidden,
       classes: classEntries[String(m.MemberId)] || [],
       svFloor: flag.svFloor,
-      raid: flag.raid,
+      nmRaid: flag.nmRaid,
+      easyHardRaid: flag.easyHardRaid,
       dungeons: dungeons.map(function (d) {
         return { dungeonId: d.dungeonId, bestMasterLevel: d.bestMasterLevel, points: d.points, cleared: d.cleared };
       }),

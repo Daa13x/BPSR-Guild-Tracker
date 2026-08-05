@@ -84,9 +84,29 @@ var PLAYER_HEADERS = [
   'MountEarned', 'MountEarnedAt', 'MountPosition', 'MountPointsWhenEarned',
   'LastUpdated', 'RegisteredAt', 'IsAdmin', 'Notes', 'Hidden', 'Verified',
   // New columns stay at the end so existing Players rows never shift during
-  // the in-place spreadsheet upgrade.
-  'RaidComplete', 'RaidDate', 'MasterComplete', 'MasterDate'
+  // the in-place spreadsheet upgrade. `RaidComplete`/`RaidDate` are the legacy
+  // single-raid columns kept only for backward-compatible migration; NM and
+  // Easy/Hard raid are the current separated fields.
+  'RaidComplete', 'RaidDate', 'MasterComplete', 'MasterDate',
+  'NMRaidComplete', 'NMRaidDate', 'EHRaidComplete', 'EHRaidDate'
 ];
+
+/**
+ * Normalise a Players row's raid state into the two separated booleans,
+ * migrating legacy `RaidComplete` into Easy/Hard when the new columns are
+ * still blank. Pure read: never writes. Invalid/missing values become false.
+ */
+function raidState_(p) {
+  var ehSet = p.EHRaidComplete !== '' && p.EHRaidComplete !== null && p.EHRaidComplete !== undefined;
+  var easyHard = ehSet ? truthy_(p.EHRaidComplete) : truthy_(p.RaidComplete);   // legacy Raid => Easy/Hard
+  var easyHardDate = ehSet ? p.EHRaidDate : p.RaidDate;
+  return {
+    nm: truthy_(p.NMRaidComplete),
+    nmDate: p.NMRaidDate || '',
+    easyHard: easyHard,
+    easyHardDate: easyHardDate || ''
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Setup
@@ -362,7 +382,9 @@ function submitProgress(payload) {
     var points = clampInt_(payload.masterPoints, 0, 100000, stored ? Number(stored.MasterPoints) || 0 : 0);
     var easy = !!payload.easyComplete;
     var hard = !!payload.hardComplete;
-    var raid = !!payload.raidComplete;
+    // Separated raid difficulties; accept the legacy combined flag as Easy/Hard.
+    var nmRaid = !!payload.nmRaidComplete;
+    var easyHardRaid = payload.easyHardRaidComplete !== undefined ? !!payload.easyHardRaidComplete : !!payload.raidComplete;
     var master = !!payload.masterComplete;
     var ranks = payload.masterRanks || {};
 
@@ -394,10 +416,17 @@ function submitProgress(payload) {
       events.push(evt_(email, name, 'HARD_COMPLETE', '', false, true, period, true, true));
       player.HardComplete = true; player.HardDate = now;
     }
-    if (raid && !truthy_(player.RaidComplete)) {
-      events.push(evt_(email, name, 'RAID_COMPLETE', '', false, true, period, true, true));
-      player.RaidComplete = true; player.RaidDate = now;
+    var raidNow = raidState_(player);
+    if (nmRaid && !raidNow.nm) {
+      events.push(evt_(email, name, 'NM_RAID_COMPLETE', '', false, true, period, true, true));
+      player.NMRaidComplete = true; player.NMRaidDate = now;
     }
+    if (easyHardRaid && !raidNow.easyHard) {
+      events.push(evt_(email, name, 'EASYHARD_RAID_COMPLETE', '', false, true, period, true, true));
+      player.EHRaidComplete = true; player.EHRaidDate = now;
+    }
+    // Retire the legacy combined field on any save.
+    player.RaidComplete = ''; player.RaidDate = '';
     if (master && !truthy_(player.MasterComplete)) {
       events.push(evt_(email, name, 'MASTER_COMPLETE', '', false, true, period, true, true));
       player.MasterComplete = true; player.MasterDate = now;
@@ -735,7 +764,8 @@ function buildBundle_() {
       svComplete: sv >= SV_MAX_FLOOR,
       easy: truthy_(p.EasyComplete),
       hard: truthy_(p.HardComplete),
-      raid: truthy_(p.RaidComplete),
+      nmRaid: raidState_(p).nm,
+      easyHardRaid: raidState_(p).easyHard,
       master: truthy_(p.MasterComplete),
       points: pts,
       pointsPct: Math.min(100, Math.round(pts / mountTarget * 100)),

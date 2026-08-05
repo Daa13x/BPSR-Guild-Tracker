@@ -141,12 +141,16 @@
     return html || '<span class="dim">—</span>';
   }
 
-  function raidStatus(member) {
-    var complete = Boolean(member && member.raid);
-    var label = complete ? 'Raid completed this week' : 'Raid not completed this week';
-    return '<span class="ms-raid-status ' + (complete ? 'complete' : 'incomplete') + '" title="' + label + '" aria-label="' + label + '">' +
-      '<span aria-hidden="true">' + (complete ? '✓' : '×') + '</span></span>';
+  /** One raid-completion tick for a named difficulty. NM Raid and Easy/Hard
+   * Raid are rendered as independent columns and never combined. */
+  function raidStatus(complete, name) {
+    var done = Boolean(complete);
+    var label = name + (done ? ' completed this week' : ' not completed this week');
+    return '<span class="ms-raid-status ' + (done ? 'complete' : 'incomplete') + '" title="' + label + '" aria-label="' + label + '">' +
+      '<span aria-hidden="true">' + (done ? '✓' : '×') + '</span></span>';
   }
+  function nmRaidStatus(member) { return raidStatus(member && member.nmRaid, 'NM Raid'); }
+  function easyHardRaidStatus(member) { return raidStatus(member && member.easyHardRaid, 'Easy/Hard Raid'); }
 
   function pageSlice(list, page, size) {
     var total = Math.max(1, Math.ceil(list.length / size));
@@ -183,6 +187,8 @@
     selectMembers: selectMembers,
     classConfig: classConfig,
     raidStatus: raidStatus,
+    nmRaidStatus: nmRaidStatus,
+    easyHardRaidStatus: easyHardRaidStatus,
     pageSlice: pageSlice,
     seasonSchedule: seasonSchedule
   };
@@ -292,7 +298,8 @@
       lastUpdated: row.lastUpdated || null,
       verified: Boolean(row.verified),
       hidden: Boolean(row.hidden),
-      raid: Boolean(row.raid),
+      nmRaid: Boolean(row.nmRaid),
+      easyHardRaid: Boolean(row.easyHardRaid),
       classes: Array.isArray(row.classes) ? row.classes.map(function (entry) { return { classId: String(entry.classId || ''), buildId: String(entry.buildId || entry.buildPathId || '') }; }) : [],
       svFloor: normaliseSvFloor(row.svFloor === undefined ? row.SVFloor : row.svFloor),
       dungeons: dungeons
@@ -362,9 +369,9 @@
     var season = state.season;
     var now = Date.now();
     var html = '<table class="ms-table"><thead>' +
-      '<tr><th colspan="10"></th><th colspan="6" class="ms-group-head">Chaotic Realm Dungeons<small>(best Master clear)</small></th></tr>' +
+      '<tr><th colspan="11"></th><th colspan="6" class="ms-group-head">Chaotic Realm Dungeons<small>(best Master clear)</small></th></tr>' +
       '<tr>' +
-      '<th scope="col">Rank</th><th scope="col">Character</th><th scope="col">Raid</th><th scope="col">Config</th><th scope="col">Total Score</th>' +
+      '<th scope="col">Rank</th><th scope="col">Character</th><th scope="col">NM Raid</th><th scope="col">Easy/Hard Raid</th><th scope="col">Config</th><th scope="col">Total Score</th>' +
       '<th scope="col">Progress</th><th scope="col">Remaining</th><th scope="col">Cleared</th>' +
       '<th scope="col">Mount</th><th scope="col">Last Updated</th><th scope="col">SV Floor</th>' +
       season.dungeons.map(function (d) {
@@ -387,7 +394,8 @@
           (m.hidden ? '<span class="badge hidden-badge" title="Hidden from other viewers — only you can see this row">Hidden — only you</span>' : '') +
           '<span class="sr-only">' + (active ? 'Active in the last 24 hours' : 'Not active recently') + '</span>' +
         '</span></td>' +
-        '<td data-l="Raid" class="ms-raid-cell">' + raidStatus(m) + '</td>' +
+        '<td data-l="NM Raid" class="ms-raid-cell">' + nmRaidStatus(m) + '</td>' +
+        '<td data-l="Easy/Hard Raid" class="ms-raid-cell">' + easyHardRaidStatus(m) + '</td>' +
         '<td data-l="Config" class="ms-config">' + classConfig(m) + '</td>' +
         '<td data-l="Total"><span class="ms-total">' + num(m.totalScore) + '<small>/ ' + num(season.maxScore) + '</small></span></td>' +
         '<td data-l="Progress"><span class="ms-pct">' + pct + '%</span>' +
@@ -728,7 +736,7 @@
       if (maxValue) maxValue.textContent = num(season.maxScore) + ' PTS';
       var tag = byId('ms-season-tag');
       if (tag) tag.textContent = season.displayName;
-      document.title = season.displayName + ' Master Seal · BPSR Guild Tracker';
+      document.title = 'OnlyPaws Tracker — ' + season.displayName + ' Master Seal';
       setConnection('ok', 'Connected');
       renderSeasonNote();   // show the real season schedule as soon as it arrives
       refreshView();

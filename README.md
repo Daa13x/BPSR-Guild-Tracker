@@ -93,6 +93,18 @@ A signed-in member can record any number of unique class/build combinations from
 - **Guild Member CONFIG:** the Master Seal guild table projects the same saved selections in role order (DPS, Tank, Healer), while preserving the member's chosen order within each role.
 - **Compatibility note:** legacy class rows remain readable; existing Master Seal / SV progress remains keyed to the member and is not re-keyed or lost.
 
+## Raid difficulties: NM Raid and Easy/Hard Raid
+
+The single "Raid" completion has been split into two independent booleans that are never combined internally or visually: `nmRaidCompleted` and `easyHardRaidCompleted`. Both appear as separate tick boxes in the Dungeon Difficulty controls and as two separate columns (**NM RAID**, **EASY/HARD RAID**) in the Guild Members table, each with the green ✓ / red × status (distinguished by glyph and label, not colour alone). Each resets independently on the weekly Monday 05:00 UTC‑2 boundary.
+
+Storage stays on the Players sheet with new columns `NMRaidComplete`/`NMRaidDate` and `EHRaidComplete`/`EHRaidDate`. The legacy `RaidComplete`/`RaidDate` columns are kept only for a one-time, backward-compatible migration: on the next load or save, a completed legacy Raid becomes `easyHardRaidCompleted: true` (incomplete → `false`), `nmRaidCompleted` defaults to `false`, and the legacy column is cleared. Missing or invalid legacy values normalise to `false` and the migration is idempotent (`raidState_` in Code.gs; covered by `tests/backend/stim-floor.test.js`). New saves never write the combined field.
+
+## Data source of truth — Sheets today, GitHub migration (deferred, see blocker)
+
+Public class/season **definitions** already load from versioned GitHub JSON (`data/manifest.json` → `data/classes.json`, `data/master-seal.json`) via `StaticData.js`, so the page does not wait on the spreadsheet for those. Member **progression** (scores, SV floors, raid completion, roles) is still read from the Apps Script `/exec` (`leaderboard` / `masterSeal`).
+
+Moving member progression to a GitHub-backed datastore **with writes** (spec §6–10, plus the admin "Sync Spreadsheet to GitHub" import) is **not yet implemented on production, and cannot be completed from this environment.** It requires a protected backend that holds a **GitHub write token**; the only backend here is Google Apps Script, which (a) can only be deployed from the owner's Google account, and (b) must be given the token as a Script Property secret. Neither is accessible from the tracker repo tooling. Implementing a partial read-swap to an unpopulated `data/guild.json` would break the working live read path, so it was deliberately not done. This is documented rather than faked. To pursue it, the owner would: add a fine-scoped GitHub PAT to Apps Script Script Properties, add server actions that commit approved non-private fields to `data/guild.json` with conflict-aware (SHA-based) updates and debounced batching, keep account keys/recovery codes Sheet-only, and add an admin-only sync action. None of that can be verified live without the deploy + token.
+
 ## Backend setup and redeployment
 
 1. Back up the production spreadsheet and open **Extensions → Apps Script**.

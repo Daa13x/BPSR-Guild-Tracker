@@ -453,7 +453,10 @@ button { cursor: pointer; }
 .badge.hard { border-color: #ff8a32; color: #ff8a32; background: rgba(255, 138, 50, .10); }
 .badge.master { border-color: #ff5d72; color: #ff5d72; background: rgba(255, 93, 114, .10); }
 .badge.ember { border-color: var(--warning); color: var(--warning); }
-.ms-raid-cell { text-align: center; }
+.ms-raid-cell { text-align: center; white-space: nowrap; }
+/* Keep the two independent raid columns compact so the wider score/dungeon
+   columns stay readable. */
+.ms-table th[scope="col"] { vertical-align: bottom; }
 .ms-raid-status { display: inline-grid; place-items: center; width: 20px; height: 20px; border: 1px solid currentColor; border-radius: 50%; font-size: 14px; font-weight: 900; line-height: 1; }
 .ms-raid-status.complete { color: var(--success); background: rgba(75, 222, 141, .10); }
 .ms-raid-status.incomplete { color: #ff5d72; background: rgba(255, 93, 114, .08); }

@@ -1,0 +1,13 @@
+{
+  "name": "OnlyPaws Tracker",
+  "short_name": "OnlyPaws",
+  "description": "OnlyPaws guild tracker — Master Seal, SV floors and raid progress.",
+  "start_url": "Leaderboard.html",
+  "display": "standalone",
+  "background_color": "#0b0712",
+  "theme_color": "#0b0712",
+  "icons": [
+    { "src": "assets/paw.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
+    { "src": "assets/paw.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "maskable" }
+  ]
+}
