@@ -99,11 +99,43 @@ A signed-in member can record any number of unique class/build combinations from
 
 Storage stays on the Players sheet with new columns `NMRaidComplete`/`NMRaidDate` and `EHRaidComplete`/`EHRaidDate`. The legacy `RaidComplete`/`RaidDate` columns are kept only for a one-time, backward-compatible migration: on the next load or save, a completed legacy Raid becomes `easyHardRaidCompleted: true` (incomplete → `false`), `nmRaidCompleted` defaults to `false`, and the legacy column is cleared. Missing or invalid legacy values normalise to `false` and the migration is idempotent (`raidState_` in Code.gs; covered by `tests/backend/stim-floor.test.js`). New saves never write the combined field.
 
-## Data source of truth — Sheets today, GitHub migration (deferred, see blocker)
+## Architecture: public code repo, private data repo, Sheets for secrets
 
-Public class/season **definitions** already load from versioned GitHub JSON (`data/manifest.json` → `data/classes.json`, `data/master-seal.json`) via `StaticData.js`, so the page does not wait on the spreadsheet for those. Member **progression** (scores, SV floors, raid completion, roles) is still read from the Apps Script `/exec` (`leaderboard` / `masterSeal`).
+- **Public code repo** `Daa13x/BPSR-Guild-Tracker` — the static site (GitHub Pages) plus the Apps Script `/exec` API source. Public class/season **definitions** load from versioned GitHub JSON (`data/manifest.json` → `data/classes.json`, `data/master-seal.json`) via `StaticData.js`, so the page never waits on the spreadsheet for those.
+- **Private data repo** `Daa13x/BPSR-Guild-Tracker-Data` (private, branch `main`) — stores NON-PRIVATE tracker data under `state/`: `state/schema.json`, `state/manifest.json`, `state/board.json`, `state/members/<publicMemberId>.json`, and migration audit under `state/migration/`. Member files hold `schemaVersion, publicMemberId, characterName, profile, classes, stimVault, masterSeal, difficulty{easy,hard,master}, nmRaidCompleted, easyHardRaidCompleted, raidResetPeriod, stimVaultResetPeriod, updatedAt, dataRevision`. Scores/rankings are **always recomputed server-side** and never trusted from the browser.
+- **Apps Script** is the only writer to GitHub; it holds the token. **Google Sheets keeps private data only**: accounts, sessions, session hashes, backup codes, login throttling, disabled state, admin roles, private audit, and the `privateMemberId → publicMemberId` map (`MemberMap`).
 
-Moving member progression to a GitHub-backed datastore **with writes** (spec §6–10, plus the admin "Sync Spreadsheet to GitHub" import) is **not yet implemented on production, and cannot be completed from this environment.** It requires a protected backend that holds a **GitHub write token**; the only backend here is Google Apps Script, which (a) can only be deployed from the owner's Google account, and (b) must be given the token as a Script Property secret. Neither is accessible from the tracker repo tooling. Implementing a partial read-swap to an unpopulated `data/guild.json` would break the working live read path, so it was deliberately not done. This is documented rather than faked. To pursue it, the owner would: add a fine-scoped GitHub PAT to Apps Script Script Properties, add server actions that commit approved non-private fields to `data/guild.json` with conflict-aware (SHA-based) updates and debounced batching, keep account keys/recovery codes Sheet-only, and add an admin-only sync action. None of that can be verified live without the deploy + token.
+### Script Properties (secrets stay server-side)
+
+`GITHUB_DATA_TOKEN`, `GITHUB_DATA_OWNER`, `GITHUB_DATA_REPO`, `GITHUB_DATA_BRANCH`, `GITHUB_DATA_PREFIX`, `GITHUB_DATA_MODE`. The token is read only at request time in `GitHubStore.gs` and is **never** returned, logged, put in an error message, committed, or exposed to the browser. Never place a real token or backup code in the repo or docs.
+
+### Storage modes (`GITHUB_DATA_MODE`)
+
+- **sheets** (default now) — the current system; nothing changes live. Migration tools can be previewed/executed/verified without switching.
+- **shadow** — auth + the authoritative write stay in Sheets; each normal save is **also** mirrored to GitHub for comparison. A GitHub failure is surfaced (`shadowError`), never silently swallowed; normal data is never written *back* to Sheets from GitHub.
+- **github** — all normal reads/writes use GitHub; Sheets serves only private auth/permission data (and the private id map). GitHub errors are shown honestly with **no Sheets fallback** for progression. There is a single source of truth.
+
+Modes only change via an authenticated admin action; **github mode is refused until a verification has passed.**
+
+### `GitHubStore.gs` safety
+
+Writes restricted to `state/` (path traversal/escape rejected); every object scanned and private keys rejected before any network call; commits are one atomic git-data commit (blob→tree→commit→ref); the branch is updated with `force:false` so a newer commit is never clobbered; conflicts are detected and retried a bounded number of times, then surfaced as `GITHUB_CONFLICT`; the hot public cache is cleared after writes.
+
+### Migration (admin-only, in the Administration → **GitHub Data Storage** panel)
+
+`previewGithubMigration` (build from Sheets, strip private, validate, count, warn, mint a single-use confirm token — changes nothing) → `executeGithubMigration` (require the confirm token, re-check the source fingerprint hasn't changed, one atomic commit of the whole dataset) → `verifyGithubMigration` (read GitHub back, compare member count + approved fields + recomputed scores, scan for private fields, confirm legacy Raid became Easy/Hard only with NM defaulted false) → `switchGithubStorageMode` to shadow, then github. `getGithubStorageStatus` shows mode, repo, commit, schema, member count, and the last preview/execute/verify — never the token.
+
+Legacy raid migration rule: **completed Raid → `easyHardRaidCompleted: true`; incomplete → `false`; `nmRaidCompleted` always defaults to `false`** and is never copied from the old combined field. Old `RaidComplete` Sheet columns are kept for rollback and no longer written.
+
+### Rollback / token rotation
+
+Rollback: set `GITHUB_DATA_MODE` back to `sheets` (Sheets data was never deleted) and redeploy is not required to read Sheets again. Token rotation/expiry: replace `GITHUB_DATA_TOKEN` in Script Properties; no code change and no redeploy of client code needed. If a token is revoked/expired, GitHub calls fail honestly (writes report an error; the UI does not claim success).
+
+### Remaining `SpreadsheetApp` use (all private, required)
+
+Accounts/sessions/backup codes/throttling/admin roles/audit in `AuthApi.gs` and `Code.gs`, plus the private `MemberMap` (id mapping) and `GithubMigration` (preview token + audit) in `Migration.gs`. In **github mode** none of the *progression* tables (`Players`, `MasterSeal`, class sheets) are read or written for normal saves; a test (`tests/backend/github-store.test.js`) fails if a normal github-mode action touches them.
+
+> Live status: this code is committed and deployed to Pages, but **`GITHUB_DATA_MODE` is `sheets` and nothing has been migrated live.** Turning it on needs the owner to redeploy Apps Script (the code + token already exist in Script Properties), then run Preview → Execute → Verify → shadow → github from the admin panel. See "Enabling GitHub storage" below.
 
 ## Backend setup and redeployment
 

@@ -1468,6 +1468,70 @@
     auditCard.appendChild(audit);
     auditCard.appendChild(actionButton('Refresh audit log', 'admin', loadAudit));
     adminGrid.appendChild(auditCard);
+
+    // ---- GitHub Data Storage (admin only; normal members never see this) ----
+    var ghCard = adminCard('GitHub Data Storage', 'Migrate non-private tracker data to the private data repo, verify it, then switch storage mode. Sheets keeps private account data only.');
+    ghCard.id = 'admin-github';
+    var ghStatus = E('pre'); ghStatus.className = 'gh-status'; ghStatus.id = 'admin-github-status';
+    ghStatus.textContent = 'Loading GitHub storage status…';
+    ghCard.appendChild(ghStatus);
+    var ghResult = E('p'); ghResult.className = 'notice'; ghResult.id = 'admin-github-result'; ghResult.setAttribute('role', 'status');
+    ghCard.appendChild(ghResult);
+    var lastConfirm = null;
+
+    function ghShow(status) {
+      ghStatus.textContent =
+        'Mode:        ' + status.mode + (status.configured ? '' : ' (NOT CONFIGURED)') + '\n' +
+        'Data repo:   ' + (status.owner || '?') + '/' + (status.repo || '?') + ' @ ' + (status.branch || '?') + '\n' +
+        'Commit:      ' + (status.currentCommit ? String(status.currentCommit).slice(0, 12) : '—') + '\n' +
+        'Schema:      v' + status.schemaVersion + '\n' +
+        'Token set:   ' + (status.hasToken ? 'yes' : 'no') + '\n' +
+        'Last preview:  ' + (status.lastPreview ? status.lastPreview.at + ' (' + status.lastPreview.memberCount + ' members, ' + status.lastPreview.warnings + ' warnings)' : '—') + '\n' +
+        'Last execute:  ' + (status.lastExecute ? status.lastExecute.at + ' commit ' + String(status.lastExecute.commit || '').slice(0, 12) + ' (' + status.lastExecute.memberCount + ' members)' : '—') + '\n' +
+        'Last verify:   ' + (status.lastVerify ? status.lastVerify.at + ' — ' + (status.lastVerify.pass ? 'PASS' : (status.lastVerify.problems + ' problem(s)')) : '—');
+    }
+    function ghLoadStatus() {
+      return api('getGithubStorageStatus', { token: token }).then(ghShow).catch(function (f) { ghStatus.textContent = friendlyFailure(f); });
+    }
+    function ghNotice(msg, isError) { ghResult.className = 'notice' + (isError ? ' error' : ''); ghResult.textContent = msg; }
+
+    ghCard.appendChild(actionButton('Refresh status', 'admin', function () { return ghLoadStatus(); }));
+    ghCard.appendChild(actionButton('1. Preview migration', 'admin', function () {
+      return api('previewGithubMigration', { token: token }).then(function (r) {
+        lastConfirm = r.confirmToken;
+        ghNotice('Preview: ' + r.memberCount + ' members, ' + r.warnings.length + ' warning(s). ' +
+          (r.warnings.length ? 'Resolve: ' + r.warnings.slice(0, 3).join('; ') : 'No warnings — you may execute.') +
+          ' (' + r.raidConversionNote + ')', r.warnings.length > 0);
+      });
+    }));
+    ghCard.appendChild(actionButton('2. Execute migration', 'admin', function () {
+      if (!lastConfirm) { ghNotice('Run a preview first.', true); return; }
+      if (!root.confirm('Write the full initial dataset to GitHub in one commit? Spreadsheet data is left untouched.')) return;
+      return api('executeGithubMigration', { token: token, confirmToken: lastConfirm }).then(function (r) {
+        lastConfirm = null;
+        ghNotice('Migrated ' + r.memberCount + ' members. Commit ' + String(r.commit).slice(0, 12) + '. Now Verify.');
+        return ghLoadStatus();
+      });
+    }));
+    ghCard.appendChild(actionButton('3. Verify migration', 'admin', function () {
+      return api('verifyGithubMigration', { token: token }).then(function (r) {
+        ghNotice(r.pass ? 'Verification PASSED (' + r.memberCount + ' members). github mode may be enabled.'
+          : 'Verification FAILED: ' + r.problems.slice(0, 4).join('; '), !r.pass);
+        return ghLoadStatus();
+      });
+    }));
+    ghCard.appendChild(actionButton('Enable shadow mode', 'admin', function () {
+      return api('switchGithubStorageMode', { token: token, mode: 'shadow' }).then(function (r) { ghNotice('Storage mode is now: ' + r.mode); return ghLoadStatus(); });
+    }));
+    ghCard.appendChild(actionButton('Enable github mode', 'admin', function () {
+      if (!root.confirm('Switch live storage to GitHub? Verification must have passed. Sheets will no longer serve normal tracker data.')) return;
+      return api('switchGithubStorageMode', { token: token, mode: 'github' }).then(function (r) { ghNotice('Storage mode is now: ' + r.mode); return ghLoadStatus(); });
+    }));
+    ghCard.appendChild(actionButton('Return to sheets mode', 'admin', function () {
+      return api('switchGithubStorageMode', { token: token, mode: 'sheets' }).then(function (r) { ghNotice('Storage mode is now: ' + r.mode); return ghLoadStatus(); });
+    }));
+    adminGrid.appendChild(ghCard);
+    ghLoadStatus();
     function loadAudit() {
       audit.textContent = 'Loading audit entries…';
       return api('adminAudit', { token: token }).then(function (rows) {

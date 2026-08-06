@@ -37,3 +37,16 @@ test('the paw favicon is a transparent two-tone SVG with no background box', () 
   assert.equal(/<rect[^>]*width="1024"[^>]*height="1024"/.test(svg), false, 'no full-canvas background box');
   assert.equal(/fill="#fff"|fill="white"|fill="#000"|fill="black"/.test(svg), false, 'no black/white box');
 });
+
+test('the admin GitHub Data Storage panel exists and is inside the admin-only renderer', () => {
+  const src = fs.readFileSync('AppFrontend.js', 'utf8');
+  // The panel and its actions live in renderAdmin (only reached for admins).
+  const adminStart = src.indexOf('function renderAdmin');
+  const ghStart = src.indexOf("adminCard('GitHub Data Storage'");
+  assert.ok(ghStart > adminStart && adminStart !== -1, 'GitHub panel is built inside renderAdmin');
+  ['getGithubStorageStatus', 'previewGithubMigration', 'executeGithubMigration', 'verifyGithubMigration', 'switchGithubStorageMode']
+    .forEach(a => assert.ok(src.includes("'" + a + "'"), 'panel wires ' + a));
+  // github mode switch is guarded by a confirm, and execute needs a preview token.
+  assert.match(src, /if \(!lastConfirm\)/);
+  assert.match(src, /Switch live storage to GitHub/);
+});
