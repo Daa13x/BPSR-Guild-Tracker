@@ -741,9 +741,14 @@ function api_(a, d) {
   if (a === 'adminLogin') return adminLogin_(d);
   if (a === 'leaderboard') { var vid = d.token ? activeMemberId_(d.token) : ''; if (vid) applyStimReset_(vid); return JSON.parse(getLeaderboardBundle(vid)); }
   if (a === 'activities') return activities_();
-  if (a === 'masterSeal') return masterSealBoard_(d.token ? activeMemberId_(d.token) : '');
-  if (a === 'myMasterSeal') return myMasterSeal_(d.token);
-  if (a === 'masterSealUpdate') return masterSealUpdate_(d.token, d);
+  if (a === 'masterSeal') { var mvid = d.token ? activeMemberId_(d.token) : ''; return storageMode_() === 'github' ? githubMasterSealBoard_(mvid) : masterSealBoard_(mvid); }
+  if (a === 'myMasterSeal') { var mid = activeMemberId_(d.token); return storageMode_() === 'github' ? githubMyMasterSeal_(mid) : myMasterSeal_(d.token); }
+  if (a === 'masterSealUpdate') {
+    if (storageMode_() === 'github') return githubMasterSealUpdate_(activeMemberId_(d.token), d);
+    var res = masterSealUpdate_(d.token, d);
+    if (storageMode_() === 'shadow') { try { shadowMirrorMember_(activeMemberId_(d.token)); } catch (e) { res.shadowError = (e && e.message) || 'shadow mirror failed'; } }
+    return res;
+  }
   if (a === 'adminMasterSealEdit') return adminMasterSealEdit_(d.token, d);
   if (a === 'me') { var meId = activeMemberId_(d.token); touchMemberAccess_(meId); return profile_(meId); }
   if (a === 'refresh') {
@@ -795,6 +800,12 @@ function api_(a, d) {
   if (a === 'setActiveClass') return setActiveClass_(d.token, d);
   if (a === 'promoteClass') return promoteClass_(d.token, d);
   if (a === 'deleteClass') return deleteClass_(d.token, d);
+  // GitHub data storage — migration and mode control (admin only).
+  if (a === 'getGithubStorageStatus') return getGithubStorageStatus_(d.token);
+  if (a === 'previewGithubMigration') return previewGithubMigration_(d.token);
+  if (a === 'executeGithubMigration') return executeGithubMigration_(d.token, d);
+  if (a === 'verifyGithubMigration') return verifyGithubMigration_(d.token);
+  if (a === 'switchGithubStorageMode') return switchGithubStorageMode_(d.token, d);
   throw apiError_('UNKNOWN_ACTION', 'Unknown action.');
 }
 

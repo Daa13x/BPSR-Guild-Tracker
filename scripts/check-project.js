@@ -10,6 +10,8 @@ const required = [
   'AuthApi.gs',
   'MasterSeal.gs',
   'Classes.gs',
+  'GitHubStore.gs',
+  'Migration.gs',
   'StaticData.js',
   'data/manifest.json',
   'data/classes.json',
@@ -131,7 +133,7 @@ requireText('.github/workflows/pages.yml', [
   { label: 'must use deploy-pages', regex: /actions\/deploy-pages@v\d+/ }
 ]);
 
-for (const relative of ['Code.gs', 'AuthApi.gs', 'MasterSeal.gs', 'Classes.gs', 'StaticData.js', 'config.js', 'classes.js', 'AppFrontend.js', 'MasterSealPage.js', 'Boards.js', 'ClassSelector.js']) {
+for (const relative of ['Code.gs', 'AuthApi.gs', 'MasterSeal.gs', 'Classes.gs', 'GitHubStore.gs', 'Migration.gs', 'StaticData.js', 'config.js', 'classes.js', 'AppFrontend.js', 'MasterSealPage.js', 'Boards.js', 'ClassSelector.js']) {
   const absolute = path.join(root, relative);
   if (!fs.existsSync(absolute)) continue;
   try {

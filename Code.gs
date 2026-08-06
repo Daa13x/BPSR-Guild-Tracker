@@ -92,9 +92,11 @@ var PLAYER_HEADERS = [
 ];
 
 /**
- * Normalise a Players row's raid state into the two separated booleans,
- * migrating legacy `RaidComplete` into Easy/Hard when the new columns are
- * still blank. Pure read: never writes. Invalid/missing values become false.
+ * Normalise a Players row's raid state into the two separated booleans.
+ * `nm` is the Nightmare Mode raid (NM = Nightmare, never Normal). Legacy
+ * combined `RaidComplete` migrates into Easy/Hard only — never into NM — when
+ * the new columns are still blank. Pure read: never writes. Invalid/missing
+ * values become false.
  */
 function raidState_(p) {
   var ehSet = p.EHRaidComplete !== '' && p.EHRaidComplete !== null && p.EHRaidComplete !== undefined;
@@ -142,6 +144,7 @@ function setupSpreadsheet() {
   ensureClassSheet_();   // legacy personal class / build selections
   ensureClassSlotSheet_(); // two-slot editor state, additive and non-destructive
   ensureClassCollectionSheet_(); // ordered dynamic class/build collection
+  if (typeof ensureMemberMapSheet_ === 'function') ensureMemberMapSheet_(); // private publicMemberId map + migration audit
 
   // Seed config defaults without overwriting existing values.
   var cfgSheet = ss.getSheetByName(SHEETS.CONFIG);

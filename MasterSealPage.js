@@ -371,7 +371,7 @@
     var html = '<table class="ms-table"><thead>' +
       '<tr><th colspan="11"></th><th colspan="6" class="ms-group-head">Chaotic Realm Dungeons<small>(best Master clear)</small></th></tr>' +
       '<tr>' +
-      '<th scope="col">Rank</th><th scope="col">Character</th><th scope="col">NM Raid</th><th scope="col">Easy/Hard Raid</th><th scope="col">Config</th><th scope="col">Total Score</th>' +
+      '<th scope="col">Rank</th><th scope="col">Character</th><th scope="col" title="Nightmare Mode raid">NM Raid</th><th scope="col" title="Easy / Hard raid">Easy/Hard Raid</th><th scope="col">Config</th><th scope="col">Total Score</th>' +
       '<th scope="col">Progress</th><th scope="col">Remaining</th><th scope="col">Cleared</th>' +
       '<th scope="col">Mount</th><th scope="col">Last Updated</th><th scope="col">SV Floor</th>' +
       season.dungeons.map(function (d) {

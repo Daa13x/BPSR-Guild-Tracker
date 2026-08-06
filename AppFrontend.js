@@ -868,12 +868,13 @@
     return { cleared: cleared, bestMasterLevel: hasLevel ? Number(level) : null, points: cleared ? points : 0 };
   }
 
-  // NM Raid and Easy/Hard Raid are independent booleans — never one shared value.
+  // NM Raid = Nightmare Mode raid (NOT Normal Mode). NM Raid and Easy/Hard Raid
+  // are independent booleans — never one shared value.
   var SEAL_DIFFICULTIES = [
     { key: 'easy', label: 'Easy' },
     { key: 'hard', label: 'Hard' },
-    { key: 'nmRaidCompleted', label: 'NM Raid' },
-    { key: 'easyHardRaidCompleted', label: 'Easy/Hard Raid' },
+    { key: 'nmRaidCompleted', label: 'NM Raid', title: 'Nightmare Mode raid' },
+    { key: 'easyHardRaidCompleted', label: 'Easy/Hard Raid', title: 'Easy / Hard raid' },
     { key: 'master', label: 'Master' }
   ];
 
@@ -891,6 +892,7 @@
       input.name = 'seal-difficulty-' + difficulty.key;
       input.value = difficulty.key;
       input.checked = Boolean(values[difficulty.key]);
+      if (difficulty.title) { label.title = difficulty.title; input.setAttribute('aria-label', difficulty.label + ' (' + difficulty.title + ')'); }
       label.appendChild(input);
       label.appendChild(E('span', difficulty.label));
       group.appendChild(label);
