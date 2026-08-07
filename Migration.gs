@@ -45,6 +45,23 @@ function memberIdForPublic_(publicId) {
 function stimPeriodId_(now) { var b = lastStimReset_(now || new Date(), stimAnchor_()); return b ? b.toISOString() : ''; }
 function raidPeriodId_(now) { var b = lastRaidReset_(now || new Date(), stimAnchor_()); return b ? b.toISOString() : ''; }
 
+/**
+ * Safe account relationship for a member, expressed ONLY in public ids and a
+ * harmless creation timestamp — never a private member id, code or secret.
+ * `role` is 'main' (has linked alts), 'alt' (linked under a main) or 'solo'.
+ */
+function accountRelation_(memberId, links, memberRow) {
+  var rows = links || activeLinks_();
+  var incoming = rows.filter(function (r) { return String(r.AltMemberId) === String(memberId); })[0] || null;
+  var outgoing = rows.filter(function (r) { return String(r.MainMemberId) === String(memberId); });
+  return {
+    role: outgoing.length ? 'main' : (incoming ? 'alt' : 'solo'),
+    mainPublicId: publicIdFor_(incoming ? String(incoming.MainMemberId) : String(memberId)),
+    altPublicIds: outgoing.map(function (r) { return publicIdFor_(String(r.AltMemberId)); }),
+    createdAt: memberRow && memberRow.CreatedAt ? iso_(memberRow.CreatedAt) : null
+  };
+}
+
 /** Build the non-private member file from the current Sheets data. */
 function buildMemberFile_(memberRow, ctx) {
   var memberId = String(memberRow.MemberId);
@@ -62,6 +79,7 @@ function buildMemberFile_(memberRow, ctx) {
       disabled: Boolean(memberRow.DisabledAt)
     },
     classes: (ctx.classesByMember[memberId] || []).map(function (x) { return { classId: String(x.classId), buildId: String(x.buildId) }; }),
+    account: accountRelation_(memberId, ctx.links, memberRow),
     stimVault: { floors: floor },
     masterSeal: {
       dungeons: dungeons.map(function (d) { return { dungeonId: d.dungeonId, bestMasterLevel: d.bestMasterLevel, points: d.points, cleared: d.cleared }; })
@@ -115,7 +133,7 @@ function buildBoardFile_(memberFiles) {
 
 /** Build one member's file from the current Sheets data. */
 function buildSingleMemberFile_(memberId) {
-  var ctx = { playersById: {}, sealByMember: sealRowsByMember_(), classesByMember: classEntriesByMember_() };
+  var ctx = { playersById: {}, sealByMember: sealRowsByMember_(), classesByMember: classEntriesByMember_(), links: activeLinks_() };
   readTable_(SHEETS.PLAYERS).rows.forEach(function (p) { ctx.playersById[String(p.UserId)] = p; });
   var m = member_(memberId);
   if (!m) throw apiError_('NOT_FOUND', 'Member not found.');
@@ -139,7 +157,8 @@ function buildDataset_() {
   var ctx = {
     playersById: {},
     sealByMember: sealRowsByMember_(),
-    classesByMember: classEntriesByMember_()
+    classesByMember: classEntriesByMember_(),
+    links: activeLinks_()
   };
   readTable_(SHEETS.PLAYERS).rows.forEach(function (p) { ctx.playersById[String(p.UserId)] = p; });
   var members = readTable_(AUTH_SHEETS.MEMBERS).rows;
@@ -152,7 +171,7 @@ function buildDataset_() {
   var schema = {
     schemaVersion: GH_SCHEMA_VERSION,
     describes: 'OnlyPaws Tracker non-private state',
-    memberFields: ['schemaVersion', 'publicMemberId', 'characterName', 'profile', 'classes', 'stimVault', 'masterSeal', 'nmRaidCompleted', 'easyHardRaidCompleted', 'raidResetPeriod', 'stimVaultResetPeriod', 'updatedAt', 'dataRevision']
+    memberFields: ['schemaVersion', 'publicMemberId', 'characterName', 'profile', 'classes', 'account', 'stimVault', 'masterSeal', 'nmRaidCompleted', 'easyHardRaidCompleted', 'raidResetPeriod', 'stimVaultResetPeriod', 'updatedAt', 'dataRevision']
   };
   return { files: files, board: board, manifest: manifest, schema: schema, ctx: ctx };
 }
@@ -210,6 +229,7 @@ function githubReadMemberFile_(memberId) {
     file: {
       schemaVersion: GH_SCHEMA_VERSION, publicMemberId: publicId, characterName: '',
       profile: { verified: false, hidden: false, disabled: false }, classes: [],
+      account: accountRelation_(memberId, null, member_(memberId)),
       stimVault: { floors: 0 }, masterSeal: { dungeons: [] },
       difficulty: { easy: false, hard: false, master: false },
       nmRaidCompleted: false, easyHardRaidCompleted: false,
@@ -355,6 +375,28 @@ function githubMasterSealUpdate_(memberId, d) {
   };
 }
 
+/**
+ * github mode: after a class edit is saved in the Sheets class store, write the
+ * member's new class list THROUGH to their canonical GitHub file (and re-rank
+ * the board). Only `classes` is touched — the GitHub-authoritative progression
+ * in the file is preserved. The class editor keeps Sheets as its working store;
+ * GitHub stays the canonical copy that reads/board come from.
+ */
+function githubMirrorMemberClasses_(memberId) {
+  var r = githubReadMemberFile_(memberId);
+  var file = r.file;
+  file.classes = (classEntriesByMember_()[String(memberId)] || []).map(function (x) {
+    return { classId: String(x.classId), buildId: String(x.buildId) };
+  });
+  file.updatedAt = iso_(new Date());
+  file.dataRevision = (Number(file.dataRevision) || 0) + 1;
+  ghCommitFiles_([
+    { rel: 'state/members/' + file.publicMemberId + '.json', json: file },
+    { rel: 'state/board.json', json: githubBoardWithMember_(file) }
+  ], 'Update classes for ' + file.publicMemberId);
+  return { mirrored: true };
+}
+
 // -------------------------------------------------------------------------
 // Migration actions (admin-only)
 // -------------------------------------------------------------------------
@@ -382,7 +424,7 @@ function datasetFingerprint_(dataset) {
   var stable = dataset.files.map(function (f) {
     return {
       publicMemberId: f.publicMemberId, characterName: f.characterName,
-      profile: f.profile, classes: f.classes, stimVault: f.stimVault,
+      profile: f.profile, classes: f.classes, account: f.account, stimVault: f.stimVault,
       masterSeal: f.masterSeal, nmRaidCompleted: f.nmRaidCompleted, easyHardRaidCompleted: f.easyHardRaidCompleted,
       raidResetPeriod: f.raidResetPeriod, stimVaultResetPeriod: f.stimVaultResetPeriod
     };
@@ -474,6 +516,7 @@ function verifyGithubMigration_(token) {
       if (String(g.characterName) !== String(f.characterName)) problems.push('Name mismatch for ' + f.publicMemberId);
       if (Boolean(g.nmRaidCompleted) !== Boolean(f.nmRaidCompleted)) problems.push('NM raid mismatch for ' + f.publicMemberId);
       if (Boolean(g.easyHardRaidCompleted) !== Boolean(f.easyHardRaidCompleted)) problems.push('Easy/Hard raid mismatch for ' + f.publicMemberId);
+      if (f.account && (!g.account || String(g.account.role) !== String(f.account.role) || String(g.account.mainPublicId) !== String(f.account.mainPublicId))) problems.push('Account relationship mismatch for ' + f.publicMemberId);
       var er = boardRowFromMember_(f), gr = byPublic[f.publicMemberId];
       if (gr && er.totalScore !== gr.totalScore) problems.push('Score mismatch for ' + f.publicMemberId);
     });

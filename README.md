@@ -113,7 +113,7 @@ Storage stays on the Players sheet with new columns `NMRaidComplete`/`NMRaidDate
 
 - **sheets** (default now) — the current system; nothing changes live. Migration tools can be previewed/executed/verified without switching.
 - **shadow** — auth + the authoritative write stay in Sheets; each normal save is **also** mirrored to GitHub for comparison. A GitHub failure is surfaced (`shadowError`), never silently swallowed; normal data is never written *back* to Sheets from GitHub.
-- **github** — all normal reads/writes use GitHub; Sheets serves only private auth/permission data (and the private id map). GitHub errors are shown honestly with **no Sheets fallback** for progression. There is a single source of truth. Every box — the six dungeons, the Stim Vault floor, Easy/Hard/Master and both raids (NM Raid, Easy/Hard Raid) — is saved to GitHub.
+- **github** — all normal reads/writes use GitHub; Sheets serves only private auth/permission data (and the private id map). GitHub errors are shown honestly with **no Sheets fallback** for progression. There is a single source of truth. Every box — the six dungeons, the Stim Vault floor, Easy/Hard/Master and both raids (NM Raid, Easy/Hard Raid) — is saved to GitHub, plus each member's **profile** (character name, verified/hidden), **class/build selections**, and **account relationships** (main/alt, expressed only in public ids). Class edits are written through to the canonical GitHub file too (`classMirror_`), so no save is browser-only.
 
 Modes only change via an authenticated admin action; **github mode is refused until a verification has passed.**
 
@@ -123,7 +123,7 @@ In github mode the spreadsheet is a **write-only mirror** — nothing reads prog
 
 ### `GitHubStore.gs` safety
 
-Writes restricted to `state/` (path traversal/escape rejected); every object scanned and private keys rejected before any network call; commits are one atomic git-data commit (blob→tree→commit→ref); the branch is updated with `force:false` so a newer commit is never clobbered; conflicts are detected and retried a bounded number of times, then surfaced as `GITHUB_CONFLICT`; the hot public cache is cleared after writes.
+Writes restricted to `state/` (path traversal/escape rejected); every object is deep-scanned and any key resembling a secret is rejected **before any network call** — the forbidden list covers `token`/`secret`/`password`/`recovery`/`backupCode`/`pinHash`/`apiKey`/`oauth`/`privateKey`/`signingKey`/`encryptionKey`/`credential`/`hash`/`salt`/`email`/private `memberId` (only `publicMemberId` is whitelisted). A test drives secret-shaped keys and a hostile save payload through the layer and fails if any reach GitHub. Commits are one atomic git-data commit (blob→tree→commit→ref); the branch is updated with `force:false` so a newer commit is never clobbered; conflicts are detected and retried a bounded number of times, then surfaced as `GITHUB_CONFLICT`; the hot public cache is cleared after writes.
 
 ### Migration (admin-only, in the Administration → **GitHub Data Storage** panel)
 
@@ -137,7 +137,7 @@ Rollback: set `GITHUB_DATA_MODE` back to `sheets` (Sheets data was never deleted
 
 ### Remaining `SpreadsheetApp` use (all private, required)
 
-Accounts/sessions/backup codes/throttling/admin roles/audit in `AuthApi.gs` and `Code.gs`, plus the private `MemberMap` (id mapping) and `GithubMigration` (preview token + audit) in `Migration.gs`. In **github mode** none of the *progression* tables (`Players`, `MasterSeal`, class sheets) are read or written for normal saves; a test (`tests/backend/github-store.test.js`) fails if a normal github-mode action touches them.
+Accounts/sessions/backup codes/PIN material/throttling/admin roles/audit in `AuthApi.gs` and `Code.gs`, plus the private `MemberMap` (id mapping) and `GithubMigration` (preview token + audit) in `Migration.gs`. The `AccountLinks` sheet is the private main/alt graph; its **relationships** are published to GitHub as public ids, but the private↔public mapping never leaves Sheets. In **github mode** the *progression* tables (`Players`, `MasterSeal`) are neither read nor written for normal saves — a test fails if a github-mode save touches them. The class editor still uses its Sheets store as a working buffer, but every class edit is written through to the canonical GitHub member file (`classMirror_`); reads and the board come from GitHub.
 
 > Live status: this code is committed and deployed to Pages, but **`GITHUB_DATA_MODE` is `sheets` and nothing has been migrated live.** Turning it on needs the owner to redeploy Apps Script (the code + token already exist in Script Properties), then run Preview → Execute → Verify → shadow → github from the admin panel. See "Enabling GitHub storage" below.
 

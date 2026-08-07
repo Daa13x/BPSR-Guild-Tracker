@@ -792,14 +792,16 @@ function api_(a, d) {
   if (a === 'adminReset') return adminReset_(d.token);
   if (a === 'adminCorrectAchievement') return adminCorrect_(d.token, d);
   if (a === 'adminAudit') { admin_(d.token); return table_(SHEETS.AUDIT).rows.slice(-100).map(function (r) { return { at: iso_(r.Timestamp), action: String(r.Action), target: String(r.Target), details: String(r.Details) }; }); }
-  // Personal class / build selections.
+  // Personal class / build selections. Reads never mutate; each mutation is
+  // persisted through to GitHub in github/shadow mode (classMirror_), so a
+  // class change reaches the canonical store and cannot stay browser-only.
   if (a === 'myClasses') return myClasses_(d.token);
-  if (a === 'saveClasses') return saveClasses_(d.token, d);
-  if (a === 'saveClassSlots') return saveClassSlots_(d.token, d);
-  if (a === 'saveClass') return saveClass_(d.token, d);
-  if (a === 'setActiveClass') return setActiveClass_(d.token, d);
-  if (a === 'promoteClass') return promoteClass_(d.token, d);
-  if (a === 'deleteClass') return deleteClass_(d.token, d);
+  if (a === 'saveClasses') return classMirror_(saveClasses_(d.token, d), d.token);
+  if (a === 'saveClassSlots') return classMirror_(saveClassSlots_(d.token, d), d.token);
+  if (a === 'saveClass') return classMirror_(saveClass_(d.token, d), d.token);
+  if (a === 'setActiveClass') return classMirror_(setActiveClass_(d.token, d), d.token);
+  if (a === 'promoteClass') return classMirror_(promoteClass_(d.token, d), d.token);
+  if (a === 'deleteClass') return classMirror_(deleteClass_(d.token, d), d.token);
   // GitHub data storage — migration and mode control (admin only).
   if (a === 'getGithubStorageStatus') return getGithubStorageStatus_(d.token);
   if (a === 'previewGithubMigration') return previewGithubMigration_(d.token);
@@ -808,6 +810,26 @@ function api_(a, d) {
   if (a === 'switchGithubStorageMode') return switchGithubStorageMode_(d.token, d);
   if (a === 'syncGithubToSheets') return syncGithubToSheets_(d.token, d);
   throw apiError_('UNKNOWN_ACTION', 'Unknown action.');
+}
+
+/**
+ * Persist a just-saved class change through to the canonical store. In github
+ * mode the member's GitHub file is updated (classes only; progression kept);
+ * in shadow mode the member is mirrored alongside the authoritative Sheets
+ * write. A persistence failure is surfaced on the result (githubError /
+ * shadowError), never swallowed — the class edit is not reported as fully
+ * saved when the canonical write failed. In sheets mode this is a no-op.
+ */
+function classMirror_(res, token) {
+  var mode = storageMode_();
+  if (mode === 'github') {
+    try { githubMirrorMemberClasses_(activeMemberId_(token)); }
+    catch (e) { if (res && typeof res === 'object') res.githubError = (e && e.message) || 'github classes write failed'; }
+  } else if (mode === 'shadow') {
+    try { shadowMirrorMember_(activeMemberId_(token)); }
+    catch (e) { if (res && typeof res === 'object') res.shadowError = (e && e.message) || 'shadow mirror failed'; }
+  }
+  return res;
 }
 
 function doPost(e) { try { var raw = (e && e.postData && e.postData.contents) || ''; if (raw.length > MAX_BODY) throw apiError_('TOO_LARGE', 'Invalid request.'); var p = JSON.parse(raw); if (!p || typeof p.action !== 'string' || typeof p.data !== 'object') throw apiError_('MALFORMED', 'Invalid request.'); return ContentService.createTextOutput(JSON.stringify({ ok: true, data: api_(p.action, p.data || {}) })).setMimeType(ContentService.MimeType.JSON); } catch (err) { console.error('BPSR API failure: ' + String(err && (err.stack || err.message) || err)); return ContentService.createTextOutput(JSON.stringify({ ok: false, error: { code: err.code || 'REQUEST_FAILED', message: err.code ? err.message : 'Request could not be completed.' } })).setMimeType(ContentService.MimeType.JSON); } }

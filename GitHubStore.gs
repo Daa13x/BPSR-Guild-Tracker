@@ -26,7 +26,8 @@ var GH_FORBIDDEN_KEYS = [
   'backupcode', 'backup_code', 'pinhash', 'pinsalt', 'sessiontoken', 'token',
   'tokenhash', 'sessionhash', 'secret', 'password', 'passwd', 'recovery',
   'recoverycode', 'loginattempt', 'privatememberid', 'memberid', 'email',
-  'adminsecret', 'githubtoken', 'apikey', 'credential', 'salt', 'hash'
+  'adminsecret', 'githubtoken', 'apikey', 'credential', 'salt', 'hash',
+  'oauth', 'privatekey', 'signingkey', 'encryptionkey'
 ];
 
 function ghProps_() {

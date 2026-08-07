@@ -322,6 +322,82 @@ test('sync is admin-only', () => {
   assert.throws(() => call(c, 'syncGithubToSheets', { token: other.session.token }), /Administrator|admin/i);
 });
 
+// ---- account relationships + class persistence ----
+
+test('account main/alt relationships migrate to GitHub as public ids, with no private ids', () => {
+  const c = runtime(); githubReady(c);
+  const admin = makeAdmin(c);                                     // the main account
+  const alt = call(c, 'createAltAccount', { token: admin.session.token, characterName: 'Alty' });
+  const preview = call(c, 'previewGithubMigration', { token: admin.session.token });
+  call(c, 'executeGithubMigration', { token: admin.session.token, confirmToken: preview.confirmToken });
+
+  const mainPub = c.publicIdFor_(admin.member.memberId);
+  const altPub = c.publicIdFor_(alt.account.memberId);
+  const mainFile = JSON.parse(c.__github.files['state/members/' + mainPub + '.json']);
+  const altFile = JSON.parse(c.__github.files['state/members/' + altPub + '.json']);
+
+  assert.equal(mainFile.account.role, 'main');
+  assert.equal(mainFile.account.altPublicIds.length, 1);
+  assert.equal(mainFile.account.altPublicIds[0], altPub);
+  assert.equal(altFile.account.role, 'alt');
+  assert.equal(altFile.account.mainPublicId, mainPub);
+  // The relationship carries ONLY public ids — never a real member id.
+  const blob = (JSON.stringify(mainFile) + JSON.stringify(altFile)).toLowerCase();
+  [admin.member.memberId, alt.account.memberId].forEach(id =>
+    assert.equal(blob.includes(id.toLowerCase()), false, 'private member id must not appear in GitHub data'));
+});
+
+test('Save Classes persists to the GitHub member file in github mode without clobbering progression', () => {
+  const c = runtime(); githubReady(c);
+  const admin = makeAdmin(c);
+  call(c, 'masterSealUpdate', { token: admin.session.token, dungeons: {}, stimVault: { points: 25 },
+    difficulty: { easy: false, hard: false, nmRaidCompleted: true, easyHardRaidCompleted: false, master: false } });
+  const preview = call(c, 'previewGithubMigration', { token: admin.session.token });
+  call(c, 'executeGithubMigration', { token: admin.session.token, confirmToken: preview.confirmToken });
+  call(c, 'verifyGithubMigration', { token: admin.session.token });
+  call(c, 'switchGithubStorageMode', { token: admin.session.token, mode: 'github' });
+
+  const cls = c.CLASS_CATALOGUE[0], build = cls.builds[1];
+  const res = call(c, 'saveClasses', { token: admin.session.token, entries: [{ classId: cls.id, buildId: build.id }] });
+  assert.equal(res.githubError, undefined, 'class save must reach GitHub, not just Sheets');
+
+  const pub = c.publicIdFor_(admin.member.memberId);
+  const file = JSON.parse(c.__github.files['state/members/' + pub + '.json']);
+  assert.equal(file.classes.length, 1);
+  assert.equal(file.classes[0].classId, cls.id);
+  assert.equal(file.classes[0].buildId, build.id);
+  // The class write must NOT clobber the GitHub-authoritative progression.
+  assert.equal(file.nmRaidCompleted, true, 'raid progression preserved through a class save');
+  assert.equal(file.stimVault.floors, 25, 'stim floor preserved through a class save');
+});
+
+test('no secret can reach GitHub: forbidden keys are rejected and a hostile payload cannot smuggle them', () => {
+  const c = runtime(); githubReady(c);
+  // The commit layer rejects a broad range of secret-shaped keys before any write.
+  ['oauthToken', 'apiKey', 'privateKey', 'sessionSecret', 'recoveryCode', 'backupCode', 'passwordHash', 'githubToken']
+    .forEach(k => {
+      const obj = { publicMemberId: 'pm-x' }; obj[k] = 'x';
+      assert.throws(() => c.ghCommitFiles_([{ rel: 'state/members/pm-x.json', json: obj }]), /private field/i,
+        k + ' must be rejected before any write');
+    });
+
+  // Through the real save path: a malicious frontend adds secret-ish fields.
+  const admin = makeAdmin(c);
+  const preview = call(c, 'previewGithubMigration', { token: admin.session.token });
+  call(c, 'executeGithubMigration', { token: admin.session.token, confirmToken: preview.confirmToken });
+  call(c, 'verifyGithubMigration', { token: admin.session.token });
+  call(c, 'switchGithubStorageMode', { token: admin.session.token, mode: 'github' });
+  call(c, 'masterSealUpdate', { token: admin.session.token, dungeons: {}, stimVault: { points: 10 },
+    difficulty: { easy: false, hard: false, nmRaidCompleted: false, easyHardRaidCompleted: false, master: false },
+    password: 'hunter2', sessionToken: 'sess-abc', backupCode: 'BPSR-XXXX-XXXX' });
+
+  // The whole GitHub store must contain none of the injected secret values.
+  const all = JSON.stringify(c.__github.files);
+  assert.equal(/hunter2|sess-abc|BPSR-XXXX/.test(all), false, 'injected secret values must never be stored');
+  assert.ok(c.__props.GITHUB_DATA_TOKEN, 'token lives only in server-side Script Properties');
+  assert.equal(all.includes('test-token-never-real'), false, 'the GitHub token must never appear in stored data');
+});
+
 test('shadow mode writes to GitHub in addition to Sheets and reports failures honestly', () => {
   const c = runtime(); githubReady(c);
   const admin = makeAdmin(c);
