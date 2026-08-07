@@ -46,7 +46,7 @@ test('the admin GitHub Data Storage panel exists and is inside the admin-only re
   const adminStart = src.indexOf('function renderAdmin');
   const ghStart = src.indexOf("adminCard('GitHub Data Storage'");
   assert.ok(ghStart > adminStart && adminStart !== -1, 'GitHub panel is built inside renderAdmin');
-  ['getGithubStorageStatus', 'previewGithubMigration', 'executeGithubMigration', 'verifyGithubMigration', 'switchGithubStorageMode']
+  ['getGithubStorageStatus', 'previewGithubMigration', 'executeGithubMigration', 'verifyGithubMigration', 'switchGithubStorageMode', 'syncGithubToSheets']
     .forEach(a => assert.ok(src.includes("'" + a + "'"), 'panel wires ' + a));
   // github mode switch is guarded by a confirm, and execute needs a preview token.
   assert.match(src, /if \(!lastConfirm\)/);

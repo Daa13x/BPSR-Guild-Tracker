@@ -496,7 +496,8 @@ function getGithubStorageStatus_(token) {
     currentCommit: head, schemaVersion: GH_SCHEMA_VERSION,
     lastPreview: migGetMeta_('lastPreview'),
     lastExecute: migGetMeta_('lastExecute'),
-    lastVerify: migGetMeta_('lastVerify')
+    lastVerify: migGetMeta_('lastVerify'),
+    lastSync: migGetMeta_('lastSync')
   };
 }
 
@@ -514,4 +515,75 @@ function switchGithubStorageMode_(token, d) {
     audit_(String(actor.MemberId), 'GH_MODE_SWITCH', '', 'mode=' + mode);
     return { mode: mode };
   });
+}
+
+// -------------------------------------------------------------------------
+// One-way sync: GitHub -> Google Sheets (write-only mirror)
+// -------------------------------------------------------------------------
+
+/**
+ * Refresh the Google Sheets mirror from GitHub (admin-only, one-way).
+ *
+ * With GitHub as the source of truth for progression, the spreadsheet is a
+ * write-only backup that an admin refreshes on demand from the "Sync with
+ * Google Spreadsheet" button. This reads every migrated member file from
+ * GitHub and writes the boxes (dungeons, Stim Vault floor, Easy/Hard/Master
+ * and both raids) back into the Players and MasterSeal sheets. It never reads
+ * Sheets progression as authority and never writes back to GitHub.
+ *
+ * The Players raid columns are provisioned first, so NM Raid and Easy/Hard
+ * Raid land in real columns even on a spreadsheet created before they existed
+ * — which is exactly why those ticks were not appearing on the sheet.
+ */
+function syncGithubToSheets_(token, d) {
+  return withAdminLock_(token, function (actor) {
+    if (!githubConfigured_()) throw apiError_('CONFIG', 'GitHub data storage is not configured.');
+    var boardRead = ghReadJson_('state/board.json');
+    if (!boardRead.exists) throw apiError_('GITHUB', 'No board.json in GitHub — run the migration first.');
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    ensureColumns_(ss.getSheetByName(SHEETS.PLAYERS), PLAYER_HEADERS);   // provision NM/EH raid columns
+    ensureMasterSealSheet_();
+
+    var summary = { membersSynced: 0, playersWritten: 0, dungeonWrites: 0, skippedNoFile: 0, problems: [] };
+    readTable_(MEMBER_MAP_SHEET).rows.forEach(function (map) {
+      var memberId = String(map.MemberId), publicId = String(map.PublicMemberId);
+      var read = ghReadJson_('state/members/' + publicId + '.json');
+      if (!read.exists || !read.json) { summary.skippedNoFile++; return; }
+      try {
+        syncMemberFileToSheets_(memberId, read.json, summary);
+        summary.membersSynced++;
+      } catch (e) {
+        summary.problems.push(publicId + ': ' + ((e && e.message) || e));
+      }
+    });
+    bustCache_();
+    migPutMeta_('lastSync', { at: iso_(new Date()), membersSynced: summary.membersSynced, problems: summary.problems.length });
+    audit_(String(actor.MemberId), 'GH_SYNC_TO_SHEETS', '', summary.membersSynced + ' members, ' + summary.problems.length + ' problem(s)');
+    return summary;
+  });
+}
+
+/** Write one GitHub member file into the Sheets mirror (one player row + the
+ * six dungeon rows). One-way GitHub -> Sheets; the file's own completion drives
+ * the row, and existing dates are kept so a mirror refresh does not churn them. */
+function syncMemberFileToSheets_(memberId, file, summary) {
+  var p = linkedPlayer_(memberId);   // throws IDENTITY_MISMATCH if not exactly one row
+  var diff = file.difficulty || {};
+  p.SVFloor = file.stimVault ? (Number(file.stimVault.floors) || 0) : 0;
+  p.EasyComplete = Boolean(diff.easy); p.EasyDate = diff.easy ? (p.EasyDate || new Date()) : '';
+  p.HardComplete = Boolean(diff.hard); p.HardDate = diff.hard ? (p.HardDate || new Date()) : '';
+  p.MasterComplete = Boolean(diff.master); p.MasterDate = diff.master ? (p.MasterDate || new Date()) : '';
+  p.NMRaidComplete = Boolean(file.nmRaidCompleted); p.NMRaidDate = file.nmRaidCompleted ? (p.NMRaidDate || new Date()) : '';
+  p.EHRaidComplete = Boolean(file.easyHardRaidCompleted); p.EHRaidDate = file.easyHardRaidCompleted ? (p.EHRaidDate || new Date()) : '';
+  p.RaidComplete = ''; p.RaidDate = '';   // never keep the legacy combined field
+  p.LastUpdated = file.updatedAt ? new Date(file.updatedAt) : new Date();
+  writePlayerRow_(p);
+  summary.playersWritten++;
+
+  var submit = {};
+  ((file.masterSeal && file.masterSeal.dungeons) || []).forEach(function (dg) {
+    submit[String(dg.dungeonId)] = { bestMasterLevel: dg.bestMasterLevel, points: dg.points, cleared: dg.cleared };
+  });
+  if (Object.keys(submit).length && sealWrite_(memberId, submit)) summary.dungeonWrites++;
 }

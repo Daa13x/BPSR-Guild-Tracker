@@ -806,6 +806,7 @@ function api_(a, d) {
   if (a === 'executeGithubMigration') return executeGithubMigration_(d.token, d);
   if (a === 'verifyGithubMigration') return verifyGithubMigration_(d.token);
   if (a === 'switchGithubStorageMode') return switchGithubStorageMode_(d.token, d);
+  if (a === 'syncGithubToSheets') return syncGithubToSheets_(d.token, d);
   throw apiError_('UNKNOWN_ACTION', 'Unknown action.');
 }
 

@@ -1470,7 +1470,7 @@
     adminGrid.appendChild(auditCard);
 
     // ---- GitHub Data Storage (admin only; normal members never see this) ----
-    var ghCard = adminCard('GitHub Data Storage', 'Migrate non-private tracker data to the private data repo, verify it, then switch storage mode. Sheets keeps private account data only.');
+    var ghCard = adminCard('GitHub Data Storage', 'Migrate non-private tracker data to the private data repo, verify it, then switch storage mode. In github mode the boxes save to GitHub and the spreadsheet becomes a write-only mirror you refresh with "Sync with Google Spreadsheet". Sheets keeps private account data only.');
     ghCard.id = 'admin-github';
     var ghStatus = E('pre'); ghStatus.className = 'gh-status'; ghStatus.id = 'admin-github-status';
     ghStatus.textContent = 'Loading GitHub storage status…';
@@ -1488,7 +1488,8 @@
         'Token set:   ' + (status.hasToken ? 'yes' : 'no') + '\n' +
         'Last preview:  ' + (status.lastPreview ? status.lastPreview.at + ' (' + status.lastPreview.memberCount + ' members, ' + status.lastPreview.warnings + ' warnings)' : '—') + '\n' +
         'Last execute:  ' + (status.lastExecute ? status.lastExecute.at + ' commit ' + String(status.lastExecute.commit || '').slice(0, 12) + ' (' + status.lastExecute.memberCount + ' members)' : '—') + '\n' +
-        'Last verify:   ' + (status.lastVerify ? status.lastVerify.at + ' — ' + (status.lastVerify.pass ? 'PASS' : (status.lastVerify.problems + ' problem(s)')) : '—');
+        'Last verify:   ' + (status.lastVerify ? status.lastVerify.at + ' — ' + (status.lastVerify.pass ? 'PASS' : (status.lastVerify.problems + ' problem(s)')) : '—') + '\n' +
+        'Last sheet sync: ' + (status.lastSync ? status.lastSync.at + ' (' + status.lastSync.membersSynced + ' members, ' + status.lastSync.problems + ' problem(s))' : '—');
     }
     function ghLoadStatus() {
       return api('getGithubStorageStatus', { token: token }).then(ghShow).catch(function (f) { ghStatus.textContent = friendlyFailure(f); });
@@ -1529,6 +1530,16 @@
     }));
     ghCard.appendChild(actionButton('Return to sheets mode', 'admin', function () {
       return api('switchGithubStorageMode', { token: token, mode: 'sheets' }).then(function (r) { ghNotice('Storage mode is now: ' + r.mode); return ghLoadStatus(); });
+    }));
+    ghCard.appendChild(actionButton('Sync with Google Spreadsheet', 'admin', function () {
+      if (!root.confirm('Copy the current GitHub data into the Google Spreadsheet? This overwrites the sheet mirror (including the NM Raid and Easy/Hard Raid columns); GitHub stays the source of truth.')) return;
+      return api('syncGithubToSheets', { token: token }).then(function (r) {
+        ghNotice('Synced ' + r.membersSynced + ' member(s) into the spreadsheet' +
+          (r.skippedNoFile ? ', ' + r.skippedNoFile + ' with no GitHub file skipped' : '') +
+          (r.problems && r.problems.length ? '. Problems: ' + r.problems.slice(0, 3).join('; ') : '.'),
+          Boolean(r.problems && r.problems.length));
+        return ghLoadStatus();
+      });
     }));
     adminGrid.appendChild(ghCard);
     ghLoadStatus();

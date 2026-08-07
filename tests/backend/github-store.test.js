@@ -280,6 +280,48 @@ test('github mode raid + Stim Vault resets use period ids and fire once', () => 
   assert.equal(call(c, 'myMasterSeal', { token: admin.session.token }).stimVault.points, 12);
 });
 
+test('sync copies GitHub state back into the Sheets mirror (raid boxes included), one-way', () => {
+  const c = runtime(); githubReady(c);
+  const admin = makeAdmin(c);
+  // Seed progression, migrate, verify, and go live on GitHub.
+  call(c, 'masterSealUpdate', { token: admin.session.token,
+    dungeons: { 'towering-ruin': { bestMasterLevel: 5, points: 100, cleared: true } },
+    stimVault: { points: 33 },
+    difficulty: { easy: true, hard: false, nmRaidCompleted: true, easyHardRaidCompleted: false, master: false } });
+  const preview = call(c, 'previewGithubMigration', { token: admin.session.token });
+  call(c, 'executeGithubMigration', { token: admin.session.token, confirmToken: preview.confirmToken });
+  call(c, 'verifyGithubMigration', { token: admin.session.token });
+  call(c, 'switchGithubStorageMode', { token: admin.session.token, mode: 'github' });
+
+  // In github mode the member flips their raids/master — this lands ONLY in GitHub.
+  call(c, 'masterSealUpdate', { token: admin.session.token, dungeons: {},
+    difficulty: { easy: true, hard: false, nmRaidCompleted: false, easyHardRaidCompleted: true, master: true } });
+  const beforeRow = c.readTable_('Players').rows.filter(r => String(r.UserId) === admin.member.memberId)[0];
+  assert.equal(c.truthy_(beforeRow.EHRaidComplete), false, 'sheet not yet updated from GitHub');
+
+  // Sync GitHub -> Sheets. Must not write anything back to GitHub.
+  const refBefore = c.__github.refUpdates.length;
+  const sum = call(c, 'syncGithubToSheets', { token: admin.session.token });
+  assert.ok(sum.membersSynced >= 1);
+  assert.equal(c.__github.refUpdates.length, refBefore, 'sync is one-way: it must not commit to GitHub');
+
+  // The Players row now mirrors GitHub, including the raid columns that were "not linked up".
+  const afterRow = c.readTable_('Players').rows.filter(r => String(r.UserId) === admin.member.memberId)[0];
+  assert.equal(c.truthy_(afterRow.NMRaidComplete), false, 'NM raid mirrored (cleared)');
+  assert.equal(c.truthy_(afterRow.EHRaidComplete), true, 'Easy/Hard raid mirrored into the sheet');
+  assert.equal(c.truthy_(afterRow.MasterComplete), true, 'Master completion mirrored');
+  // Dungeon rows mirrored into the MasterSeal sheet.
+  const seal = c.readTable_(c.MASTER_SEAL_SHEET).rows.filter(r => String(r.MemberId) === admin.member.memberId);
+  assert.ok(seal.length >= 1, 'dungeon rows written into the MasterSeal sheet');
+});
+
+test('sync is admin-only', () => {
+  const c = runtime(); githubReady(c);
+  makeAdmin(c);
+  const other = call(c, 'createAccount', { characterName: 'Aria' });
+  assert.throws(() => call(c, 'syncGithubToSheets', { token: other.session.token }), /Administrator|admin/i);
+});
+
 test('shadow mode writes to GitHub in addition to Sheets and reports failures honestly', () => {
   const c = runtime(); githubReady(c);
   const admin = makeAdmin(c);

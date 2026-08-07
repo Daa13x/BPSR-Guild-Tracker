@@ -113,9 +113,13 @@ Storage stays on the Players sheet with new columns `NMRaidComplete`/`NMRaidDate
 
 - **sheets** (default now) — the current system; nothing changes live. Migration tools can be previewed/executed/verified without switching.
 - **shadow** — auth + the authoritative write stay in Sheets; each normal save is **also** mirrored to GitHub for comparison. A GitHub failure is surfaced (`shadowError`), never silently swallowed; normal data is never written *back* to Sheets from GitHub.
-- **github** — all normal reads/writes use GitHub; Sheets serves only private auth/permission data (and the private id map). GitHub errors are shown honestly with **no Sheets fallback** for progression. There is a single source of truth.
+- **github** — all normal reads/writes use GitHub; Sheets serves only private auth/permission data (and the private id map). GitHub errors are shown honestly with **no Sheets fallback** for progression. There is a single source of truth. Every box — the six dungeons, the Stim Vault floor, Easy/Hard/Master and both raids (NM Raid, Easy/Hard Raid) — is saved to GitHub.
 
 Modes only change via an authenticated admin action; **github mode is refused until a verification has passed.**
+
+### Sync to Google Spreadsheet (write-only mirror)
+
+In github mode the spreadsheet is a **write-only mirror** — nothing reads progression from it. The **Sync with Google Spreadsheet** button (`syncGithubToSheets`, admin-only) copies the current GitHub state back into the `Players` and `MasterSeal` sheets on demand, so the spreadsheet stays a readable/exportable backup. It is strictly one-way (GitHub → Sheets, never the reverse) and a test asserts it never commits back to GitHub. It **provisions the `NMRaidComplete`/`EHRaidComplete` columns first** via `ensureColumns_`, which is why it fixes the earlier symptom where the NM Raid and Easy/Hard Raid ticks did not appear on a spreadsheet created before those columns existed (`writePlayerRow_` maps strictly by the sheet's physical header row, so values for absent columns were silently dropped).
 
 ### `GitHubStore.gs` safety
 
@@ -123,7 +127,7 @@ Writes restricted to `state/` (path traversal/escape rejected); every object sca
 
 ### Migration (admin-only, in the Administration → **GitHub Data Storage** panel)
 
-`previewGithubMigration` (build from Sheets, strip private, validate, count, warn, mint a single-use confirm token — changes nothing) → `executeGithubMigration` (require the confirm token, re-check the source fingerprint hasn't changed, one atomic commit of the whole dataset) → `verifyGithubMigration` (read GitHub back, compare member count + approved fields + recomputed scores, scan for private fields, confirm legacy Raid became Easy/Hard only with NM defaulted false) → `switchGithubStorageMode` to shadow, then github. `getGithubStorageStatus` shows mode, repo, commit, schema, member count, and the last preview/execute/verify — never the token.
+`previewGithubMigration` (build from Sheets, strip private, validate, count, warn, mint a single-use confirm token — changes nothing) → `executeGithubMigration` (require the confirm token, re-check the source fingerprint hasn't changed, one atomic commit of the whole dataset) → `verifyGithubMigration` (read GitHub back, compare member count + approved fields + recomputed scores, scan for private fields, confirm legacy Raid became Easy/Hard only with NM defaulted false) → `switchGithubStorageMode` to shadow, then github. `getGithubStorageStatus` shows mode, repo, commit, schema, member count, and the last preview/execute/verify/sheet-sync — never the token.
 
 Legacy raid migration rule: **completed Raid → `easyHardRaidCompleted: true`; incomplete → `false`; `nmRaidCompleted` always defaults to `false`** and is never copied from the old combined field. Old `RaidComplete` Sheet columns are kept for rollback and no longer written.
 
