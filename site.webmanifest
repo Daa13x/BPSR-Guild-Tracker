@@ -7,7 +7,7 @@
   "background_color": "#0b0712",
   "theme_color": "#0b0712",
   "icons": [
-    { "src": "assets/paw.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
-    { "src": "assets/paw.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "maskable" }
+    { "src": "assets/paws.png", "type": "image/png", "sizes": "1250x1250", "purpose": "any" },
+    { "src": "assets/paws.png", "type": "image/png", "sizes": "1250x1250", "purpose": "maskable" }
   ]
 }
