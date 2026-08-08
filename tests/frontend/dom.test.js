@@ -790,6 +790,74 @@ test('an unexpected backend failure is reported honestly, never as a raw string'
   assert.equal(/^Server error$/m.test(app.gate.textContent), false, 'no bare "Server error" label');
 });
 
+function ghStatusFixture(overrides) {
+  return {
+    mode: 'sheets', configured: true, hasToken: true, owner: 'Daa13x',
+    repo: 'BPSR-Guild-Tracker-Data', branch: 'main', prefix: '', currentCommit: null,
+    schemaVersion: 1, lastPreview: null, lastExecute: null, lastVerify: null, lastSync: null,
+    ...(overrides || {})
+  };
+}
+
+test('migration preview token survives an admin re-render and Execute sends the exact token once', async () => {
+  let executeCalls = 0;
+  const app = createHarness((action, data) => {
+    if (action === 'restore') return { member: profile({ isAdmin: true }), session: session('admin-token') };
+    if (action === 'adminMembers' || action === 'adminDuplicates' || action === 'adminAudit') return [];
+    if (action === 'getGithubStorageStatus') return ghStatusFixture();
+    if (action === 'previewGithubMigration') {
+      return { memberCount: 8, warnings: [], confirmToken: 'confirm-XYZ',
+        raidConversionNote: 'Legacy Raid maps to Easy/Hard only; NM defaults to false.' };
+    }
+    if (action === 'executeGithubMigration') {
+      executeCalls += 1;
+      assert.equal(data.confirmToken, 'confirm-XYZ', 'Execute must send the token minted by Preview');
+      return { commit: 'abc123def4567', memberCount: 8 };
+    }
+  });
+  await app.ready();
+  await signIn(app);
+  assert.equal(app.administration.hidden, false, 'admin section is open');
+
+  buttonByText(app.admin, '1. Preview migration').click();
+  await settle(12);
+  assert.equal(app.ui.state.ghConfirm, 'confirm-XYZ', 'preview token is held on durable app state');
+
+  // The old bug: a re-render between Preview and Execute dropped the token
+  // (it lived in renderAdmin's closure). It must now survive on state.
+  app.ui.renderAdmin();
+  await settle(12);
+  assert.equal(app.ui.state.ghConfirm, 'confirm-XYZ', 'token survives an admin re-render');
+
+  buttonByText(app.admin, '2. Execute migration').click();
+  await settle(12);
+  assert.equal(executeCalls, 1, 'Execute ran once with the surviving token');
+  assert.equal(app.ui.state.ghConfirm, null, 'token is consumed after a successful execute');
+  assert.match(app.admin.querySelector('#admin-github-result').textContent, /Migrated 8 members/);
+
+  // A second Execute click must not re-run: single-use, no duplicate migration.
+  buttonByText(app.admin, '2. Execute migration').click();
+  await settle(8);
+  assert.equal(executeCalls, 1, 'a second Execute is refused — no duplicate migration');
+  assert.match(app.admin.querySelector('#admin-github-result').textContent, /Run a preview first/);
+});
+
+test('Execute migration without a successful preview never calls the backend', async () => {
+  let executeCalls = 0;
+  const app = createHarness((action) => {
+    if (action === 'restore') return { member: profile({ isAdmin: true }), session: session('admin-token') };
+    if (action === 'adminMembers' || action === 'adminDuplicates' || action === 'adminAudit') return [];
+    if (action === 'getGithubStorageStatus') return ghStatusFixture();
+    if (action === 'executeGithubMigration') { executeCalls += 1; return { commit: 'x', memberCount: 0 }; }
+  });
+  await app.ready();
+  await signIn(app);
+  buttonByText(app.admin, '2. Execute migration').click();
+  await settle(8);
+  assert.equal(executeCalls, 0, 'no preview → no execute request');
+  assert.match(app.admin.querySelector('#admin-github-result').textContent, /Run a preview first/);
+});
+
 test('the emergency recovery secret opens admin tools in memory only', async () => {
   const app = createHarness((action, data) => {
     if (action === 'adminLogin') {

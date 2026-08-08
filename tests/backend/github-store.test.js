@@ -132,6 +132,22 @@ test('execute requires a preview token, writes one atomic commit, and verify pas
   assert.equal(verify.pass, true, JSON.stringify(verify.problems));
 });
 
+test('a used or stale confirm token cannot execute again (single-use, server-enforced)', () => {
+  const c = runtime(); githubReady(c);
+  const admin = makeAdmin(c);
+  const preview = call(c, 'previewGithubMigration', { token: admin.session.token });
+  const first = call(c, 'executeGithubMigration', { token: admin.session.token, confirmToken: preview.confirmToken });
+  assert.ok(first.commit);
+  const refUpdatesAfterFirst = c.__github.refUpdates.length;
+  // Replaying the same (now consumed) token must be refused — no second migration.
+  assert.throws(() => call(c, 'executeGithubMigration', { token: admin.session.token, confirmToken: preview.confirmToken }),
+    /preview|confirm/i);
+  assert.equal(c.__github.refUpdates.length, refUpdatesAfterFirst, 'a replayed token commits nothing');
+  // A brand-new preview is required before another execute is allowed.
+  const preview2 = call(c, 'previewGithubMigration', { token: admin.session.token });
+  assert.notEqual(preview2.confirmToken, preview.confirmToken, 'each preview mints a fresh token');
+});
+
 test('member files carry the separated raid fields and never private data', () => {
   const c = runtime(); githubReady(c);
   const admin = makeAdmin(c);

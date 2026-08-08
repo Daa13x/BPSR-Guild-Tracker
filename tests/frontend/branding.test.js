@@ -49,6 +49,6 @@ test('the admin GitHub Data Storage panel exists and is inside the admin-only re
   ['getGithubStorageStatus', 'previewGithubMigration', 'executeGithubMigration', 'verifyGithubMigration', 'switchGithubStorageMode', 'syncGithubToSheets']
     .forEach(a => assert.ok(src.includes("'" + a + "'"), 'panel wires ' + a));
   // github mode switch is guarded by a confirm, and execute needs a preview token.
-  assert.match(src, /if \(!lastConfirm\)/);
+  assert.match(src, /if \(!state\.ghConfirm\)/);
   assert.match(src, /Switch live storage to GitHub/);
 });

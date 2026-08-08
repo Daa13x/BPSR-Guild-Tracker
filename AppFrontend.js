@@ -23,7 +23,12 @@
     accounts: null,
     switchingAccount: false,
     accountEpoch: 0,
-    mySealKey: ''
+    mySealKey: '',
+    // Migration preview confirm token — held on durable app state (NOT a
+    // per-render closure) so re-rendering the admin panel between Preview and
+    // Execute cannot drop it. Transient in-memory only; the backend also
+    // stores and single-use-validates it server-side.
+    ghConfirm: null
   };
   var surfaceLoadInFlight = null;
   var sealLoadInFlight = null, sealLoadKey = '';
@@ -1477,7 +1482,6 @@
     ghCard.appendChild(ghStatus);
     var ghResult = E('p'); ghResult.className = 'notice'; ghResult.id = 'admin-github-result'; ghResult.setAttribute('role', 'status');
     ghCard.appendChild(ghResult);
-    var lastConfirm = null;
 
     function ghShow(status) {
       ghStatus.textContent =
@@ -1495,22 +1499,31 @@
       return api('getGithubStorageStatus', { token: token }).then(ghShow).catch(function (f) { ghStatus.textContent = friendlyFailure(f); });
     }
     function ghNotice(msg, isError) { ghResult.className = 'notice' + (isError ? ' error' : ''); ghResult.textContent = msg; }
+    // Survive a re-render: if a preview token is already held, say so.
+    if (state.ghConfirm) ghNotice('Preview ready — you may Execute migration.');
 
     ghCard.appendChild(actionButton('Refresh status', 'admin', function () { return ghLoadStatus(); }));
     ghCard.appendChild(actionButton('1. Preview migration', 'admin', function () {
       return api('previewGithubMigration', { token: token }).then(function (r) {
-        lastConfirm = r.confirmToken;
+        state.ghConfirm = r.confirmToken;
         ghNotice('Preview: ' + r.memberCount + ' members, ' + r.warnings.length + ' warning(s). ' +
           (r.warnings.length ? 'Resolve: ' + r.warnings.slice(0, 3).join('; ') : 'No warnings — you may execute.') +
           ' (' + r.raidConversionNote + ')', r.warnings.length > 0);
+        return ghLoadStatus();   // reflect the new Last preview immediately
       });
     }));
     ghCard.appendChild(actionButton('2. Execute migration', 'admin', function () {
-      if (!lastConfirm) { ghNotice('Run a preview first.', true); return; }
+      if (!state.ghConfirm) { ghNotice('Run a preview first.', true); return; }
       if (!root.confirm('Write the full initial dataset to GitHub in one commit? Spreadsheet data is left untouched.')) return;
-      return api('executeGithubMigration', { token: token, confirmToken: lastConfirm }).then(function (r) {
-        lastConfirm = null;
+      var confirmToken = state.ghConfirm;
+      state.ghConfirm = null;   // single-use: consume before the call so a double-click cannot resend it
+      return api('executeGithubMigration', { token: token, confirmToken: confirmToken }).then(function (r) {
         ghNotice('Migrated ' + r.memberCount + ' members. Commit ' + String(r.commit).slice(0, 12) + '. Now Verify.');
+        return ghLoadStatus();
+      }).catch(function (f) {
+        // A failed execute (e.g. source changed) means the token is spent; a
+        // fresh Preview is required. Surface it and refresh status.
+        ghNotice(friendlyFailure(f), true);
         return ghLoadStatus();
       });
     }));
