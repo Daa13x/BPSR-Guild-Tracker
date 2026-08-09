@@ -174,6 +174,16 @@ function ghBranchHead_() {
   return body.object ? body.object.sha : null;
 }
 
+/**
+ * Editor-only connectivity check. Run this once after setting the Script
+ * Properties to authorise UrlFetchApp and prove this deployment can reach the
+ * configured private repository. It returns a branch SHA only; credentials
+ * and response bodies are never logged or returned.
+ */
+function testGithubConnection_() {
+  return { connected: true, branchHead: ghBranchHead_() };
+}
+
 // --- small cache for hot public reads (board / member), cleared after writes ---
 function ghCache_() { try { return CacheService.getScriptCache(); } catch (_) { return null; } }
 function ghCacheGet_(key) { var c = ghCache_(); if (!c) return null; var v = c.get(GH_CACHE_PREFIX + key); if (!v) return null; try { return JSON.parse(v); } catch (_) { return null; } }
