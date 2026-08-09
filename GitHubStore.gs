@@ -180,7 +180,7 @@ function ghBranchHead_() {
  * configured private repository. It returns a branch SHA only; credentials
  * and response bodies are never logged or returned.
  */
-function testGithubConnection_() {
+function testGithubConnection() {
   return { connected: true, branchHead: ghBranchHead_() };
 }
 
