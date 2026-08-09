@@ -126,11 +126,19 @@
   }
 
   function classConfig(member) {
-    var order = ['dps', 'tank', 'healer'], groups = { dps: [], tank: [], healer: [] };
+    // `classes` is the saved priority list: index zero is Primary and every
+    // following entry is a Secondary. Keep the role labels in that same
+    // priority order instead of always forcing DPS, Tank, Healer. For example
+    // a DPS primary followed by healer then tank renders DPS / Healer / Tank;
+    // a healer primary renders Healer before the other roles.
+    var order = [], groups = { dps: [], tank: [], healer: [] };
     (member.classes || []).forEach(function (entry) {
       var c = root.BPSR_CLASSES && root.BPSR_CLASSES.getClass(entry.classId);
       var valid = c && root.BPSR_CLASSES.validate(entry.classId, entry.buildId);
-      if (c && valid.ok && groups[c.combatRole]) groups[c.combatRole].push({ c: c, build: valid.build });
+      if (c && valid.ok && groups[c.combatRole]) {
+        if (order.indexOf(c.combatRole) < 0) order.push(c.combatRole);
+        groups[c.combatRole].push({ c: c, build: valid.build });
+      }
     });
     var html = order.map(function (role) {
       if (!groups[role].length) return '';

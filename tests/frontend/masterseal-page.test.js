@@ -130,7 +130,7 @@ test('combat-role filters use the canonical class registry', () => {
   assert.deepEqual(H.selectMembers(members, { filter: 'dps' }).map(m => m.name), ['Dps']);
 });
 
-test('Guild Members CONFIG groups saved selections by role while preserving each role order', () => {
+test('Guild Members keeps the Primary class role first, then follows secondary priority', () => {
   const html = H.classConfig({ classes: [
     { classId: 'marksman', buildId: 'falconry' }, { classId: 'beat-performer', buildId: 'concerto' },
     { classId: 'shield-knight', buildId: 'recovery' }, { classId: 'marksman', buildId: 'wildpack' }
@@ -140,7 +140,15 @@ test('Guild Members CONFIG groups saved selections by role while preserving each
   assert.doesNotMatch(html, /ms-config-chip/);
   assert.match(html, /title="Marksman · Falconry\nMarksman · Wildpack"/);
   assert.ok(html.indexOf('Marksman · Falconry') < html.indexOf('Marksman · Wildpack'));
-  assert.ok(html.indexOf('DPS') < html.indexOf('Tank') && html.indexOf('Tank') < html.indexOf('Healer'));
+  assert.ok(html.indexOf('DPS') < html.indexOf('Healer') && html.indexOf('Healer') < html.indexOf('Tank'),
+    'a DPS Primary is followed by the saved healer then tank roles');
+  const healerFirst = H.classConfig({ classes: [
+    { classId: 'verdant-oracle', buildId: 'lifebind' },
+    { classId: 'shield-knight', buildId: 'recovery' },
+    { classId: 'marksman', buildId: 'falconry' }
+  ] });
+  assert.ok(healerFirst.indexOf('Healer') < healerFirst.indexOf('Tank') && healerFirst.indexOf('Tank') < healerFirst.indexOf('DPS'),
+    'a healer Primary is followed by its saved secondary-role order');
   assert.match(H.classConfig({ classes: [] }), /—/);
 });
 
