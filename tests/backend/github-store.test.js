@@ -507,8 +507,21 @@ test('shadow mode writes to GitHub in addition to Sheets and reports failures ho
   const c = runtime(); githubReady(c);
   const admin = makeAdmin(c);
   call(c, 'switchGithubStorageMode', { token: admin.session.token, mode: 'shadow' });
+  const criticalSection = [];
+  c.LockService.getScriptLock = () => ({
+    waitLock() { criticalSection.push('acquire'); },
+    releaseLock() { criticalSection.push('release'); }
+  });
+  c.SpreadsheetApp.flush = () => criticalSection.push('flush');
+  const realShadowMirror = c.shadowMirrorMember_;
+  c.shadowMirrorMember_ = memberId => {
+    criticalSection.push('mirror');
+    return realShadowMirror(memberId);
+  };
   const res = call(c, 'masterSealUpdate', { token: admin.session.token, dungeons: {}, stimVault: { points: 15 },
     difficulty: { easy: false, hard: false, nmRaidCompleted: true, easyHardRaidCompleted: false, master: false } });
+  assert.deepEqual(criticalSection, ['acquire', 'flush', 'mirror', 'release'],
+    'the Sheet write is flushed and mirrored while one script lock excludes a concurrent sync');
   // Sheets remains authoritative (existing return shape) …
   assert.equal(res.stimVault.points, 15);
   // … and the member was mirrored to GitHub.
@@ -520,4 +533,34 @@ test('shadow mode writes to GitHub in addition to Sheets and reports failures ho
   const res2 = call(c, 'masterSealUpdate', { token: admin.session.token, dungeons: {}, stimVault: { points: 16 },
     difficulty: { easy: false, hard: false, nmRaidCompleted: true, easyHardRaidCompleted: false, master: false } });
   assert.ok(res2.shadowError, 'shadow GitHub failure is reported');
+});
+
+test('a waiting save selects the storage mode only after the transition lock is acquired', () => {
+  function exercise(startMode, modeAfterWait) {
+    const c = runtime(); githubReady(c);
+    const admin = makeAdmin(c);
+    c.__props.GITHUB_DATA_MODE = startMode;
+    const events = [];
+    c.LockService.getScriptLock = () => ({
+      waitLock() { events.push('acquire'); c.__props.GITHUB_DATA_MODE = modeAfterWait; },
+      releaseLock() { events.push('release'); }
+    });
+    c.masterSealUpdateUnlocked_ = () => { events.push('sheets'); return { path: 'sheets' }; };
+    c.githubMasterSealUpdate_ = () => { events.push('github'); return { path: 'github' }; };
+    c.SpreadsheetApp.flush = () => events.push('flush');
+    c.shadowMirrorMember_ = () => events.push('mirror');
+    const result = call(c, 'masterSealUpdate', {
+      token: admin.session.token, memberId: admin.member.memberId, dungeons: {},
+      difficulty: { easy: false, hard: false, nmRaidCompleted: false, easyHardRaidCompleted: false, master: false }
+    });
+    return { events, result };
+  }
+
+  const afterGithubSwitch = exercise('shadow', 'github');
+  assert.equal(afterGithubSwitch.result.path, 'github');
+  assert.deepEqual(afterGithubSwitch.events, ['acquire', 'github', 'release']);
+
+  const afterMaintenanceSwitch = exercise('github', 'sheets');
+  assert.equal(afterMaintenanceSwitch.result.path, 'sheets');
+  assert.deepEqual(afterMaintenanceSwitch.events, ['acquire', 'sheets', 'release']);
 });

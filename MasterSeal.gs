@@ -317,26 +317,49 @@ function myMasterSeal_(token) {
   };
 }
 
-function masterSealUpdate_(token, d, resolvedMemberId) {
+function masterSealUpdateUnlocked_(memberId, d) {
+  var changed = sealWrite_(memberId, d.dungeons);
+  var stimChanged = d.stimVault ? stimWrite_(memberId, d.stimVault) : false;
+  var difficultyChanged = d.difficulty ? sealDifficultyWrite_(memberId, d.difficulty) : false;
+  var mine = sealRowsByMember_()[String(memberId)];
+  var dungeons = sealProgress_(mine);
+  return {
+    changed: changed || stimChanged || difficultyChanged,
+    dungeons: dungeons,
+    totals: sealTotals_(dungeons),
+    stimVault: stimVaultPublic_(memberId),
+    difficulty: sealDifficultyPublic_(memberId)
+  };
+}
+
+/** Select the authority only after acquiring the same lock used by mode
+ * switches and GitHub-to-Sheets sync. The selected write then remains inside
+ * that critical section, so a waiting save always follows the new mode and a
+ * transition cannot split one save across two authorities. */
+function masterSealUpdateForStorageMode_(token, d, resolvedMemberId) {
   var memberId = resolvedMemberId ? String(resolvedMemberId) : activeMemberId_(token);
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
-    var changed = sealWrite_(memberId, d.dungeons);
-    var stimChanged = d.stimVault ? stimWrite_(memberId, d.stimVault) : false;
-    var difficultyChanged = d.difficulty ? sealDifficultyWrite_(memberId, d.difficulty) : false;
-    var mine = sealRowsByMember_()[String(memberId)];
-    var dungeons = sealProgress_(mine);
-    return {
-      changed: changed || stimChanged || difficultyChanged,
-      dungeons: dungeons,
-      totals: sealTotals_(dungeons),
-      stimVault: stimVaultPublic_(memberId),
-      difficulty: sealDifficultyPublic_(memberId)
-    };
+    var mode = storageMode_();
+    if (mode === 'github') return githubMasterSealUpdate_(memberId, d);
+    var res = masterSealUpdateUnlocked_(memberId, d);
+    if (mode === 'shadow') {
+      // Commit queued Sheet writes before rebuilding the GitHub member file.
+      SpreadsheetApp.flush();
+      try { shadowMirrorMember_(memberId); }
+      catch (e) { res.shadowError = (e && e.message) || 'shadow mirror failed'; }
+    }
+    return res;
   } finally {
     lock.releaseLock();
   }
+}
+
+// Retained for internal callers that previously invoked the Sheets helper;
+// routing is now deliberately mode-aware and serialized.
+function masterSealUpdate_(token, d, resolvedMemberId) {
+  return masterSealUpdateForStorageMode_(token, d, resolvedMemberId);
 }
 
 function adminMasterSealEdit_(token, d) {

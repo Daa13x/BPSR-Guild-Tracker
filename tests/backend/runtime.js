@@ -108,7 +108,7 @@ function runtime() {
 
   const ctx = {
     console, Date, JSON, Math, String, Number, Object, Array, RegExp, isFinite, Boolean,
-    SpreadsheetApp: { getActiveSpreadsheet: () => ss },
+    SpreadsheetApp: { getActiveSpreadsheet: () => ss, flush() {} },
     Utilities: {
       DigestAlgorithm: { SHA_256: 'sha256' },
       computeDigest: (_, s) => [...crypto.createHash('sha256').update(s).digest()],

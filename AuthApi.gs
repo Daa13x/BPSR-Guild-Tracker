@@ -767,10 +767,7 @@ function api_(a, d) {
   if (a === 'myMasterSeal') { var mid = activeMemberId_(d.token); return storageMode_() === 'github' ? githubMyMasterSeal_(mid) : myMasterSeal_(d.token); }
   if (a === 'masterSealUpdate') {
     var saveMemberId = expectedActiveMemberId_(d.token, d.memberId);
-    if (storageMode_() === 'github') return githubMasterSealUpdate_(saveMemberId, d);
-    var res = masterSealUpdate_(d.token, d, saveMemberId);
-    if (storageMode_() === 'shadow') { try { shadowMirrorMember_(saveMemberId); } catch (e) { res.shadowError = (e && e.message) || 'shadow mirror failed'; } }
-    return res;
+    return masterSealUpdateForStorageMode_(d.token, d, saveMemberId);
   }
   if (a === 'adminMasterSealEdit') return adminMasterSealEdit_(d.token, d);
   if (a === 'me') { var meId = activeMemberId_(d.token); touchMemberAccess_(meId); return profile_(meId); }
