@@ -131,6 +131,12 @@ Writes restricted to `state/` (path traversal/escape rejected); every object is 
 
 Legacy raid migration rule: **completed Raid → `easyHardRaidCompleted: true`; incomplete → `false`; `nmRaidCompleted` always defaults to `false`** and is never copied from the old combined field. Old `RaidComplete` Sheet columns are kept for rollback and no longer written.
 
+### Importing an approved workbook export
+
+`scripts/import-xlsx-data.mjs` deterministically converts an owner-provided `.xlsx` export into the exact private-repository `state/` contract. It reads the operational tracker tables and writes only the fields accepted by `GitHubStore.gs`: member display names, public member ids, class selections, main/alt relationships expressed as public ids, SV, Master Seal, and difficulty/raid state. It deliberately never emits `Members`, `Sessions`, `BackupCodes`, `LoginAttempts`, audit records, PIN/hash/salt material, private member ids, or admin notes.
+
+Run it only with the local Codex spreadsheet runtime and target a clean clone of the **private** data repository; inspect its key-only privacy scan and `git diff --check` before committing. Do not add the source workbook to Git. The importer is a recovery/bootstrap tool: normal production writes remain Apps Script → GitHub after GitHub storage is enabled.
+
 ### Rollback / token rotation
 
 Rollback: set `GITHUB_DATA_MODE` back to `sheets` (Sheets data was never deleted) and redeploy is not required to read Sheets again. Token rotation/expiry: replace `GITHUB_DATA_TOKEN` in Script Properties; no code change and no redeploy of client code needed. If a token is revoked/expired, GitHub calls fail honestly (writes report an error; the UI does not claim success).
