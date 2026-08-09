@@ -1003,6 +1003,13 @@
         // The Stim Vault floor is the SV floor, so keep the member profile and
         // the SV/Masters boards in step after saving.
         if (state.member && result.stimVault) state.member.svFloor = result.stimVault.points;
+        // Do not make the member wait for the follow-up public-board read
+        // before the two raid status indicators reflect this confirmed save.
+        // The board reload below remains the authoritative reconciliation for
+        // every viewer and for a later page refresh.
+        if (root.MS_PAGE && root.MS_PAGE.applyMemberDifficulty && state.member && result.difficulty) {
+          root.MS_PAGE.applyMemberDifficulty(state.member.characterName, result.difficulty);
+        }
         message.className = 'notice';
         message.textContent = result.changed ? 'Master Seal progress saved.' : 'No Master Seal changes.';
         renderSealMetric();

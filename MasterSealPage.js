@@ -772,7 +772,28 @@
     if (state.status === 'ready') refreshView();
   }
 
-  root.MS_PAGE = { state: state, load: load, select: select, refreshView: refreshView, resetFilters: resetFilters, setViewer: setViewer };
+  /**
+   * Apply a just-confirmed Master Seal save to the currently displayed member
+   * row. This is deliberately an optimistic *display* bridge only: the
+   * server remains the source of truth and AppFrontend immediately reloads
+   * the public board after calling this method. Keeping this tiny update here
+   * prevents the NM Raid and Easy/Hard Raid circles from appearing detached
+   * from their saved sidebar checkboxes while that read is in flight.
+   */
+  function applyMemberDifficulty(name, difficulty) {
+    if (!name || !difficulty) return false;
+    var changed = false;
+    state.members.forEach(function (member) {
+      if (member.name !== String(name)) return;
+      member.nmRaid = Boolean(difficulty.nmRaidCompleted);
+      member.easyHardRaid = Boolean(difficulty.easyHardRaidCompleted);
+      changed = true;
+    });
+    if (changed && state.status === 'ready') refreshView();
+    return changed;
+  }
+
+  root.MS_PAGE = { state: state, load: load, select: select, refreshView: refreshView, resetFilters: resetFilters, setViewer: setViewer, applyMemberDifficulty: applyMemberDifficulty };
   // The account controller reloads the board after sign-in / progress saves.
   root.loadMasterSeal = load;
 

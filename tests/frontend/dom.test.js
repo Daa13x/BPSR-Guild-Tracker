@@ -621,7 +621,10 @@ test('the Master Seal editor submits the Stim Vault and six dungeons, deriving c
     if (action === 'restore') return { member: profile(), session: session('member-token') };
     if (action === 'myMasterSeal') return seal;
     if (action === 'masterSealUpdate') {
-      return { changed: true, dungeons: seal.dungeons, totals: { ...seal.totals, totalScore: 316 }, stimVault: seal.stimVault };
+      return {
+        changed: true, dungeons: seal.dungeons, totals: { ...seal.totals, totalScore: 316 }, stimVault: seal.stimVault,
+        difficulty: { easy: false, hard: true, nmRaidCompleted: true, easyHardRaidCompleted: false, master: true }
+      };
     }
   });
   await app.ready();
@@ -665,6 +668,8 @@ test('the Master Seal editor submits the Stim Vault and six dungeons, deriving c
   assert.deepEqual(update.data.difficulty,
     { easy: false, hard: true, nmRaidCompleted: true, easyHardRaidCompleted: false, master: true },
     'NM Raid and Easy/Hard Raid are independent');
+  assert.match(fs.readFileSync('AppFrontend.js', 'utf8'), /MS_PAGE\.applyMemberDifficulty\(state\.member\.characterName, result\.difficulty\)/,
+    'a confirmed sidebar save immediately updates the matching board statuses');
   assert.match(app.seal.querySelector('.notice').textContent, /Master Seal progress saved/);
 });
 

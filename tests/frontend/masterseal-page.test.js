@@ -165,6 +165,14 @@ test('Guild Members carries both separated raid flags from the backend row', () 
   assert.equal(/raid:\s*Boolean\(row\.raid\)/.test(source), false, 'no single combined raid field');
 });
 
+test('Guild Members exposes the confirmed difficulty bridge for the saved member', () => {
+  const source = fs.readFileSync('MasterSealPage.js', 'utf8');
+  assert.match(source, /function applyMemberDifficulty\(name, difficulty\)/);
+  assert.match(source, /member\.nmRaid = Boolean\(difficulty\.nmRaidCompleted\)/);
+  assert.match(source, /member\.easyHardRaid = Boolean\(difficulty\.easyHardRaidCompleted\)/);
+  assert.match(source, /applyMemberDifficulty: applyMemberDifficulty/);
+});
+
 test('pagination slices correctly and clamps out-of-range pages', () => {
   const list = Array.from({ length: 28 }, (_, i) => ({ n: i + 1 }));
   const first = H.pageSlice(list, 1, 10);
