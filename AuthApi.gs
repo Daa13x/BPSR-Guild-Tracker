@@ -380,6 +380,28 @@ function activeMemberSession_(token, validatedSession, links, memberRows) {
 function activeMemberId_(token, validatedSession, links, memberRows) {
   return String(activeMemberSession_(token, validatedSession, links, memberRows).ActiveMemberId);
 }
+/** Resolve the authenticated active account once for a write. New clients send
+ * the member id they rendered; if another tab switched the shared session in
+ * the meantime, reject instead of silently writing the other character. */
+function expectedActiveMemberId_(token, expectedMemberId) {
+  var links = activeLinks_();
+  var s = activeMemberSession_(token, null, links);
+  var activeId = String(s.ActiveMemberId);
+  var hasExpectedId = expectedMemberId !== undefined && expectedMemberId !== null && expectedMemberId !== '';
+  // A legacy single-account client cannot race an account switch, so it can
+  // still save without this newer field. Linked-account sessions must bind the
+  // write to the member rendered by the page; omission is fail-closed.
+  if (!hasExpectedId) {
+    if (accessibleAccountIds_(s, links).length !== 1) {
+      throw apiError_('CONFLICT', 'A selected member ID is required before saving this linked account. Refresh My Progress and try again.');
+    }
+    return activeId;
+  }
+  if (String(expectedMemberId) !== activeId) {
+    throw apiError_('CONFLICT', 'The active account changed before this save. Refresh My Progress and try again.');
+  }
+  return activeId;
+}
 function writeSessionCell_(session, header, value) {
   var t = table_(AUTH_SHEETS.SESSIONS), col = colIndex_(t, header);
   if (col > 0) t.sheet.getRange(session._row, col).setValue(value);
@@ -744,9 +766,10 @@ function api_(a, d) {
   if (a === 'masterSeal') { var mvid = d.token ? activeMemberId_(d.token) : ''; return storageMode_() === 'github' ? githubMasterSealBoard_(mvid) : masterSealBoard_(mvid); }
   if (a === 'myMasterSeal') { var mid = activeMemberId_(d.token); return storageMode_() === 'github' ? githubMyMasterSeal_(mid) : myMasterSeal_(d.token); }
   if (a === 'masterSealUpdate') {
-    if (storageMode_() === 'github') return githubMasterSealUpdate_(activeMemberId_(d.token), d);
-    var res = masterSealUpdate_(d.token, d);
-    if (storageMode_() === 'shadow') { try { shadowMirrorMember_(activeMemberId_(d.token)); } catch (e) { res.shadowError = (e && e.message) || 'shadow mirror failed'; } }
+    var saveMemberId = expectedActiveMemberId_(d.token, d.memberId);
+    if (storageMode_() === 'github') return githubMasterSealUpdate_(saveMemberId, d);
+    var res = masterSealUpdate_(d.token, d, saveMemberId);
+    if (storageMode_() === 'shadow') { try { shadowMirrorMember_(saveMemberId); } catch (e) { res.shadowError = (e && e.message) || 'shadow mirror failed'; } }
     return res;
   }
   if (a === 'adminMasterSealEdit') return adminMasterSealEdit_(d.token, d);

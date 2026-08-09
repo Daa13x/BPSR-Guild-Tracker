@@ -623,7 +623,8 @@ test('the Master Seal editor submits the Stim Vault and six dungeons, deriving c
     if (action === 'masterSealUpdate') {
       return {
         changed: true, dungeons: seal.dungeons, totals: { ...seal.totals, totalScore: 316 }, stimVault: seal.stimVault,
-        difficulty: { easy: false, hard: true, nmRaidCompleted: true, easyHardRaidCompleted: false, master: true }
+        difficulty: { easy: false, hard: true, nmRaidCompleted: true, easyHardRaidCompleted: false, master: true },
+        publicMemberId: 'pm-1'
       };
     }
   });
@@ -661,6 +662,7 @@ test('the Master Seal editor submits the Stim Vault and six dungeons, deriving c
   await settle();
   const update = app.calls.find(call => call.action === 'masterSealUpdate');
   assert.equal(update.data.token, 'member-token');
+  assert.equal(update.data.memberId, 'MEM-1', 'save is bound to the member rendered when the form was submitted');
   assert.equal(Object.keys(update.data.dungeons).length, 6, 'six dungeons, Stim Vault sent separately');
   assert.deepEqual(update.data.dungeons['towering-ruin'], { cleared: true, bestMasterLevel: 5, points: 316 });
   assert.deepEqual(update.data.dungeons['sea-ringed-reef'], { cleared: false, bestMasterLevel: null, points: 0 });
@@ -668,8 +670,8 @@ test('the Master Seal editor submits the Stim Vault and six dungeons, deriving c
   assert.deepEqual(update.data.difficulty,
     { easy: false, hard: true, nmRaidCompleted: true, easyHardRaidCompleted: false, master: true },
     'NM Raid and Easy/Hard Raid are independent');
-  assert.match(fs.readFileSync('AppFrontend.js', 'utf8'), /MS_PAGE\.applyMemberDifficulty\(state\.member\.characterName, result\.difficulty\)/,
-    'a confirmed sidebar save immediately updates the matching board statuses');
+  assert.match(fs.readFileSync('AppFrontend.js', 'utf8'), /MS_PAGE\.applyMemberDifficulty\(result\.publicMemberId, result\.difficulty\)/,
+    'a confirmed sidebar save immediately updates only the stable public member id');
   assert.match(app.seal.querySelector('.notice').textContent, /Master Seal progress saved/);
 });
 

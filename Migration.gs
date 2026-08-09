@@ -307,7 +307,8 @@ function githubMyMasterSeal_(memberId) {
   var dungeons = sealProgress_(githubDungeonRows_(file));
   return {
     season: sealSeasonPublic_(), dungeons: dungeons, totals: sealTotals_(dungeons),
-    stimVault: githubStimPublic_(file, next), difficulty: githubDifficultyPublic_(file)
+    stimVault: githubStimPublic_(file, next), difficulty: githubDifficultyPublic_(file),
+    publicMemberId: file.publicMemberId
   };
 }
 
@@ -371,7 +372,8 @@ function githubMasterSealUpdate_(memberId, d) {
   var next = stimBoundary ? new Date(stimBoundary.getTime() + STIM_RESET_PERIOD_MS).toISOString() : null;
   return {
     changed: true, dungeons: dungeons2, totals: sealTotals_(dungeons2),
-    stimVault: githubStimPublic_(file, next), difficulty: githubDifficultyPublic_(file)
+    stimVault: githubStimPublic_(file, next), difficulty: githubDifficultyPublic_(file),
+    publicMemberId: file.publicMemberId
   };
 }
 

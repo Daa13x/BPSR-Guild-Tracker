@@ -993,7 +993,10 @@
           difficulty[box.value] = Boolean(box.checked);
         });
       }
-      api('masterSealUpdate', { token: memberToken(), dungeons: dungeons, stimVault: stimVault, difficulty: difficulty }).then(function (result) {
+      api('masterSealUpdate', {
+        token: memberToken(), memberId: state.member.memberId,
+        dungeons: dungeons, stimVault: stimVault, difficulty: difficulty
+      }).then(function (result) {
         if (state.mySeal) {
           state.mySeal.dungeons = result.dungeons;
           state.mySeal.totals = result.totals;
@@ -1007,8 +1010,8 @@
         // before the two raid status indicators reflect this confirmed save.
         // The board reload below remains the authoritative reconciliation for
         // every viewer and for a later page refresh.
-        if (root.MS_PAGE && root.MS_PAGE.applyMemberDifficulty && state.member && result.difficulty) {
-          root.MS_PAGE.applyMemberDifficulty(state.member.characterName, result.difficulty);
+        if (root.MS_PAGE && root.MS_PAGE.applyMemberDifficulty && result.publicMemberId && result.difficulty) {
+          root.MS_PAGE.applyMemberDifficulty(result.publicMemberId, result.difficulty);
         }
         message.className = 'notice';
         message.textContent = result.changed ? 'Master Seal progress saved.' : 'No Master Seal changes.';

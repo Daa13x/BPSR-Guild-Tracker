@@ -160,6 +160,20 @@
   function nmRaidStatus(member) { return raidStatus(member && member.nmRaid, 'NM Raid'); }
   function easyHardRaidStatus(member) { return raidStatus(member && member.easyHardRaid, 'Easy/Hard Raid'); }
 
+  /** Update one board member by the public stable id returned by the confirmed
+   * GitHub save. Display names are deliberately not identity keys. */
+  function applyDifficultyByPublicId(members, publicMemberId, difficulty) {
+    if (!Array.isArray(members) || !publicMemberId || !difficulty) return false;
+    var changed = false;
+    members.forEach(function (member) {
+      if (member.id !== String(publicMemberId)) return;
+      member.nmRaid = Boolean(difficulty.nmRaidCompleted);
+      member.easyHardRaid = Boolean(difficulty.easyHardRaidCompleted);
+      changed = true;
+    });
+    return changed;
+  }
+
   function pageSlice(list, page, size) {
     var total = Math.max(1, Math.ceil(list.length / size));
     var current = Math.min(Math.max(1, page), total);
@@ -197,6 +211,8 @@
     raidStatus: raidStatus,
     nmRaidStatus: nmRaidStatus,
     easyHardRaidStatus: easyHardRaidStatus,
+    applyDifficultyByPublicId: applyDifficultyByPublicId,
+    adaptMember: adaptMember,
     pageSlice: pageSlice,
     seasonSchedule: seasonSchedule
   };
@@ -297,7 +313,7 @@
     // Server totals stay authoritative; derived values are used only when absent.
     var total = Number(row.totalScore) || 0;
     return {
-      id: row.name, name: String(row.name), rank: Number(row.rank) || index + 1,
+      id: String(row.publicMemberId || row.name), name: String(row.name), rank: Number(row.rank) || index + 1,
       totalScore: total,
       remainingScore: row.remainingScore === undefined ? remainingScore(total, season.maxScore) : Number(row.remainingScore),
       progressPercent: row.progressPercent === undefined ? progressPercent(total, season.maxScore) : Number(row.progressPercent),
@@ -788,15 +804,8 @@
    * prevents the NM Raid and Easy/Hard Raid circles from appearing detached
    * from their saved sidebar checkboxes while that read is in flight.
    */
-  function applyMemberDifficulty(name, difficulty) {
-    if (!name || !difficulty) return false;
-    var changed = false;
-    state.members.forEach(function (member) {
-      if (member.name !== String(name)) return;
-      member.nmRaid = Boolean(difficulty.nmRaidCompleted);
-      member.easyHardRaid = Boolean(difficulty.easyHardRaidCompleted);
-      changed = true;
-    });
+  function applyMemberDifficulty(publicMemberId, difficulty) {
+    var changed = applyDifficultyByPublicId(state.members, publicMemberId, difficulty);
     if (changed && state.status === 'ready') refreshView();
     return changed;
   }

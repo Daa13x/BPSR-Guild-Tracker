@@ -29,9 +29,43 @@ test('state paths reject traversal, escapes and non-state locations', () => {
   assert.throws(() => c.ghStatePath_('/etc/passwd'), /Invalid data path/);
   assert.throws(() => c.ghStatePath_('config/board.json'), /under state/);
   assert.throws(() => c.ghStatePath_('state//x.json'), /Invalid data path/);
+  assert.throws(() => c.ghStatePath_('state/state/board.json'), /nested state\/state/);
   // A prefix is applied but the path still must be under state/.
   c.__props.GITHUB_DATA_PREFIX = 'env/prod';
   assert.equal(c.ghStatePath_('state/board.json'), 'env/prod/state/board.json');
+  // A prefix that already names the full state root must not create a second
+  // state/state source of truth. This mirrors the live production setting.
+  c.__props.GITHUB_DATA_PREFIX = 'state';
+  assert.equal(c.ghStatePath_('state/board.json'), 'state/board.json');
+  c.__props.GITHUB_DATA_PREFIX = 'env/prod/state';
+  assert.equal(c.ghStatePath_('state/board.json'), 'env/prod/state/board.json');
+  c.__props.GITHUB_DATA_PREFIX = '../state';
+  assert.throws(() => c.ghStatePath_('state/board.json'), /invalid path segment/);
+  c.__props.GITHUB_DATA_PREFIX = 'env//state';
+  assert.throws(() => c.ghStatePath_('state/board.json'), /empty path segment/);
+  c.__props.GITHUB_DATA_PREFIX = 'state/state';
+  assert.throws(() => c.ghStatePath_('state/board.json'), /nested state directory/);
+});
+
+test('a full-root prefix commits only to the canonical state tree', () => {
+  const c = runtime(); githubReady(c);
+  c.__props.GITHUB_DATA_PREFIX = 'state';
+  c.ghCommitFiles_([{ rel: 'state/board.json', json: { rows: [] } }], 'canonical root');
+  assert.ok('state/board.json' in c.__github.files);
+  assert.equal('state/state/board.json' in c.__github.files, false, 'must not create a duplicate state tree');
+});
+
+test('a divergent legacy duplicate is ignored while canonical reads and writes stay at root', () => {
+  const c = runtime(); githubReady(c);
+  c.__props.GITHUB_DATA_PREFIX = 'state';
+  c.__github.files['state/board.json'] = JSON.stringify({ marker: 'canonical' });
+  c.__github.files['state/state/board.json'] = JSON.stringify({ marker: 'legacy-duplicate' });
+  c.__github.commits[c.__github.head].files = { ...c.__github.files };
+  assert.equal(c.ghReadJson_('state/board.json').json.marker, 'canonical');
+  c.ghCommitFiles_([{ rel: 'state/board.json', json: { marker: 'new-canonical' } }], 'canonical update');
+  assert.equal(JSON.parse(c.__github.files['state/board.json']).marker, 'new-canonical');
+  assert.equal(JSON.parse(c.__github.files['state/state/board.json']).marker, 'legacy-duplicate',
+    'the retired duplicate tree is never read or written');
 });
 
 test('private fields are rejected before any write', () => {
@@ -68,13 +102,18 @@ test('commits are atomic, land the files, and never force-update the branch', ()
   c.__github.refUpdates.forEach(u => assert.equal(u.force, false, 'force must be false'));
 });
 
-test('a transient non-fast-forward conflict is retried and then succeeds', () => {
+test('a non-fast-forward conflict fails the whole stale board/member commit', () => {
   const c = runtime(); githubReady(c);
+  c.__github.files['state/board.json'] = JSON.stringify({ marker: 'newer-board' });
+  const before = c.__github.head;
   c.__github.conflictOnce = true;
-  const res = c.ghCommitFiles_([{ rel: 'state/manifest.json', json: { ok: true } }], 'retry');
-  assert.ok(res.commit);
-  assert.ok(res.attempts >= 2, 'took at least two attempts');
-  assert.equal(JSON.parse(c.__github.files['state/manifest.json']).ok, true);
+  assert.throws(() => c.ghCommitFiles_([
+    { rel: 'state/board.json', json: { marker: 'stale-board' } },
+    { rel: 'state/members/pm-1.json', json: { publicMemberId: 'pm-1', nmRaidCompleted: true } }
+  ], 'stale save'), /changed while this save|not.*applied/i);
+  assert.equal(c.__github.head, before, 'our stale commit never advances the branch');
+  assert.equal(JSON.parse(c.__github.files['state/board.json']).marker, 'newer-board', 'newer board remains intact');
+  assert.equal('state/members/pm-1.json' in c.__github.files, false, 'stale paired member write is not applied');
 });
 
 test('an unresolvable conflict throws and writes nothing', () => {
@@ -264,12 +303,62 @@ test('github mode saves progression to GitHub (member + board) and never to Shee
       difficulty: { easy: false, hard: false, nmRaidCompleted: true, easyHardRaidCompleted: false, master: false } });
   } finally { c.readTable_ = realRead; c.writePlayerRow_ = realWrite; }
   assert.equal(res.stimVault.points, 52);
+  assert.equal(res.publicMemberId, c.publicIdFor_(admin.member.memberId));
   assert.equal(res.difficulty.nmRaidCompleted, true);
   assert.equal(res.difficulty.easyHardRaidCompleted, false);
   // Persisted to GitHub and reloadable.
   const reload = call(c, 'myMasterSeal', { token: admin.session.token });
   assert.equal(reload.stimVault.points, 52);
   assert.equal(reload.difficulty.nmRaidCompleted, true);
+});
+
+test('a stale linked-account form cannot write the newly active member', () => {
+  const c = runtime(); githubReady(c);
+  const main = makeAdmin(c, 'Main Paw');
+  const alt = call(c, 'createAltAccount', { token: main.session.token, characterName: 'Alt Paw' });
+  const preview = call(c, 'previewGithubMigration', { token: main.session.token });
+  call(c, 'executeGithubMigration', { token: main.session.token, confirmToken: preview.confirmToken });
+  call(c, 'verifyGithubMigration', { token: main.session.token });
+  call(c, 'switchGithubStorageMode', { token: main.session.token, mode: 'github' });
+
+  const mainPub = c.publicIdFor_(main.member.memberId);
+  const altPub = c.publicIdFor_(alt.account.memberId);
+  const mainPath = 'state/members/' + mainPub + '.json';
+  const altPath = 'state/members/' + altPub + '.json';
+  const headBefore = c.__github.head;
+  const mainBefore = c.__github.files[mainPath];
+  const altBefore = c.__github.files[altPath];
+
+  call(c, 'switchActiveAccount', { token: main.session.token, memberId: alt.account.memberId });
+  assert.throws(() => call(c, 'masterSealUpdate', {
+    token: main.session.token, dungeons: {},
+    difficulty: { easy: false, hard: false, nmRaidCompleted: true, easyHardRaidCompleted: false, master: false }
+  }), /selected member ID is required/i);
+  assert.equal(c.__github.head, headBefore, 'omitting the selected member creates no GitHub commit');
+  assert.equal(c.__github.files[mainPath], mainBefore);
+  assert.equal(c.__github.files[altPath], altBefore, 'omitting the selected member cannot modify the active alt');
+
+  assert.throws(() => call(c, 'masterSealUpdate', {
+    token: main.session.token, memberId: main.member.memberId, dungeons: {},
+    difficulty: { easy: false, hard: false, nmRaidCompleted: true, easyHardRaidCompleted: false, master: false }
+  }), /active account changed/i);
+  assert.equal(c.__github.head, headBefore, 'conflicted stale form creates no GitHub commit');
+  assert.equal(c.__github.files[mainPath], mainBefore);
+  assert.equal(c.__github.files[altPath], altBefore, 'newly active alt is not modified by the stale main form');
+
+  const saved = call(c, 'masterSealUpdate', {
+    token: main.session.token, memberId: alt.account.memberId, dungeons: {},
+    difficulty: { easy: false, hard: false, nmRaidCompleted: true, easyHardRaidCompleted: false, master: false }
+  });
+  assert.equal(saved.publicMemberId, altPub);
+  assert.equal(c.__github.files[mainPath], mainBefore, 'correct alt save leaves the main member byte-identical');
+  const altFile = JSON.parse(c.__github.files[altPath]);
+  assert.equal(altFile.nmRaidCompleted, true);
+  assert.equal(altFile.easyHardRaidCompleted, false);
+  const board = JSON.parse(c.__github.files['state/board.json']);
+  const altRow = board.rows.find(row => row.publicMemberId === altPub);
+  assert.equal(altRow.nmRaid, true);
+  assert.equal(altRow.easyHardRaid, false);
 });
 
 test('github mode raid + Stim Vault resets use period ids and fire once', () => {

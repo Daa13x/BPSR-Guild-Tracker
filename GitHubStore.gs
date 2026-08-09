@@ -18,7 +18,6 @@
  */
 
 var GH_STATE_ROOT = 'state/';
-var GH_MAX_CONFLICT_RETRIES = 4;
 var GH_CACHE_PREFIX = 'ghstate_';
 
 /** Private keys that must never appear in any GitHub-stored object. */
@@ -45,6 +44,17 @@ function ghProps_() {
 function ghNormalisePrefix_(raw) {
   var s = String(raw || '').replace(/^\/+|\/+$/g, '');
   if (s && !/^[A-Za-z0-9._\/\-]+$/.test(s)) throw apiError_('CONFIG', 'GITHUB_DATA_PREFIX contains invalid characters.');
+  if (/\/{2,}/.test(s)) throw apiError_('CONFIG', 'GITHUB_DATA_PREFIX contains an empty path segment.');
+  var parts = s ? s.split('/') : [];
+  parts.forEach(function (part) {
+    if (!part || part === '.' || part === '..') throw apiError_('CONFIG', 'GITHUB_DATA_PREFIX contains an invalid path segment.');
+  });
+  // `state` may be supplied as the final full-root segment for backward
+  // compatibility, but it must never occur earlier or more than once.
+  var stateAt = parts.indexOf('state');
+  if (stateAt !== -1 && stateAt !== parts.length - 1) {
+    throw apiError_('CONFIG', 'GITHUB_DATA_PREFIX must not contain a nested state directory.');
+  }
   return s;
 }
 
@@ -62,8 +72,26 @@ function ghStatePath_(rel) {
   }
   if (!/^[A-Za-z0-9._\/\-]+$/.test(rel)) throw apiError_('BAD_PATH', 'Invalid data path.');
   if (rel.indexOf(GH_STATE_ROOT) !== 0) throw apiError_('BAD_PATH', 'Data may only be written under state/.');
+  if (rel.indexOf(GH_STATE_ROOT + GH_STATE_ROOT) === 0) {
+    throw apiError_('BAD_PATH', 'A nested state/state data path is not allowed.');
+  }
   var c = ghProps_();
-  return (c.prefix ? c.prefix + '/' : '') + rel;
+  if (!c.prefix) return rel;
+
+  // GITHUB_DATA_PREFIX is normally a container *above* the canonical
+  // `state/` directory (for example `env/prod`). The production project was
+  // historically configured with the full root `state`, though, while every
+  // caller also passes `state/...`. Blind concatenation therefore created a
+  // second `state/state/...` tree and made the documented canonical files
+  // stale. Accept either prefix spelling, but never duplicate the state
+  // segment. The same guard covers a scoped full root such as
+  // `env/prod/state`.
+  var stateDir = GH_STATE_ROOT.replace(/\/+$/, '');
+  var prefixEndsAtState = c.prefix === stateDir ||
+    c.prefix.slice(-(stateDir.length + 1)) === '/' + stateDir;
+  return prefixEndsAtState
+    ? c.prefix + '/' + rel.slice(GH_STATE_ROOT.length)
+    : c.prefix + '/' + rel;
 }
 
 /** Deep-scan an object for forbidden private keys. Throws if any are present. */
@@ -130,7 +158,10 @@ function ghEncodePath_(path) { return path.split('/').map(encodeURIComponent).jo
 
 /**
  * Atomically commit one or more JSON files under state/ in a single commit,
- * never force-updating the branch. Retries on a non-fast-forward conflict.
+ * never force-updating the branch. A non-fast-forward conflict is returned
+ * to the caller so the whole read → regenerate → commit operation can be
+ * retried from fresh state; reusing an already-built board would overwrite a
+ * concurrent member's newer board row.
  * `files` is [{ rel, json }]. Returns { commit, tree }.
  */
 function ghCommitFiles_(files, message) {
@@ -143,26 +174,22 @@ function ghCommitFiles_(files, message) {
     return { path: full, mode: '100644', type: 'blob', content: JSON.stringify(f.json, null, 2) + '\n' };
   });
 
-  var attempt = 0, lastConflict = null;
-  while (attempt < GH_MAX_CONFLICT_RETRIES) {
-    attempt++;
-    var ref = ghExpectOk_(ghRequest_('get', ghApiUrl_('/git/ref/heads/' + encodeURIComponent(c.branch))), 'GitHub ref read');
-    var baseSha = ref.object.sha;
-    var baseCommit = ghExpectOk_(ghRequest_('get', ghApiUrl_('/git/commits/' + baseSha)), 'GitHub base commit');
-    var tree = ghExpectOk_(ghRequest_('post', ghApiUrl_('/git/trees'), { base_tree: baseCommit.tree.sha, tree: items }), 'GitHub tree create');
-    var commit = ghExpectOk_(ghRequest_('post', ghApiUrl_('/git/commits'),
-      { message: message || 'Update tracker state', tree: tree.sha, parents: [baseSha] }), 'GitHub commit create');
-    // Update the branch WITHOUT force — a newer head makes this fail, not clobber.
-    var upd = ghRequest_('patch', ghApiUrl_('/git/refs/heads/' + encodeURIComponent(c.branch)), { sha: commit.sha, force: false });
-    if (upd.code >= 200 && upd.code < 300) {
-      ghBustCache_();
-      return { commit: commit.sha, tree: tree.sha, attempts: attempt };
-    }
-    // 422 = not a fast-forward → someone committed after our read. Retry.
-    if (upd.code === 422) { lastConflict = upd; continue; }
-    ghExpectOk_(upd, 'GitHub ref update');
+  var ref = ghExpectOk_(ghRequest_('get', ghApiUrl_('/git/ref/heads/' + encodeURIComponent(c.branch))), 'GitHub ref read');
+  var baseSha = ref.object.sha;
+  var baseCommit = ghExpectOk_(ghRequest_('get', ghApiUrl_('/git/commits/' + baseSha)), 'GitHub base commit');
+  var tree = ghExpectOk_(ghRequest_('post', ghApiUrl_('/git/trees'), { base_tree: baseCommit.tree.sha, tree: items }), 'GitHub tree create');
+  var commit = ghExpectOk_(ghRequest_('post', ghApiUrl_('/git/commits'),
+    { message: message || 'Update tracker state', tree: tree.sha, parents: [baseSha] }), 'GitHub commit create');
+  // Update the branch WITHOUT force — a newer head makes this fail, not clobber.
+  var upd = ghRequest_('patch', ghApiUrl_('/git/refs/heads/' + encodeURIComponent(c.branch)), { sha: commit.sha, force: false });
+  if (upd.code >= 200 && upd.code < 300) {
+    ghBustCache_();
+    return { commit: commit.sha, tree: tree.sha, attempts: 1 };
   }
-  throw apiError_('GITHUB_CONFLICT', 'GitHub had newer changes after ' + GH_MAX_CONFLICT_RETRIES + ' attempts; the write was NOT applied. Please retry.');
+  if (upd.code === 422) {
+    throw apiError_('GITHUB_CONFLICT', 'GitHub changed while this save was being prepared; the write was NOT applied. Please retry.');
+  }
+  ghExpectOk_(upd, 'GitHub ref update');
 }
 
 /** Current branch head commit SHA, or null when the branch/ref is unset. */

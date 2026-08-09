@@ -317,8 +317,8 @@ function myMasterSeal_(token) {
   };
 }
 
-function masterSealUpdate_(token, d) {
-  var memberId = activeMemberId_(token);
+function masterSealUpdate_(token, d, resolvedMemberId) {
+  var memberId = resolvedMemberId ? String(resolvedMemberId) : activeMemberId_(token);
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
