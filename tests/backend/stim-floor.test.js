@@ -140,8 +140,12 @@ test('legacy combined Raid data migrates into Easy/Hard on first load and never 
   const c = runtime();
   const dax = call(c, 'createAccount', { characterName: 'Dax' });
   // Simulate a pre-split record: legacy RaidComplete true, no NM/EH columns set.
+  // Date the legacy completion to *now* (the current raid week) so the on-load
+  // migration is tested in isolation. A hardcoded past date would be correctly
+  // reset by the weekly raid reset once real time crosses the next Monday
+  // boundary, which is a separate concern covered by the tests below.
   setCell(c, dax.member.memberId, 'RaidComplete', true);
-  setCell(c, dax.member.memberId, 'RaidDate', new Date('2026-08-04T00:00:00Z'));
+  setCell(c, dax.member.memberId, 'RaidDate', new Date());
   setCell(c, dax.member.memberId, 'NMRaidComplete', '');
   setCell(c, dax.member.memberId, 'EHRaidComplete', '');
   const loaded = call(c, 'myMasterSeal', { token: dax.session.token });
