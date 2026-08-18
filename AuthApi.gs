@@ -829,6 +829,16 @@ function api_(a, d) {
   if (a === 'verifyGithubMigration') return verifyGithubMigration_(d.token);
   if (a === 'switchGithubStorageMode') return switchGithubStorageMode_(d.token, d);
   if (a === 'syncGithubToSheets') return syncGithubToSheets_(d.token, d);
+  // Discord bot: a member mints a link code from the website (member session);
+  // every other action is server-to-server, authenticated by the bot secret.
+  if (a === 'createDiscordLinkCode') return createDiscordLinkCode_(d.token);
+  if (a === 'discordLink') return discordLink_(d);
+  if (a === 'discordUnlink') return discordUnlink_(d);
+  if (a === 'discordWhoami') return discordWhoami_(d);
+  if (a === 'discordProgress') return discordProgress_(d);
+  if (a === 'discordUpdate') return discordUpdate_(d);
+  if (a === 'discordAccounts') return discordAccounts_(d);
+  if (a === 'discordSwitchAccount') return discordSwitchAccount_(d);
   throw apiError_('UNKNOWN_ACTION', 'Unknown action.');
 }
 

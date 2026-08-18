@@ -132,6 +132,7 @@ function runtime() {
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'Classes.gs'), 'utf8'), ctx);
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'GitHubStore.gs'), 'utf8'), ctx);
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'Migration.gs'), 'utf8'), ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'Discord.gs'), 'utf8'), ctx);
   ctx.ensureActivePeriod_ = () => ({ ResetPeriodId: 'RP1', _row: 2, FirstUpdaterUserId: '' });
   ctx.setupSpreadsheet();
   ctx.__sheets = sheets;
