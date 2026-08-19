@@ -952,6 +952,13 @@
       grid.replaceChildren();
       // Stim Vault first — a floors value with no Master level, resets biweekly.
       grid.appendChild(sealDifficultyBoxes(mine.difficulty));
+      // A GitHub-mode myMasterSeal read may have just applied the weekly raid
+      // reset after the public board was loaded. Reconcile that confirmed
+      // response by stable public id so the table changes on this same render,
+      // rather than showing stale completed circles until another reload.
+      if (root.MS_PAGE && root.MS_PAGE.applyMemberDifficulty && mine.publicMemberId && mine.difficulty) {
+        root.MS_PAGE.applyMemberDifficulty(mine.publicMemberId, mine.difficulty);
+      }
       var stim = mine.stimVault || { points: 0, bestMasterLevel: null };
       var stimRow = sealRow('stim-vault', 'Stim Vault', stim, season.maxMasterLevel, season.maxScore,
         { withLevel: false, valueLabel: 'Floors', valueMax: stim.max || 60 });

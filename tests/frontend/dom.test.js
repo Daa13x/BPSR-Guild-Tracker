@@ -615,6 +615,47 @@ test('My Progress no longer shows the Masters progression form', async () => {
   assert.equal(app.calls.some(c => c.action === 'activities'), false, 'no activities fetch for the removed form');
 });
 
+test('a myMasterSeal weekly reset response immediately redraws both raid statuses', async () => {
+  const board = [
+    { id: 'pm-reset-member', nmRaid: true, easyHardRaid: true },
+    { id: 'pm-other-member', nmRaid: true, easyHardRaid: true }
+  ];
+  let redraws = 0;
+  const mine = {
+    ...emptySeal(),
+    publicMemberId: 'pm-reset-member',
+    difficulty: {
+      easy: false, hard: false,
+      nmRaidCompleted: false, easyHardRaidCompleted: false,
+      master: false
+    }
+  };
+  const app = createHarness((action) => {
+    if (action === 'restore') return { member: profile(), session: session('member-token') };
+    if (action === 'myMasterSeal') return mine;
+  }, {
+    globals: {
+      MS_PAGE: {
+        applyMemberDifficulty(publicMemberId, difficulty) {
+          const member = board.find(row => row.id === publicMemberId);
+          if (!member) return false;
+          member.nmRaid = Boolean(difficulty.nmRaidCompleted);
+          member.easyHardRaid = Boolean(difficulty.easyHardRaidCompleted);
+          redraws += 1;
+          return true;
+        }
+      }
+    }
+  });
+  await app.ready();
+  await signIn(app);
+
+  assert.equal(redraws, 1, 'the confirmed reset response redraws the already-loaded board immediately');
+  assert.deepEqual(board[0], { id: 'pm-reset-member', nmRaid: false, easyHardRaid: false });
+  assert.deepEqual(board[1], { id: 'pm-other-member', nmRaid: true, easyHardRaid: true },
+    'the stable public id prevents another member from being redrawn');
+});
+
 test('the Master Seal editor submits the Stim Vault and six dungeons, deriving cleared', async () => {
   const seal = emptySeal();
   const app = createHarness((action, data) => {
